@@ -68,16 +68,16 @@ export function ChatPanel() {
   }, [input, isLoading, llmConfig, code, messages, addMessage, setIsLoading, setIsSettingsOpen]);
 
   return (
-    <div className="h-full flex flex-col bg-[#1a1a2e]">
+    <div className="h-full flex flex-col bg-surface">
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-4">
-            <div className="w-10 h-10 rounded-lg bg-[#e94560]/10 flex items-center justify-center">
-              <svg className="w-5 h-5 text-[#e94560]/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+              <svg className="w-5 h-5 text-accent/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <p className="text-[#a8b2d1]/30 text-xs font-mono">
+            <p className="text-text-muted/30 text-xs font-mono">
               Ask AI to help with your sketch
             </p>
           </div>
@@ -87,8 +87,8 @@ export function ChatPanel() {
               key={msg.id}
               className={`px-3 py-2 rounded-lg text-xs leading-relaxed ${
                 msg.role === 'user'
-                  ? 'bg-[#0f3460]/40 text-[#ccd6f6] ml-6 border border-[#0f3460]/40'
-                  : 'bg-[#16213e] text-[#a8b2d1] mr-6 border border-[#0f3460]/20'
+                  ? 'bg-border/40 text-text-primary ml-6 border border-border/40'
+                  : 'bg-surface-raised text-text-muted mr-6 border border-border/20'
               }`}
             >
               <div className="whitespace-pre-wrap break-words font-mono">{msg.content}</div>
@@ -98,7 +98,7 @@ export function ChatPanel() {
                     const extracted = extractCode(msg.content);
                     if (extracted) setCode(extracted);
                   }}
-                  className="mt-2 text-[10px] font-mono bg-[#e94560]/20 hover:bg-[#e94560]/30 text-[#e94560] px-2 py-1 rounded transition-colors"
+                  className="mt-2 text-[10px] font-mono bg-accent/20 hover:bg-accent/30 text-accent px-2 py-1 rounded transition-colors"
                 >
                   Apply Code
                 </button>
@@ -109,7 +109,7 @@ export function ChatPanel() {
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="p-2 border-t border-[#0f3460]/40 shrink-0">
+      <form onSubmit={handleSubmit} className="p-2 border-t border-border/40 shrink-0">
         <div className="flex gap-2">
           <input
             type="text"
@@ -117,12 +117,12 @@ export function ChatPanel() {
             onChange={(e) => setInput(e.target.value)}
             placeholder={llmConfig.apiKey ? 'Ask AI...' : 'Set API key in settings'}
             disabled={isLoading || !llmConfig.apiKey}
-            className="flex-1 bg-[#16213e] text-[#ccd6f6] px-3 py-2 rounded-lg text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#53d8fb]/50 border border-[#0f3460]/40 placeholder:text-[#a8b2d1]/20 disabled:opacity-40"
+            className="input-field flex-1 !w-auto text-xs disabled:opacity-40"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim() || !llmConfig.apiKey}
-            className="bg-[#e94560] hover:bg-[#e94560]/80 disabled:opacity-30 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg text-xs font-mono transition-colors"
+            className="btn-primary px-3 py-2 text-xs"
           >
             {isLoading ? '...' : 'Send'}
           </button>

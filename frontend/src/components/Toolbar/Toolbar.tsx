@@ -13,23 +13,23 @@ export function Toolbar() {
   };
 
   return (
-    <div className="h-11 bg-[#16213e] border-b border-[#0f3460]/60 flex items-center px-4 gap-3 shrink-0">
+    <div className="h-11 bg-surface-raised border-b border-border/60 flex items-center px-4 gap-3 shrink-0">
       <div className="flex items-center gap-2.5">
-        <span className="text-[#e94560] font-black text-lg tracking-tight">p5</span>
-        <span className="text-[#53d8fb] text-[10px] font-mono uppercase tracking-[0.2em] opacity-70">
+        <span className="text-accent font-black text-lg tracking-tight">p5</span>
+        <span className="text-info text-[10px] font-mono uppercase tracking-[0.2em] opacity-70">
           AI Editor
         </span>
       </div>
 
-      <div className="w-px h-5 bg-[#0f3460]/60 mx-2" />
+      <div className="w-px h-5 bg-border/60 mx-2" />
 
       <div className="flex items-center gap-1.5">
         <button
           onClick={handlePlay}
-          className={`w-8 h-8 rounded-md flex items-center justify-center transition-all duration-150 ${
+          className={`btn-icon ${
             isRunning
-              ? 'bg-[#e94560]/20 text-[#e94560] hover:bg-[#e94560]/30'
-              : 'bg-[#e94560] text-white hover:bg-[#e94560]/80 shadow-[0_0_12px_rgba(233,69,96,0.3)]'
+              ? 'bg-accent/20 text-accent hover:bg-accent/30'
+              : 'bg-accent text-white hover:bg-accent/80 shadow-[0_0_12px_rgba(233,69,96,0.3)]'
           }`}
           title="Run (Alt+Enter)"
         >
@@ -40,7 +40,7 @@ export function Toolbar() {
         <button
           onClick={handleStop}
           disabled={!isRunning}
-          className="w-8 h-8 rounded-md flex items-center justify-center transition-all duration-150 bg-[#0f3460]/40 text-[#a8b2d1] hover:bg-[#0f3460]/60 disabled:opacity-30 disabled:cursor-not-allowed"
+          className="btn-icon bg-border/40 text-text-muted hover:bg-border/60 disabled:opacity-30 disabled:cursor-not-allowed"
           title="Stop"
         >
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
@@ -51,13 +51,13 @@ export function Toolbar() {
 
       <div className="flex-1" />
 
-      <span className="text-[#a8b2d1]/40 text-[10px] font-mono hidden sm:block">
+      <span className="text-text-muted/40 text-[10px] font-mono hidden sm:block">
         Alt+Enter to run
       </span>
 
       <button
         onClick={() => setIsSettingsOpen(true)}
-        className="w-8 h-8 rounded-md flex items-center justify-center text-[#a8b2d1]/60 hover:text-[#53d8fb] hover:bg-[#0f3460]/40 transition-all duration-150"
+        className="btn-icon text-text-muted/60 hover:text-info hover:bg-border/40"
         title="Settings"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

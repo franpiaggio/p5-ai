@@ -20,14 +20,14 @@ export function SettingsModal() {
         if (e.target === e.currentTarget) setIsSettingsOpen(false);
       }}
     >
-      <div className="bg-[#16213e] rounded-xl p-6 w-full max-w-md border border-[#0f3460]/60 shadow-2xl">
+      <div className="bg-surface-raised rounded-xl p-6 w-full max-w-md border border-border/60 shadow-2xl">
         <div className="flex justify-between items-center mb-5">
-          <h2 className="text-base font-mono font-semibold text-[#ccd6f6] tracking-wide">
+          <h2 className="text-base font-mono font-semibold text-text-primary tracking-wide">
             Settings
           </h2>
           <button
             onClick={() => setIsSettingsOpen(false)}
-            className="text-[#a8b2d1]/40 hover:text-[#e94560] transition-colors"
+            className="text-text-muted/40 hover:text-accent transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
@@ -37,7 +37,7 @@ export function SettingsModal() {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-[#a8b2d1]/50 mb-1.5">
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
               Provider
             </label>
             <select
@@ -46,7 +46,7 @@ export function SettingsModal() {
                 const provider = e.target.value as 'openai' | 'anthropic';
                 setLLMConfig({ provider, model: MODELS[provider][0] });
               }}
-              className="w-full bg-[#1a1a2e] text-[#ccd6f6] px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#53d8fb]/50 border border-[#0f3460]/40"
+              className="input-field"
             >
               <option value="openai">OpenAI</option>
               <option value="anthropic">Anthropic</option>
@@ -54,13 +54,13 @@ export function SettingsModal() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-[#a8b2d1]/50 mb-1.5">
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
               Model
             </label>
             <select
               value={llmConfig.model}
               onChange={(e) => setLLMConfig({ model: e.target.value })}
-              className="w-full bg-[#1a1a2e] text-[#ccd6f6] px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#53d8fb]/50 border border-[#0f3460]/40"
+              className="input-field"
             >
               {MODELS[llmConfig.provider].map((model) => (
                 <option key={model} value={model}>{model}</option>
@@ -69,7 +69,7 @@ export function SettingsModal() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-[#a8b2d1]/50 mb-1.5">
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
               API Key
             </label>
             <input
@@ -77,9 +77,9 @@ export function SettingsModal() {
               value={llmConfig.apiKey}
               onChange={(e) => setLLMConfig({ apiKey: e.target.value })}
               placeholder={`Enter ${llmConfig.provider === 'openai' ? 'OpenAI' : 'Anthropic'} key`}
-              className="w-full bg-[#1a1a2e] text-[#ccd6f6] px-3 py-2 rounded-lg text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#53d8fb]/50 border border-[#0f3460]/40 placeholder:text-[#a8b2d1]/20"
+              className="input-field"
             />
-            <p className="mt-1.5 text-[10px] font-mono text-[#a8b2d1]/30">
+            <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
               Stored locally. Sent to backend only for API calls.
             </p>
           </div>
@@ -88,7 +88,7 @@ export function SettingsModal() {
         <div className="mt-6 flex justify-end">
           <button
             onClick={() => setIsSettingsOpen(false)}
-            className="bg-[#e94560] hover:bg-[#e94560]/80 text-white px-5 py-2 rounded-lg text-sm font-mono transition-colors"
+            className="btn-primary px-5"
           >
             Done
           </button>

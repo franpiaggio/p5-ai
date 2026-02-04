@@ -2,6 +2,17 @@
 
 @import "tailwindcss";
 
+@theme {
+  --color-surface: #1a1a2e;
+  --color-surface-raised: #16213e;
+  --color-border: #0f3460;
+  --color-accent: #e94560;
+  --color-info: #53d8fb;
+  --color-warning: #f0c040;
+  --color-text-primary: #ccd6f6;
+  --color-text-muted: #a8b2d1;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -14,13 +25,13 @@ html, body, #root {
 
 body {
   font-family: 'JetBrains Mono', monospace;
-  background: #1a1a2e;
-  color: #ccd6f6;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar styling */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -31,22 +42,40 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #0f3460;
+  background: var(--color-border);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #e94560;
+  background: var(--color-accent);
 }
 
 /* Selection */
 ::selection {
-  background: #e94560;
+  background: var(--color-accent);
   color: #fff;
 }
 
-/* Select dropdown styling */
+/* Select dropdown */
 select option {
-  background: #1a1a2e;
-  color: #ccd6f6;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+/* ---------- Reusable component styles ---------- */
+
+.input-field {
+  @apply w-full bg-surface text-text-primary px-3 py-2 rounded-lg text-sm font-mono
+         border border-border/40
+         focus:outline-none focus:ring-1 focus:ring-info/50
+         placeholder:text-text-muted/20;
+}
+
+.btn-primary {
+  @apply bg-accent hover:bg-accent/80 text-white px-4 py-2 rounded-lg text-sm
+         font-mono transition-colors disabled:opacity-30 disabled:cursor-not-allowed;
+}
+
+.btn-icon {
+  @apply w-8 h-8 rounded-md flex items-center justify-center transition-all duration-150;
 }

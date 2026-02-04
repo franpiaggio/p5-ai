@@ -73,13 +73,13 @@ export function P5Preview() {
 
   if (!isRunning) {
     return (
-      <div className="h-full w-full flex flex-col items-center justify-center bg-[#1a1a2e] gap-3">
-        <div className="w-12 h-12 rounded-xl bg-[#0f3460]/40 flex items-center justify-center">
-          <svg className="w-6 h-6 text-[#53d8fb]/50" fill="currentColor" viewBox="0 0 24 24">
+      <div className="h-full w-full flex flex-col items-center justify-center bg-surface gap-3">
+        <div className="w-12 h-12 rounded-xl bg-border/40 flex items-center justify-center">
+          <svg className="w-6 h-6 text-info/50" fill="currentColor" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" />
           </svg>
         </div>
-        <span className="text-[#a8b2d1]/40 text-xs font-mono">
+        <span className="text-text-muted/40 text-xs font-mono">
           Alt+Enter to run
         </span>
       </div>
