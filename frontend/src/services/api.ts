@@ -1,6 +1,98 @@
-import type { LLMConfig, Message } from '../types';
+import type { LLMConfig, Message, SketchSummary, SketchFull } from '../types';
+import { useAuthStore } from '../store/authStore';
 
 const API_BASE = 'http://localhost:3000/api';
+
+function authHeaders(): HeadersInit {
+  const token = useAuthStore.getState().token;
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+// --- Auth ---
+
+export async function loginWithGoogle(
+  credential: string,
+): Promise<{ accessToken: string; user: { id: string; email: string; name: string; picture?: string } }> {
+  const response = await fetch(`${API_BASE}/auth/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ credential }),
+  });
+  if (!response.ok) throw new Error('Google login failed');
+  return response.json();
+}
+
+export async function loginWithCredentials(
+  username: string,
+  password: string,
+): Promise<{ accessToken: string; user: { id: string; email: string; name: string; picture?: string } }> {
+  const response = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!response.ok) throw new Error('Invalid username or password');
+  return response.json();
+}
+
+// --- Sketches ---
+
+export async function createSketch(data: {
+  title: string;
+  code: string;
+  description?: string;
+}): Promise<SketchFull> {
+  const response = await fetch(`${API_BASE}/sketches`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to save sketch');
+  return response.json();
+}
+
+export async function getSketches(): Promise<SketchSummary[]> {
+  const response = await fetch(`${API_BASE}/sketches`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch sketches');
+  return response.json();
+}
+
+export async function getSketch(id: string): Promise<SketchFull> {
+  const response = await fetch(`${API_BASE}/sketches/${id}`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to fetch sketch');
+  return response.json();
+}
+
+export async function updateSketch(
+  id: string,
+  data: { title?: string; code?: string; description?: string },
+): Promise<SketchFull> {
+  const response = await fetch(`${API_BASE}/sketches/${id}`, {
+    method: 'PUT',
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) throw new Error('Failed to update sketch');
+  return response.json();
+}
+
+export async function deleteSketch(id: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/sketches/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!response.ok) throw new Error('Failed to delete sketch');
+}
+
+// --- Chat ---
 
 export interface ChatRequest {
   message: string;

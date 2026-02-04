@@ -1,7 +1,12 @@
 import { useEditorStore } from '../../store/editorStore';
+import { useAuthStore } from '../../store/authStore';
+import { LoginButton } from './GoogleLoginButton';
+import { UserMenu } from './UserMenu';
+import { SaveButton } from './SaveButton';
 
 export function Toolbar() {
   const { isRunning, setIsRunning, runSketch, setIsSettingsOpen, clearConsoleLogs } = useEditorStore();
+  const user = useAuthStore((s) => s.user);
 
   const handlePlay = () => {
     clearConsoleLogs();
@@ -49,6 +54,8 @@ export function Toolbar() {
         </button>
       </div>
 
+      {user && <SaveButton />}
+
       <div className="flex-1" />
 
       <span className="text-text-muted/40 text-[10px] font-mono hidden sm:block">
@@ -65,6 +72,8 @@ export function Toolbar() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       </button>
+
+      {user ? <UserMenu /> : <LoginButton />}
     </div>
   );
 }

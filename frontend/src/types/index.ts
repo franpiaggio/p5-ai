@@ -19,3 +19,15 @@ export interface LLMConfig {
 }
 
 export type TabType = 'console' | 'chat';
+
+export interface SketchSummary {
+  id: string;
+  title: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SketchFull extends SketchSummary {
+  code: string;
+}

@@ -1,4 +1,7 @@
 import { Toolbar, CodeEditor, P5Preview, BottomPanel, SettingsModal, SplitPane, Panel } from './components';
+import { ProfileModal } from './components/Sketches/ProfileModal';
+import { SaveSketchModal } from './components/Sketches/SaveSketchModal';
+import { LoginModal } from './components/Auth/LoginModal';
 
 function App() {
   return (
@@ -19,6 +22,9 @@ function App() {
       </SplitPane>
 
       <SettingsModal />
+      <LoginModal />
+      <ProfileModal />
+      <SaveSketchModal />
     </div>
   );
 }

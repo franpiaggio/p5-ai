@@ -6,3 +6,5 @@ export { ConsolePanel } from './Console/ConsolePanel';
 export { ChatPanel } from './Chat/ChatPanel';
 export { SettingsModal } from './Settings/SettingsModal';
 export { PanelHeader, ResizeHandle, SplitPane, Panel } from './Layout';
+export { ProfileModal } from './Sketches/ProfileModal';
+export { SaveSketchModal } from './Sketches/SaveSketchModal';
