@@ -5,4 +5,4 @@ export { BottomPanel } from './BottomPanel/BottomPanel';
 export { ConsolePanel } from './Console/ConsolePanel';
 export { ChatPanel } from './Chat/ChatPanel';
 export { SettingsModal } from './Settings/SettingsModal';
-export { PanelHeader, ResizeHandle } from './Layout';
+export { PanelHeader, ResizeHandle, SplitPane, Panel } from './Layout';
