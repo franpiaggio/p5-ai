@@ -110,8 +110,8 @@ export const useEditorStore = create<EditorState>()(
       consoleLogs: [],
       editorErrors: [],
       llmConfig: {
-        provider: 'openai',
-        model: 'gpt-4o',
+        provider: 'demo',
+        model: 'llama-3.3-70b-versatile',
         apiKey: '',
       },
       isSettingsOpen: false,

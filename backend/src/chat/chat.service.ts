@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OpenAIProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
+import { GroqProvider } from './providers/groq.provider';
 import type { ChatRequestDto } from './dto/chat.dto';
 import type { LLMMessage } from './providers/llm.interface';
 
@@ -15,11 +16,14 @@ Rules:
 
 The user's current code is provided for context.`;
 
+const DEMO_MODEL = 'llama-3.3-70b-versatile';
+
 @Injectable()
 export class ChatService {
   constructor(
     private openaiProvider: OpenAIProvider,
     private anthropicProvider: AnthropicProvider,
+    private groqProvider: GroqProvider,
   ) {}
 
   async *streamChat(request: ChatRequestDto): AsyncGenerator<string> {
@@ -42,6 +46,15 @@ export class ChatService {
       role: 'user',
       content: request.message,
     });
+
+    if (request.config.provider === 'demo') {
+      const groqKey = process.env.GROQ_API_KEY;
+      if (!groqKey) {
+        throw new Error('Demo mode is not configured. Please use your own API key in Settings.');
+      }
+      yield* this.groqProvider.stream(messages, DEMO_MODEL, groqKey);
+      return;
+    }
 
     const provider =
       request.config.provider === 'openai'

@@ -1,8 +1,16 @@
 import { useEditorStore } from '../../store/editorStore';
+import type { LLMConfig } from '../../types';
 
-const MODELS = {
+const PROVIDER_MODELS: Record<string, string[]> = {
+  demo: ['llama-3.3-70b-versatile'],
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
   anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'],
+};
+
+const PROVIDER_LABELS: Record<string, string> = {
+  demo: 'Demo (free)',
+  openai: 'OpenAI',
+  anthropic: 'Anthropic',
 };
 
 export function SettingsModal() {
@@ -14,6 +22,8 @@ export function SettingsModal() {
   const setAutoApply = useEditorStore((s) => s.setAutoApply);
 
   if (!isSettingsOpen) return null;
+
+  const isDemo = llmConfig.provider === 'demo';
 
   return (
     <div
@@ -45,46 +55,61 @@ export function SettingsModal() {
             <select
               value={llmConfig.provider}
               onChange={(e) => {
-                const provider = e.target.value as 'openai' | 'anthropic';
-                setLLMConfig({ provider, model: MODELS[provider][0] });
+                const provider = e.target.value as LLMConfig['provider'];
+                setLLMConfig({
+                  provider,
+                  model: PROVIDER_MODELS[provider][0],
+                  apiKey: provider === 'demo' ? '' : llmConfig.apiKey,
+                });
               }}
               className="input-field"
             >
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
-              Model
-            </label>
-            <select
-              value={llmConfig.model}
-              onChange={(e) => setLLMConfig({ model: e.target.value })}
-              className="input-field"
-            >
-              {MODELS[llmConfig.provider].map((model) => (
-                <option key={model} value={model}>{model}</option>
+              {Object.entries(PROVIDER_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
               ))}
             </select>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
-              API Key
-            </label>
-            <input
-              type="password"
-              value={llmConfig.apiKey}
-              onChange={(e) => setLLMConfig({ apiKey: e.target.value })}
-              placeholder={`Enter ${llmConfig.provider === 'openai' ? 'OpenAI' : 'Anthropic'} key`}
-              className="input-field"
-            />
-            <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
-              Stored locally. Sent to backend only for API calls.
+          {isDemo && (
+            <p className="text-[10px] font-mono text-info/60 bg-info/5 border border-info/15 rounded-lg px-3 py-2">
+              Free demo mode powered by Groq + Llama 3.3 70B. No API key needed.
             </p>
-          </div>
+          )}
+
+          {!isDemo && (
+            <>
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+                  Model
+                </label>
+                <select
+                  value={llmConfig.model}
+                  onChange={(e) => setLLMConfig({ model: e.target.value })}
+                  className="input-field"
+                >
+                  {PROVIDER_MODELS[llmConfig.provider].map((model) => (
+                    <option key={model} value={model}>{model}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+                  API Key
+                </label>
+                <input
+                  type="password"
+                  value={llmConfig.apiKey}
+                  onChange={(e) => setLLMConfig({ apiKey: e.target.value })}
+                  placeholder={`Enter ${PROVIDER_LABELS[llmConfig.provider]} key`}
+                  className="input-field"
+                />
+                <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
+                  Stored locally. Sent to backend only for API calls.
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="mt-5 pt-4 border-t border-border/30">

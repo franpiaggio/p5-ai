@@ -61,7 +61,7 @@ export function ChatPanel() {
   const sendMessage = useCallback(async (userMessage: string) => {
     if (!userMessage.trim() || isLoading) return;
 
-    if (!llmConfig.apiKey) {
+    if (llmConfig.provider !== 'demo' && !llmConfig.apiKey) {
       setIsSettingsOpen(true);
       return;
     }
@@ -218,13 +218,13 @@ export function ChatPanel() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={llmConfig.apiKey ? 'Ask AI...' : 'Set API key in settings'}
-            disabled={isLoading || !llmConfig.apiKey}
+            placeholder="Ask AI..."
+            disabled={isLoading || (llmConfig.provider !== 'demo' && !llmConfig.apiKey)}
             className="input-field flex-1 !w-auto text-xs disabled:opacity-40"
           />
           <button
             type="submit"
-            disabled={isLoading || !input.trim() || !llmConfig.apiKey}
+            disabled={isLoading || !input.trim() || (llmConfig.provider !== 'demo' && !llmConfig.apiKey)}
             className="btn-primary px-3 py-2 text-xs"
           >
             {isLoading ? (

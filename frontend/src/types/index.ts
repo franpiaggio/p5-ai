@@ -21,7 +21,7 @@ export interface EditorError {
 }
 
 export interface LLMConfig {
-  provider: 'openai' | 'anthropic';
+  provider: 'demo' | 'openai' | 'anthropic';
   model: string;
   apiKey: string;
 }

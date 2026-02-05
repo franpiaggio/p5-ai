@@ -6,7 +6,7 @@ export interface MessageDto {
 }
 
 export interface LLMConfigDto {
-  provider: 'openai' | 'anthropic';
+  provider: 'openai' | 'anthropic' | 'demo';
   model: string;
   apiKey: string;
 }
