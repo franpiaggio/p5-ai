@@ -187,7 +187,10 @@ export function CodeEditor() {
   const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    editor.focus();
+    // Only focus editor if user isn't already focused on chat input
+    if (!document.querySelector('[data-chat-input]:focus')) {
+      editor.focus();
+    }
   }, []);
 
   const editorOptions = {

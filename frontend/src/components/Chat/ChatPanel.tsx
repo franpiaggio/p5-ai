@@ -59,9 +59,10 @@ export function ChatPanel() {
   }, [messages]);
 
   const sendMessage = useCallback(async (userMessage: string) => {
-    if (!userMessage.trim() || isLoading) return;
+    const store = useEditorStore.getState();
+    if (!userMessage.trim() || store.isLoading) return;
 
-    if (llmConfig.provider !== 'demo' && !llmConfig.apiKey) {
+    if (store.llmConfig.provider !== 'demo' && !store.llmConfig.apiKey) {
       setIsSettingsOpen(true);
       return;
     }
@@ -76,11 +77,12 @@ export function ChatPanel() {
       let firstChunk = true;
       addMessage({ role: 'assistant', content: '' });
 
+      const currentState = useEditorStore.getState();
       for await (const chunk of streamChat({
         message: userMessage,
-        code,
-        history: messages,
-        config: llmConfig,
+        code: currentState.code,
+        history: currentState.messages.slice(0, -1),
+        config: currentState.llmConfig,
       })) {
         if (firstChunk) {
           firstChunk = false;
@@ -98,11 +100,11 @@ export function ChatPanel() {
       }
 
       // Auto-apply: extract first JS block and stage diff review
-      const state = useEditorStore.getState();
-      if (state.autoApply && assistantContent) {
+      const finalState = useEditorStore.getState();
+      if (finalState.autoApply && assistantContent) {
         const jsCode = extractFirstJsBlock(assistantContent);
         if (jsCode) {
-          const lastMsg = state.messages[state.messages.length - 1];
+          const lastMsg = finalState.messages[finalState.messages.length - 1];
           const blockKey = `${lastMsg.id}:${simpleHash(jsCode)}`;
           useEditorStore.getState().setPendingDiff({
             code: jsCode,
@@ -133,7 +135,7 @@ export function ChatPanel() {
       setIsLoading(false);
       setIsStreaming(false);
     }
-  }, [isLoading, llmConfig, code, messages, addMessage, setIsLoading, setIsStreaming, setIsSettingsOpen]);
+  }, [addMessage, setIsLoading, setIsStreaming, setIsSettingsOpen]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -218,8 +220,9 @@ export function ChatPanel() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            data-chat-input
             placeholder="Ask AI..."
-            disabled={isLoading || (llmConfig.provider !== 'demo' && !llmConfig.apiKey)}
+            disabled={llmConfig.provider !== 'demo' && !llmConfig.apiKey}
             className="input-field flex-1 !w-auto text-xs disabled:opacity-40"
           />
           <button
