@@ -1,44 +1,79 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useEditorStore } from '../../store/editorStore';
+import { useEditorStore, simpleHash, extractFirstJsBlock } from '../../store/editorStore';
 import { streamChat } from '../../services/api';
+import { MarkdownRenderer } from './MarkdownRenderer';
+
+function TypingIndicator() {
+  return (
+    <div
+      className="bg-surface-raised text-text-muted mr-6 border border-border/20 px-3 py-2 rounded-lg text-xs"
+    >
+      <div style={{ display: 'flex', gap: '4px', padding: '4px 0' }}>
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            style={{
+              width: 5,
+              height: 5,
+              borderRadius: '50%',
+              background: 'var(--color-text-muted)',
+              display: 'inline-block',
+              animation: 'typing-bounce 1s ease-in-out infinite',
+              animationDelay: `${i * 0.15}s`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function ChatPanel() {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
   const messages = useEditorStore((s) => s.messages);
   const addMessage = useEditorStore((s) => s.addMessage);
   const code = useEditorStore((s) => s.code);
   const llmConfig = useEditorStore((s) => s.llmConfig);
   const isLoading = useEditorStore((s) => s.isLoading);
   const setIsLoading = useEditorStore((s) => s.setIsLoading);
-  const setCode = useEditorStore((s) => s.setCode);
+  const isStreaming = useEditorStore((s) => s.isStreaming);
+  const setIsStreaming = useEditorStore((s) => s.setIsStreaming);
   const setIsSettingsOpen = useEditorStore((s) => s.setIsSettingsOpen);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const extractCode = useCallback((content: string): string | null => {
-    const match = content.match(/```(?:javascript|js)?\n([\s\S]*?)```/);
-    return match ? match[1].trim() : null;
+  // Track whether user is near bottom of scroll container
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const threshold = 80;
+    isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
   }, []);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+  // Only auto-scroll if user hasn't scrolled up
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  const sendMessage = useCallback(async (userMessage: string) => {
+    if (!userMessage.trim() || isLoading) return;
 
     if (!llmConfig.apiKey) {
       setIsSettingsOpen(true);
       return;
     }
 
-    const userMessage = input.trim();
-    setInput('');
+    isNearBottomRef.current = true;
     addMessage({ role: 'user', content: userMessage });
     setIsLoading(true);
+    setIsStreaming(true);
 
     try {
       let assistantContent = '';
+      let firstChunk = true;
       addMessage({ role: 'assistant', content: '' });
 
       for await (const chunk of streamChat({
@@ -47,6 +82,10 @@ export function ChatPanel() {
         history: messages,
         config: llmConfig,
       })) {
+        if (firstChunk) {
+          firstChunk = false;
+          setIsStreaming(false);
+        }
         assistantContent += chunk;
         useEditorStore.setState((state) => {
           const newMessages = [...state.messages];
@@ -57,19 +96,71 @@ export function ChatPanel() {
           return { messages: newMessages };
         });
       }
+
+      // Auto-apply: extract first JS block and stage diff review
+      const state = useEditorStore.getState();
+      if (state.autoApply && assistantContent) {
+        const jsCode = extractFirstJsBlock(assistantContent);
+        if (jsCode) {
+          const lastMsg = state.messages[state.messages.length - 1];
+          const blockKey = `${lastMsg.id}:${simpleHash(jsCode)}`;
+          useEditorStore.getState().setPendingDiff({
+            code: jsCode,
+            messageId: lastMsg.id,
+            blockKey,
+          });
+        }
+      }
     } catch (error) {
-      addMessage({
-        role: 'assistant',
-        content: `Error: ${error instanceof Error ? error.message : 'Failed to get response'}`,
+      setIsStreaming(false);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to get response';
+      const cleanError = errorMsg
+        .replace(/^\d{3}\s*/, '')
+        .replace(/\{.*\}/s, '')
+        .trim() || 'Something went wrong. Please try again.';
+
+      useEditorStore.setState((state) => {
+        const newMessages = [...state.messages];
+        if (newMessages.length > 0 && newMessages[newMessages.length - 1].role === 'assistant') {
+          newMessages[newMessages.length - 1] = {
+            ...newMessages[newMessages.length - 1],
+            content: `Warning: ${cleanError}`,
+          };
+        }
+        return { messages: newMessages };
       });
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
     }
-  }, [input, isLoading, llmConfig, code, messages, addMessage, setIsLoading, setIsSettingsOpen]);
+  }, [isLoading, llmConfig, code, messages, addMessage, setIsLoading, setIsStreaming, setIsSettingsOpen]);
+
+  const handleSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    const msg = input.trim();
+    setInput('');
+    sendMessage(msg);
+  }, [input, sendMessage]);
+
+  // Pick up fix requests from console
+  const fixRequest = useEditorStore((s) => s.fixRequest);
+  const setFixRequest = useEditorStore((s) => s.setFixRequest);
+
+  useEffect(() => {
+    if (fixRequest && !isLoading) {
+      setFixRequest(null);
+      sendMessage(fixRequest);
+    }
+  }, [fixRequest, isLoading, sendMessage, setFixRequest]);
+
+  // Determine if the last message is an empty assistant message (waiting for first chunk)
+  const lastMessage = messages[messages.length - 1];
+  const showTypingIndicator = isStreaming && lastMessage?.role === 'assistant' && !lastMessage.content;
 
   return (
     <div className="h-full flex flex-col bg-surface">
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-4">
             <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
@@ -82,29 +173,41 @@ export function ChatPanel() {
             </p>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`px-3 py-2 rounded-lg text-xs leading-relaxed ${
-                msg.role === 'user'
-                  ? 'bg-border/40 text-text-primary ml-6 border border-border/40'
-                  : 'bg-surface-raised text-text-muted mr-6 border border-border/20'
-              }`}
-            >
-              <div className="whitespace-pre-wrap break-words font-mono">{msg.content}</div>
-              {msg.role === 'assistant' && extractCode(msg.content) && (
-                <button
-                  onClick={() => {
-                    const extracted = extractCode(msg.content);
-                    if (extracted) setCode(extracted);
-                  }}
-                  className="mt-2 text-[10px] font-mono bg-accent/20 hover:bg-accent/30 text-accent px-2 py-1 rounded transition-colors"
-                >
-                  Apply Code
-                </button>
-              )}
-            </div>
-          ))
+          messages.map((msg, idx) => {
+            // Hide the empty assistant message when showing typing indicator
+            if (showTypingIndicator && idx === messages.length - 1 && msg.role === 'assistant' && !msg.content) {
+              return <TypingIndicator key={msg.id} />;
+            }
+
+            const isUser = msg.role === 'user';
+            const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            if (isUser) {
+              return (
+                <div key={msg.id} className="flex flex-col items-end">
+                  <div className="px-3 py-2 rounded-lg rounded-br-sm text-xs leading-relaxed max-w-[85%] bg-info/15 text-text-primary border border-info/20">
+                    <div className="whitespace-pre-wrap break-words font-mono">{msg.content}</div>
+                  </div>
+                  <span className="text-[9px] font-mono text-text-muted/30 mt-0.5 px-1">{time}</span>
+                </div>
+              );
+            }
+
+            return (
+              <div key={msg.id} className="flex flex-col">
+                <div className="px-3 py-2 rounded-lg text-xs leading-relaxed bg-surface-raised text-text-muted border border-border/20">
+                  <div className="break-words font-mono markdown-chat">
+                    <MarkdownRenderer
+                      content={msg.content}
+                      messageId={msg.id}
+                      isGenerating={isLoading && idx === messages.length - 1}
+                    />
+                  </div>
+                </div>
+                <span className="text-[9px] font-mono text-text-muted/30 mt-0.5 px-1">{time}</span>
+              </div>
+            );
+          })
         )}
         <div ref={messagesEndRef} />
       </div>
@@ -124,10 +227,30 @@ export function ChatPanel() {
             disabled={isLoading || !input.trim() || !llmConfig.apiKey}
             className="btn-primary px-3 py-2 text-xs"
           >
-            {isLoading ? '...' : 'Send'}
+            {isLoading ? (
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 14,
+                  height: 14,
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  animation: 'spin 0.6s linear infinite',
+                }}
+              />
+            ) : (
+              'Send'
+            )}
           </button>
         </div>
       </form>
+
+      <style>{`
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

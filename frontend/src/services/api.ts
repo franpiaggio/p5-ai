@@ -73,7 +73,7 @@ export async function getSketch(id: string): Promise<SketchFull> {
 
 export async function updateSketch(
   id: string,
-  data: { title?: string; code?: string; description?: string },
+  data: { title?: string; code?: string; description?: string; codeHistory?: unknown[] },
 ): Promise<SketchFull> {
   const response = await fetch(`${API_BASE}/sketches/${id}`, {
     method: 'PUT',
@@ -102,42 +102,59 @@ export interface ChatRequest {
 }
 
 export async function* streamChat(request: ChatRequest): AsyncGenerator<string> {
-  const response = await fetch(`${API_BASE}/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(request),
-  });
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...request,
+        history: request.history.slice(-10),
+      }),
+    });
+  } catch (error) {
+    throw new Error('Cannot connect to backend. Is it running on localhost:3000?');
+  }
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(error || 'Failed to connect to chat API');
+    throw new Error(error || `HTTP ${response.status}: Failed to connect to chat API`);
   }
 
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('No response body');
+  if (!reader) throw new Error('No response body from server');
 
   const decoder = new TextDecoder();
+  let buffer = '';
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
 
-    const chunk = decoder.decode(value);
-    const lines = chunk.split('\n');
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
     for (const line of lines) {
       if (line.startsWith('data: ')) {
-        const data = line.slice(6);
+        const data = line.slice(6).trim();
         if (data === '[DONE]') return;
+        if (!data) continue;
+
         try {
           const parsed = JSON.parse(data);
+          if (parsed.error) {
+            throw new Error(parsed.error);
+          }
           if (parsed.content) {
             yield parsed.content;
           }
-        } catch {
-          // Skip invalid JSON
+        } catch (e) {
+          if (e instanceof SyntaxError) continue; // Skip invalid JSON
+          throw e; // Re-throw other errors
         }
       }
     }

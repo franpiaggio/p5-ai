@@ -10,6 +10,8 @@ export function SettingsModal() {
   const setIsSettingsOpen = useEditorStore((s) => s.setIsSettingsOpen);
   const llmConfig = useEditorStore((s) => s.llmConfig);
   const setLLMConfig = useEditorStore((s) => s.setLLMConfig);
+  const autoApply = useEditorStore((s) => s.autoApply);
+  const setAutoApply = useEditorStore((s) => s.setAutoApply);
 
   if (!isSettingsOpen) return null;
 
@@ -83,6 +85,50 @@ export function SettingsModal() {
               Stored locally. Sent to backend only for API calls.
             </p>
           </div>
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-border/30">
+          <label className="flex items-center justify-between cursor-pointer">
+            <div>
+              <span className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-0.5">
+                Auto-apply code
+              </span>
+              <span className="block text-[10px] font-mono text-text-muted/30">
+                Show diff review automatically when AI responds with code
+              </span>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoApply}
+              onClick={() => setAutoApply(!autoApply)}
+              className="relative shrink-0 ml-4"
+              style={{
+                width: 36,
+                height: 20,
+                borderRadius: 10,
+                background: autoApply ? 'var(--color-success, #22c55e)' : 'var(--color-border)',
+                transition: 'background 0.2s',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  width: 16,
+                  height: 16,
+                  borderRadius: '50%',
+                  background: '#fff',
+                  position: 'absolute',
+                  top: 2,
+                  left: autoApply ? 18 : 2,
+                  transition: 'left 0.2s',
+                }}
+              />
+            </button>
+          </label>
         </div>
 
         <div className="mt-6 flex justify-end">

@@ -1,12 +1,84 @@
+import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { LoginButton } from './GoogleLoginButton';
 import { UserMenu } from './UserMenu';
-import { SaveButton } from './SaveButton';
+import { FileMenu } from './FileMenu';
+import { updateSketch } from '../../services/api';
+
+function SketchTitle() {
+  const sketchTitle = useEditorStore((s) => s.sketchTitle);
+  const setSketchTitle = useEditorStore((s) => s.setSketchTitle);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(sketchTitle);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setDraft(sketchTitle);
+  }, [sketchTitle]);
+
+  useEffect(() => {
+    if (editing) {
+      inputRef.current?.select();
+    }
+  }, [editing]);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed) {
+      setSketchTitle(trimmed);
+    } else {
+      setDraft(sketchTitle);
+    }
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit();
+          if (e.key === 'Escape') {
+            setDraft(sketchTitle);
+            setEditing(false);
+          }
+        }}
+        className="bg-transparent border border-info/30 rounded px-2 py-0.5 text-xs font-mono text-text-primary outline-none focus:border-info/60 w-44"
+      />
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setEditing(true)}
+      className="group flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-border/30 transition-colors cursor-pointer max-w-[200px]"
+      title="Click to rename"
+    >
+      <span className="text-xs font-mono text-text-muted truncate">
+        {sketchTitle}
+      </span>
+      <svg
+        className="w-3 h-3 text-text-muted/30 group-hover:text-info/60 shrink-0 transition-colors"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+      </svg>
+    </button>
+  );
+}
 
 export function Toolbar() {
-  const { isRunning, setIsRunning, runSketch, setIsSettingsOpen, clearConsoleLogs } = useEditorStore();
+  const { isRunning, setIsRunning, runSketch, setIsSettingsOpen, clearConsoleLogs,
+    sketchId, sketchTitle, code, codeHistory } = useEditorStore();
   const user = useAuthStore((s) => s.user);
+  const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
+  const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
 
   const handlePlay = () => {
     clearConsoleLogs();
@@ -17,6 +89,28 @@ export function Toolbar() {
     setIsRunning(false);
   };
 
+  // Global Ctrl+S handler
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (!user) {
+          setIsLoginOpen(true);
+          return;
+        }
+        if (sketchId) {
+          updateSketch(sketchId, { title: sketchTitle, code, codeHistory }).catch(
+            (err) => console.error('Failed to save:', err),
+          );
+        } else {
+          setIsSaveSketchOpen(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [user, sketchId, sketchTitle, code, codeHistory, setIsSaveSketchOpen, setIsLoginOpen]);
+
   return (
     <div className="h-11 bg-surface-raised border-b border-border/60 flex items-center px-4 gap-3 shrink-0">
       <div className="flex items-center gap-2.5">
@@ -26,7 +120,9 @@ export function Toolbar() {
         </span>
       </div>
 
-      <div className="w-px h-5 bg-border/60 mx-2" />
+      <FileMenu />
+
+      <div className="w-px h-5 bg-border/60" />
 
       <div className="flex items-center gap-1.5">
         <button
@@ -54,7 +150,7 @@ export function Toolbar() {
         </button>
       </div>
 
-      {user && <SaveButton />}
+      <SketchTitle />
 
       <div className="flex-1" />
 

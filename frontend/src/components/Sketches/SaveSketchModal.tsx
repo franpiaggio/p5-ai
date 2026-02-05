@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useEditorStore } from '../../store/editorStore';
 import { createSketch } from '../../services/api';
@@ -7,10 +7,19 @@ export function SaveSketchModal() {
   const isSaveSketchOpen = useAuthStore((s) => s.isSaveSketchOpen);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
   const code = useEditorStore((s) => s.code);
+  const sketchTitle = useEditorStore((s) => s.sketchTitle);
+  const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // Pre-fill title from store when modal opens
+  useEffect(() => {
+    if (isSaveSketchOpen) {
+      setTitle(sketchTitle);
+    }
+  }, [isSaveSketchOpen, sketchTitle]);
 
   if (!isSaveSketchOpen) return null;
 
@@ -19,11 +28,12 @@ export function SaveSketchModal() {
     setSaving(true);
     setError('');
     try {
-      await createSketch({
+      const saved = await createSketch({
         title: title.trim(),
         code,
         description: description.trim() || undefined,
       });
+      setSketchMeta(saved.id, saved.title);
       setIsSaveSketchOpen(false);
       setTitle('');
       setDescription('');

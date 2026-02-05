@@ -19,20 +19,47 @@ export class AnthropicProvider implements LLMProvider {
         content: m.content,
       }));
 
-    const stream = client.messages.stream({
-      model,
-      max_tokens: 4096,
-      system: systemMessage?.content || '',
-      messages: chatMessages,
-    });
+    try {
+      const stream = client.messages.stream({
+        model,
+        max_tokens: 4096,
+        system: systemMessage?.content || '',
+        messages: chatMessages,
+      });
 
-    for await (const event of stream) {
-      if (
-        event.type === 'content_block_delta' &&
-        event.delta.type === 'text_delta'
-      ) {
-        yield event.delta.text;
+      for await (const event of stream) {
+        if (
+          event.type === 'content_block_delta' &&
+          event.delta.type === 'text_delta'
+        ) {
+          yield event.delta.text;
+        }
       }
+    } catch (error) {
+      if (error instanceof Anthropic.APIError) {
+        const message = this.formatError(error);
+        throw new Error(message);
+      }
+      throw error;
     }
+  }
+
+  private formatError(error: InstanceType<typeof Anthropic.APIError>): string {
+    const msg = error.message.toLowerCase();
+
+    if (msg.includes('credit balance') || msg.includes('billing')) {
+      return 'Anthropic API: Insufficient credits. Please check your billing at console.anthropic.com';
+    }
+    if (msg.includes('invalid api key') || msg.includes('authentication')) {
+      return 'Anthropic API: Invalid API key. Please check your key in Settings.';
+    }
+    if (msg.includes('rate limit')) {
+      return 'Anthropic API: Rate limit exceeded. Please wait a moment and try again.';
+    }
+    if (msg.includes('model')) {
+      return `Anthropic API: Model not available. Try a different model.`;
+    }
+
+    return `Anthropic API: ${error.message}`;
   }
 }

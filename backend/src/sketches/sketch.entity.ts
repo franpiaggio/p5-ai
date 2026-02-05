@@ -22,6 +22,16 @@ export class Sketch {
   @Column({ nullable: true })
   description: string;
 
+  @Column({ type: 'simple-json', nullable: true, default: null })
+  codeHistory: Array<{
+    id: string;
+    messageId: string;
+    timestamp: number;
+    previousCode: string;
+    newCode: string;
+    summary?: string;
+  }> | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

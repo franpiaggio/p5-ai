@@ -9,6 +9,7 @@ export function ProfileModal() {
   const setIsProfileOpen = useAuthStore((s) => s.setIsProfileOpen);
   const user = useAuthStore((s) => s.user);
   const setCode = useEditorStore((s) => s.setCode);
+  const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
   const [sketches, setSketches] = useState<SketchSummary[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -28,6 +29,10 @@ export function ProfileModal() {
     try {
       const sketch = await getSketch(id);
       setCode(sketch.code);
+      setSketchMeta(sketch.id, sketch.title);
+      if (sketch.codeHistory) {
+        useEditorStore.setState({ codeHistory: sketch.codeHistory });
+      }
       setIsProfileOpen(false);
     } catch (error) {
       console.error('Failed to load sketch:', error);

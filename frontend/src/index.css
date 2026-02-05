@@ -9,6 +9,7 @@
   --color-accent: #e94560;
   --color-info: #53d8fb;
   --color-warning: #f0c040;
+  --color-success: #22c55e;
   --color-text-primary: #ccd6f6;
   --color-text-muted: #a8b2d1;
 }
@@ -78,4 +79,14 @@ select option {
 
 .btn-icon {
   @apply w-8 h-8 rounded-md flex items-center justify-center transition-all duration-150;
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-4px); }
+}
+
+@keyframes generating-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }

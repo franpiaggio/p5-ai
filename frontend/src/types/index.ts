@@ -10,6 +10,14 @@ export interface ConsoleLog {
   type: 'log' | 'error' | 'warn' | 'info';
   message: string;
   timestamp: number;
+  line?: number;
+  column?: number;
+}
+
+export interface EditorError {
+  line: number;
+  column?: number;
+  message: string;
 }
 
 export interface LLMConfig {
@@ -18,7 +26,16 @@ export interface LLMConfig {
   apiKey: string;
 }
 
-export type TabType = 'console' | 'chat';
+export interface CodeChange {
+  id: string;
+  messageId: string;
+  timestamp: number;
+  previousCode: string;
+  newCode: string;
+  summary?: string;
+}
+
+export type TabType = 'console' | 'chat' | 'history';
 
 export interface SketchSummary {
   id: string;
@@ -30,4 +47,5 @@ export interface SketchSummary {
 
 export interface SketchFull extends SketchSummary {
   code: string;
+  codeHistory?: CodeChange[] | null;
 }
