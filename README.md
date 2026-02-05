@@ -2,6 +2,10 @@
 
 Web-based p5.js editor with integrated AI chat (OpenAI / Anthropic) for generating and modifying sketches via prompts.
 
+## Demo
+
+<video src="https://github.com/franpiaggio/p5-ai/raw/main/demo.mp4" controls width="100%"></video>
+
 ## Stack
 
 - **Frontend**: React, Vite, TypeScript, Monaco Editor, Zustand, Tailwind CSS
