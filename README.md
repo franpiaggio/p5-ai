@@ -4,7 +4,7 @@ Web-based p5.js editor with integrated AI chat (OpenAI / Anthropic) for generati
 
 ## Demo
 
-https://github.com/franpiaggio/p5-ai/raw/main/demo.mp4
+[▶ Watch demo video](https://github.com/franpiaggio/p5-ai/raw/main/demo.mp4)
 
 ## Stack
 
