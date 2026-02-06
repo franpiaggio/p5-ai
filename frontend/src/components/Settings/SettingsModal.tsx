@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import { fetchModels } from '../../services/api';
 import type { LLMConfig } from '../../types';
 
-const PROVIDER_MODELS: Record<string, string[]> = {
+const FALLBACK_MODELS: Record<string, string[]> = {
   demo: ['llama-3.3-70b-versatile'],
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
   anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'],
@@ -20,6 +22,36 @@ export function SettingsModal() {
   const setLLMConfig = useEditorStore((s) => s.setLLMConfig);
   const autoApply = useEditorStore((s) => s.autoApply);
   const setAutoApply = useEditorStore((s) => s.setAutoApply);
+
+  const [models, setModels] = useState<string[]>(FALLBACK_MODELS[llmConfig.provider] ?? []);
+  const [loadingModels, setLoadingModels] = useState(false);
+
+  useEffect(() => {
+    if (!isSettingsOpen) return;
+
+    const provider = llmConfig.provider;
+    const apiKey = llmConfig.apiKey;
+
+    if (provider !== 'demo' && !apiKey) {
+      setModels(FALLBACK_MODELS[provider] ?? []);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingModels(true);
+
+    fetchModels(provider, apiKey).then((fetched) => {
+      if (cancelled) return;
+      setModels(fetched.length > 0 ? fetched : FALLBACK_MODELS[provider] ?? []);
+      setLoadingModels(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setModels(FALLBACK_MODELS[provider] ?? []);
+      setLoadingModels(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [isSettingsOpen, llmConfig.provider, llmConfig.apiKey]);
 
   if (!isSettingsOpen) return null;
 
@@ -58,7 +90,7 @@ export function SettingsModal() {
                 const provider = e.target.value as LLMConfig['provider'];
                 setLLMConfig({
                   provider,
-                  model: PROVIDER_MODELS[provider][0],
+                  model: FALLBACK_MODELS[provider][0],
                   apiKey: provider === 'demo' ? '' : llmConfig.apiKey,
                 });
               }}
@@ -80,21 +112,6 @@ export function SettingsModal() {
             <>
               <div>
                 <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
-                  Model
-                </label>
-                <select
-                  value={llmConfig.model}
-                  onChange={(e) => setLLMConfig({ model: e.target.value })}
-                  className="input-field"
-                >
-                  {PROVIDER_MODELS[llmConfig.provider].map((model) => (
-                    <option key={model} value={model}>{model}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
                   API Key
                 </label>
                 <input
@@ -105,8 +122,26 @@ export function SettingsModal() {
                   className="input-field"
                 />
                 <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
-                  Stored locally. Sent to backend only for API calls.
+                  Stored in session only — cleared when you close the tab.
                 </p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+                  Model {loadingModels && <span className="text-accent/50">loading...</span>}
+                </label>
+                <select
+                  value={llmConfig.model}
+                  onChange={(e) => setLLMConfig({ model: e.target.value })}
+                  className="input-field"
+                >
+                  {models.map((model) => (
+                    <option key={model} value={model}>{model}</option>
+                  ))}
+                  {!models.includes(llmConfig.model) && (
+                    <option value={llmConfig.model}>{llmConfig.model}</option>
+                  )}
+                </select>
               </div>
             </>
           )}

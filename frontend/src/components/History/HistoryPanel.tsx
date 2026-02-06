@@ -99,7 +99,7 @@ export function HistoryPanel() {
   const clearCodeHistory = useEditorStore((s) => s.clearCodeHistory);
   const code = useEditorStore((s) => s.code);
   const sketchId = useEditorStore((s) => s.sketchId);
-  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
 
   const [modalEntry, setModalEntry] = useState<CodeChange | null>(null);
 
@@ -108,7 +108,7 @@ export function HistoryPanel() {
   const lastSyncRef = useRef<string>('');
 
   useEffect(() => {
-    if (!token) return;
+    if (!user) return;
 
     const serialized = JSON.stringify(codeHistory.map(({ id, messageId, timestamp, summary, newCode, previousCode }) => ({
       id, messageId, timestamp, summary, newCode, previousCode,

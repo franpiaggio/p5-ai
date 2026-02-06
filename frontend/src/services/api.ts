@@ -1,16 +1,6 @@
-import type { LLMConfig, Message, SketchSummary, SketchFull } from '../types';
-import { useAuthStore } from '../store/authStore';
+import type { LLMConfig, Message, ImageAttachment, SketchSummary, SketchFull } from '../types';
 
 const API_BASE = 'http://localhost:3000/api';
-
-function authHeaders(): HeadersInit {
-  const token = useAuthStore.getState().token;
-  const headers: HeadersInit = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-}
 
 // --- Auth ---
 
@@ -20,6 +10,7 @@ export async function loginWithGoogle(
   const response = await fetch(`${API_BASE}/auth/google`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ credential }),
   });
   if (!response.ok) throw new Error('Google login failed');
@@ -33,10 +24,18 @@ export async function loginWithCredentials(
   const response = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify({ username, password }),
   });
   if (!response.ok) throw new Error('Invalid username or password');
   return response.json();
+}
+
+export async function logoutApi(): Promise<void> {
+  await fetch(`${API_BASE}/auth/logout`, {
+    method: 'POST',
+    credentials: 'include',
+  });
 }
 
 // --- Sketches ---
@@ -48,7 +47,8 @@ export async function createSketch(data: {
 }): Promise<SketchFull> {
   const response = await fetch(`${API_BASE}/sketches`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(data),
   });
   if (!response.ok) throw new Error('Failed to save sketch');
@@ -57,7 +57,8 @@ export async function createSketch(data: {
 
 export async function getSketches(): Promise<SketchSummary[]> {
   const response = await fetch(`${API_BASE}/sketches`, {
-    headers: authHeaders(),
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
   });
   if (!response.ok) throw new Error('Failed to fetch sketches');
   return response.json();
@@ -65,7 +66,8 @@ export async function getSketches(): Promise<SketchSummary[]> {
 
 export async function getSketch(id: string): Promise<SketchFull> {
   const response = await fetch(`${API_BASE}/sketches/${id}`, {
-    headers: authHeaders(),
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
   });
   if (!response.ok) throw new Error('Failed to fetch sketch');
   return response.json();
@@ -77,7 +79,8 @@ export async function updateSketch(
 ): Promise<SketchFull> {
   const response = await fetch(`${API_BASE}/sketches/${id}`, {
     method: 'PUT',
-    headers: authHeaders(),
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
     body: JSON.stringify(data),
   });
   if (!response.ok) throw new Error('Failed to update sketch');
@@ -87,9 +90,25 @@ export async function updateSketch(
 export async function deleteSketch(id: string): Promise<void> {
   const response = await fetch(`${API_BASE}/sketches/${id}`, {
     method: 'DELETE',
-    headers: authHeaders(),
+    credentials: 'include',
   });
   if (!response.ok) throw new Error('Failed to delete sketch');
+}
+
+// --- Models ---
+
+export async function fetchModels(
+  provider: string,
+  apiKey?: string,
+): Promise<string[]> {
+  const response = await fetch(`${API_BASE}/chat/models`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ provider, apiKey }),
+  });
+  if (!response.ok) return [];
+  const data = await response.json();
+  return data.models ?? [];
 }
 
 // --- Chat ---
@@ -99,6 +118,7 @@ export interface ChatRequest {
   code: string;
   history: Message[];
   config: LLMConfig;
+  images?: ImageAttachment[];
 }
 
 export async function* streamChat(request: ChatRequest): AsyncGenerator<string> {

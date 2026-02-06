@@ -1,6 +1,12 @@
+export interface LLMImageAttachment {
+  base64: string;
+  mimeType: 'image/png' | 'image/jpeg';
+}
+
 export interface LLMMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
+  images?: LLMImageAttachment[];
 }
 
 export interface LLMProvider {
@@ -9,4 +15,6 @@ export interface LLMProvider {
     model: string,
     apiKey: string,
   ): AsyncGenerator<string>;
+
+  listModels(apiKey: string): Promise<string[]>;
 }

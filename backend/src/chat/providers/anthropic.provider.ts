@@ -4,6 +4,23 @@ import type { LLMProvider, LLMMessage } from './llm.interface';
 
 @Injectable()
 export class AnthropicProvider implements LLMProvider {
+  private buildContent(msg: LLMMessage): string | Anthropic.ContentBlockParam[] {
+    if (!msg.images?.length) return msg.content;
+    const parts: Anthropic.ContentBlockParam[] = [];
+    for (const img of msg.images) {
+      parts.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: img.mimeType,
+          data: img.base64,
+        },
+      });
+    }
+    parts.push({ type: 'text', text: msg.content });
+    return parts;
+  }
+
   async *stream(
     messages: LLMMessage[],
     model: string,
@@ -16,7 +33,7 @@ export class AnthropicProvider implements LLMProvider {
       .filter((m) => m.role !== 'system')
       .map((m) => ({
         role: m.role as 'user' | 'assistant',
-        content: m.content,
+        content: this.buildContent(m),
       }));
 
     try {
@@ -42,6 +59,14 @@ export class AnthropicProvider implements LLMProvider {
       }
       throw error;
     }
+  }
+
+  async listModels(apiKey: string): Promise<string[]> {
+    const client = new Anthropic({ apiKey });
+    const list = await client.models.list({ limit: 100 });
+    return list.data
+      .map((m) => m.id)
+      .sort();
   }
 
   private formatError(error: InstanceType<typeof Anthropic.APIError>): string {

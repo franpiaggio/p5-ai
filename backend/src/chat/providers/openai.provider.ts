@@ -4,6 +4,20 @@ import type { LLMProvider, LLMMessage } from './llm.interface';
 
 @Injectable()
 export class OpenAIProvider implements LLMProvider {
+  private buildContent(msg: LLMMessage): string | OpenAI.ChatCompletionContentPart[] {
+    if (!msg.images?.length) return msg.content;
+    const parts: OpenAI.ChatCompletionContentPart[] = [
+      { type: 'text', text: msg.content },
+    ];
+    for (const img of msg.images) {
+      parts.push({
+        type: 'image_url',
+        image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
+      });
+    }
+    return parts;
+  }
+
   async *stream(
     messages: LLMMessage[],
     model: string,
@@ -16,8 +30,8 @@ export class OpenAIProvider implements LLMProvider {
         model,
         messages: messages.map((m) => ({
           role: m.role,
-          content: m.content,
-        })),
+          content: this.buildContent(m),
+        })) as OpenAI.ChatCompletionMessageParam[],
         stream: true,
       });
 
@@ -34,6 +48,18 @@ export class OpenAIProvider implements LLMProvider {
       }
       throw error;
     }
+  }
+
+  async listModels(apiKey: string): Promise<string[]> {
+    const client = new OpenAI({ apiKey });
+    const list = await client.models.list();
+    const models: string[] = [];
+    for await (const model of list) {
+      if (model.id.startsWith('gpt-')) {
+        models.push(model.id);
+      }
+    }
+    return models.sort();
   }
 
   private formatError(error: InstanceType<typeof OpenAI.APIError>): string {

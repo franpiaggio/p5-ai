@@ -36,6 +36,11 @@ export class AuthGuard implements CanActivate {
   }
 
   private extractToken(request: Request): string | null {
+    // 1. Try httpOnly cookie first
+    const cookieToken = (request as any).cookies?.token;
+    if (cookieToken) return cookieToken;
+
+    // 2. Fall back to Authorization header
     const auth = request.headers.authorization;
     if (!auth) return null;
     const [type, token] = auth.split(' ');

@@ -277,8 +277,14 @@ export function MarkdownRenderer({ content, messageId, isGenerating }: MarkdownR
           return <li style={{ margin: '2px 0', lineHeight: '1.5' }}>{children}</li>;
         },
         a({ href, children }) {
+          const safeHref =
+            href &&
+            /^https?:\/\/|^mailto:/i.test(href)
+              ? href
+              : undefined;
+          if (!safeHref) return <span>{children}</span>;
           return (
-            <a href={href} target="_blank" rel="noopener noreferrer"
+            <a href={safeHref} target="_blank" rel="noopener noreferrer"
               style={{ color: 'var(--color-info)', textDecoration: 'underline', textUnderlineOffset: '2px' }}>
               {children}
             </a>

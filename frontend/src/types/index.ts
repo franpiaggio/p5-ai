@@ -1,8 +1,14 @@
+export interface ImageAttachment {
+  base64: string;
+  mimeType: 'image/png' | 'image/jpeg';
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  images?: ImageAttachment[];
 }
 
 export interface ConsoleLog {

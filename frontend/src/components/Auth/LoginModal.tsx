@@ -21,7 +21,7 @@ export function LoginModal() {
     setError('');
     try {
       const result = await loginWithCredentials(username.trim(), password);
-      setAuth(result.user, result.accessToken);
+      setAuth(result.user);
       handleClose();
     } catch {
       setError('Invalid username or password');
@@ -35,7 +35,7 @@ export function LoginModal() {
     setError('');
     try {
       const result = await loginWithGoogle(credentialResponse.credential);
-      setAuth(result.user, result.accessToken);
+      setAuth(result.user);
       handleClose();
     } catch {
       setError('Google login failed');

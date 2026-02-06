@@ -33,17 +33,20 @@ export class AuthService implements OnModuleInit {
   }
 
   private async seedAdminUser() {
+    const adminPassword = this.configService.get<string>('ADMIN_PASSWORD');
+    if (!adminPassword) return; // Skip seeding if not configured
+
     const exists = await this.usersService.existsByUsername('admin');
     if (exists) return;
 
-    const hashedPassword = await bcrypt.hash('admin', 10);
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
     await this.usersService.createLocalUser({
       username: 'admin',
       password: hashedPassword,
       email: 'admin@localhost',
       name: 'Admin',
     });
-    this.logger.log('Seeded default admin user (admin/admin)');
+    this.logger.log('Seeded admin user from ADMIN_PASSWORD env var');
   }
 
   async login(username: string, password: string) {

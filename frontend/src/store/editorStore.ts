@@ -249,12 +249,35 @@ export const useEditorStore = create<EditorState>()(
       name: 'p5-ai-editor',
       partialize: (state) => ({
         code: state.code,
-        llmConfig: state.llmConfig,
+        llmConfig: {
+          provider: state.llmConfig.provider,
+          model: state.llmConfig.model,
+          apiKey: '',
+        },
         codeHistory: state.codeHistory,
         autoApply: state.autoApply,
         sketchId: state.sketchId,
         sketchTitle: state.sketchTitle,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const stored = sessionStorage.getItem('p5-ai-editor-key');
+        if (stored) {
+          state.llmConfig = { ...state.llmConfig, apiKey: stored };
+        }
+      },
     }
   )
+);
+
+// Sync apiKey to sessionStorage whenever it changes
+useEditorStore.subscribe(
+  (state) => {
+    const key = state.llmConfig.apiKey;
+    if (key) {
+      sessionStorage.setItem('p5-ai-editor-key', key);
+    } else {
+      sessionStorage.removeItem('p5-ai-editor-key');
+    }
+  },
 );

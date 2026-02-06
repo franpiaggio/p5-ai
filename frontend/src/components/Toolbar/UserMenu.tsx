@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { logoutApi } from '../../services/api';
 
 export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -61,7 +62,7 @@ export function UserMenu() {
           </button>
           <button
             onClick={() => {
-              logout();
+              logoutApi().finally(() => logout());
               setIsOpen(false);
             }}
             className="w-full text-left px-3 py-2 text-xs font-mono text-text-muted hover:bg-border/30 hover:text-accent transition-colors cursor-pointer"
