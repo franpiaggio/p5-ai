@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
+import { encrypt, decrypt } from '../common/crypto.util';
 
 interface CreateGoogleUserData {
   googleId: string;
@@ -22,7 +24,12 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    private configService: ConfigService,
   ) {}
+
+  private get encryptionSecret(): string {
+    return this.configService.get<string>('JWT_SECRET')!;
+  }
 
   async findOrCreateFromGoogle(data: CreateGoogleUserData): Promise<User> {
     let user = await this.usersRepository.findOne({
@@ -57,5 +64,19 @@ export class UsersService {
 
   async existsByUsername(username: string): Promise<boolean> {
     return this.usersRepository.exists({ where: { username } });
+  }
+
+  async saveApiKey(userId: string, apiKey: string): Promise<void> {
+    const encrypted = encrypt(apiKey, this.encryptionSecret);
+    await this.usersRepository.update(userId, { encryptedApiKey: encrypted });
+  }
+
+  async getApiKey(userId: string): Promise<string | null> {
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      select: ['id', 'encryptedApiKey'],
+    });
+    if (!user?.encryptedApiKey) return null;
+    return decrypt(user.encryptedApiKey, this.encryptionSecret);
   }
 }

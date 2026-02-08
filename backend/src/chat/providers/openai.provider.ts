@@ -52,14 +52,22 @@ export class OpenAIProvider implements LLMProvider {
 
   async listModels(apiKey: string): Promise<string[]> {
     const client = new OpenAI({ apiKey });
-    const list = await client.models.list();
-    const models: string[] = [];
-    for await (const model of list) {
-      if (model.id.startsWith('gpt-')) {
-        models.push(model.id);
+    try {
+      const list = await client.models.list();
+      const models: string[] = [];
+      for await (const model of list) {
+        if (model.id.startsWith('gpt-')) {
+          models.push(model.id);
+        }
       }
+      return models.sort();
+    } catch (error) {
+      if (error instanceof OpenAI.APIError) {
+        const message = this.formatError(error);
+        throw new Error(message);
+      }
+      throw error;
     }
-    return models.sort();
   }
 
   private formatError(error: InstanceType<typeof OpenAI.APIError>): string {

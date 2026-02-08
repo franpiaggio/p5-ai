@@ -296,14 +296,28 @@ export const useEditorStore = create<EditorState>()(
   )
 );
 
-// Sync apiKey to sessionStorage whenever it changes
-useEditorStore.subscribe(
-  (state) => {
-    const key = state.llmConfig.apiKey;
-    if (key) {
-      sessionStorage.setItem('p5-ai-editor-key', key);
-    } else {
-      sessionStorage.removeItem('p5-ai-editor-key');
-    }
-  },
-);
+// Sync apiKey to sessionStorage + debounced backend save
+let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+
+useEditorStore.subscribe((state) => {
+  const key = state.llmConfig.apiKey;
+  if (key) {
+    sessionStorage.setItem('p5-ai-editor-key', key);
+  } else {
+    sessionStorage.removeItem('p5-ai-editor-key');
+  }
+
+  // Debounced save to backend if logged in
+  if (saveTimeout) clearTimeout(saveTimeout);
+  if (key) {
+    saveTimeout = setTimeout(async () => {
+      try {
+        const { useAuthStore } = await import('./authStore');
+        if (useAuthStore.getState().user) {
+          const { saveApiKey } = await import('../services/api');
+          saveApiKey(key);
+        }
+      } catch { /* ignore */ }
+    }, 1000);
+  }
+});

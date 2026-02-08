@@ -55,7 +55,7 @@ function SketchTitle() {
   return (
     <button
       onClick={() => setEditing(true)}
-      className="group flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-border/30 transition-colors cursor-pointer max-w-[200px]"
+      className="group flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-border/30 transition-colors cursor-pointer min-w-0"
       title="Click to rename"
     >
       <span className="text-xs font-mono text-text-muted truncate">
@@ -73,23 +73,57 @@ function SketchTitle() {
   );
 }
 
-export function Toolbar() {
-  const { isRunning, setIsRunning, runSketch, setIsSettingsOpen, clearConsoleLogs,
-    sketchId, sketchTitle, code, codeHistory, setPreviewCode } = useEditorStore();
-  const user = useAuthStore((s) => s.user);
-  const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
-  const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
+function PlayStopButtons() {
+  const isRunning = useEditorStore((s) => s.isRunning);
+  const setIsRunning = useEditorStore((s) => s.setIsRunning);
+  const runSketch = useEditorStore((s) => s.runSketch);
+  const clearConsoleLogs = useEditorStore((s) => s.clearConsoleLogs);
 
   const handlePlay = () => {
     clearConsoleLogs();
     runSketch();
   };
 
-  const handleStop = () => {
-    setIsRunning(false);
-  };
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        onClick={handlePlay}
+        className={`btn-icon ${
+          isRunning
+            ? 'bg-accent/20 text-accent hover:bg-accent/30'
+            : 'bg-accent text-white hover:bg-accent/80 shadow-[0_0_12px_rgba(233,69,96,0.3)]'
+        }`}
+        title="Run (Alt+Enter)"
+      >
+        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </button>
+      <button
+        onClick={() => setIsRunning(false)}
+        disabled={!isRunning}
+        className="btn-icon bg-border/40 text-text-muted hover:bg-border/60 disabled:opacity-30 disabled:cursor-not-allowed"
+        title="Stop"
+      >
+        <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <rect x="6" y="6" width="12" height="12" rx="1" />
+        </svg>
+      </button>
+    </div>
+  );
+}
 
-  // Global Ctrl+S handler
+export function Toolbar() {
+  const sketchId = useEditorStore((s) => s.sketchId);
+  const sketchTitle = useEditorStore((s) => s.sketchTitle);
+  const code = useEditorStore((s) => s.code);
+  const codeHistory = useEditorStore((s) => s.codeHistory);
+  const setPreviewCode = useEditorStore((s) => s.setPreviewCode);
+  const setIsSettingsOpen = useEditorStore((s) => s.setIsSettingsOpen);
+  const user = useAuthStore((s) => s.user);
+  const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
+  const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -113,49 +147,22 @@ export function Toolbar() {
   }, [user, sketchId, sketchTitle, code, codeHistory, setIsSaveSketchOpen, setIsLoginOpen, setPreviewCode]);
 
   return (
-    <div className="h-11 bg-surface-raised border-b border-border/60 flex items-center px-4 gap-3 shrink-0">
-      <div className="flex items-center gap-2.5">
-        <span className="text-accent font-black text-lg tracking-tight">p5</span>
-        <span className="text-info text-[10px] font-mono uppercase tracking-[0.2em] opacity-70">
-          AI Editor
-        </span>
-      </div>
+    <div className="h-11 bg-surface-raised border-b border-border/60 flex items-center px-3 md:px-4 gap-2 md:gap-3 shrink-0">
+      {/* Logo */}
+      <span className="text-accent font-black text-lg tracking-tight shrink-0">p5</span>
+      <span className="text-info text-[10px] font-mono uppercase tracking-[0.2em] opacity-70 hidden md:block">
+        AI Editor
+      </span>
 
       <FileMenu />
-
-      <div className="w-px h-5 bg-border/60" />
-
-      <div className="flex items-center gap-1.5">
-        <button
-          onClick={handlePlay}
-          className={`btn-icon ${
-            isRunning
-              ? 'bg-accent/20 text-accent hover:bg-accent/30'
-              : 'bg-accent text-white hover:bg-accent/80 shadow-[0_0_12px_rgba(233,69,96,0.3)]'
-          }`}
-          title="Run (Alt+Enter)"
-        >
-          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M8 5v14l11-7z" />
-          </svg>
-        </button>
-        <button
-          onClick={handleStop}
-          disabled={!isRunning}
-          className="btn-icon bg-border/40 text-text-muted hover:bg-border/60 disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Stop"
-        >
-          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-            <rect x="6" y="6" width="12" height="12" rx="1" />
-          </svg>
-        </button>
-      </div>
+      <div className="w-px h-5 bg-border/60 hidden md:block" />
+      <PlayStopButtons />
 
       <SketchTitle />
 
       <div className="flex-1" />
 
-      <span className="text-text-muted/40 text-[10px] font-mono hidden sm:block">
+      <span className="text-text-muted/40 text-[10px] font-mono hidden md:block">
         Alt+Enter to run
       </span>
 

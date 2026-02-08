@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { fetchModels } from '../../services/api';
+import { useAuthStore } from '../../store/authStore';
+import { fetchModels, getApiKey } from '../../services/api';
 import type { LLMConfig } from '../../types';
 
 const FALLBACK_MODELS: Record<string, string[]> = {
@@ -22,9 +23,18 @@ export function SettingsModal() {
   const setLLMConfig = useEditorStore((s) => s.setLLMConfig);
   const autoApply = useEditorStore((s) => s.autoApply);
   const setAutoApply = useEditorStore((s) => s.setAutoApply);
+  const user = useAuthStore((s) => s.user);
 
   const [models, setModels] = useState<string[]>(FALLBACK_MODELS[llmConfig.provider] ?? []);
   const [loadingModels, setLoadingModels] = useState(false);
+
+  // Auto-fetch API key from backend if logged in and key is empty (e.g. page refresh)
+  useEffect(() => {
+    if (!isSettingsOpen || !user || llmConfig.apiKey) return;
+    getApiKey().then((key) => {
+      if (key) setLLMConfig({ apiKey: key });
+    });
+  }, [isSettingsOpen, user]);
 
   useEffect(() => {
     if (!isSettingsOpen) return;
@@ -121,7 +131,9 @@ export function SettingsModal() {
                 className="input-field"
               />
               <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
-                Stored in session only — cleared when you close the tab.
+                {user
+                  ? 'Encrypted & saved to your account.'
+                  : 'Stored in session only — cleared when you close the tab.'}
               </p>
             </div>
           )}

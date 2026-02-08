@@ -21,36 +21,40 @@ export function useResizable({
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
+  const startDrag = useCallback(() => {
     isDragging.current = true;
     document.body.style.cursor = direction === 'horizontal' ? 'col-resize' : 'row-resize';
     document.body.style.userSelect = 'none';
-    // Disable pointer events on iframes during drag
     document.querySelectorAll('iframe').forEach((iframe) => {
       (iframe as HTMLIFrameElement).style.pointerEvents = 'none';
     });
   }, [direction]);
 
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current || !containerRef.current) return;
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    startDrag();
+  }, [startDrag]);
 
+  const handleTouchStart = useCallback(() => {
+    startDrag();
+  }, [startDrag]);
+
+  useEffect(() => {
+    const calcSize = (clientX: number, clientY: number) => {
+      if (!isDragging.current || !containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       let newSize: number;
-
       if (direction === 'horizontal') {
-        newSize = ((e.clientX - rect.left) / rect.width) * 100;
+        newSize = ((clientX - rect.left) / rect.width) * 100;
       } else {
-        newSize = ((e.clientY - rect.top) / rect.height) * 100;
+        newSize = ((clientY - rect.top) / rect.height) * 100;
       }
-
       newSize = Math.min(Math.max(newSize, minSize), maxSize);
       setSize(newSize);
       onResize?.(newSize);
     };
 
-    const handleMouseUp = () => {
+    const stopDrag = () => {
       if (!isDragging.current) return;
       isDragging.current = false;
       document.body.style.cursor = '';
@@ -60,14 +64,24 @@ export function useResizable({
       });
     };
 
+    const handleMouseMove = (e: MouseEvent) => calcSize(e.clientX, e.clientY);
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      calcSize(e.touches[0].clientX, e.touches[0].clientY);
+    };
+
     document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mouseup', stopDrag);
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', stopDrag);
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('mouseup', stopDrag);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', stopDrag);
     };
   }, [direction, minSize, maxSize, onResize]);
 
-  return { size, containerRef, handleMouseDown };
+  return { size, containerRef, handleMouseDown, handleTouchStart };
 }

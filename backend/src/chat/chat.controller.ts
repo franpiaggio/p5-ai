@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Res } from '@nestjs/common';
+import { Controller, Post, Body, Res, HttpException, HttpStatus } from '@nestjs/common';
 import type { Response } from 'express';
 import { ChatService } from './chat.service';
 import { ChatRequestDto, ListModelsDto } from './dto/chat.dto';
@@ -9,11 +9,16 @@ export class ChatController {
 
   @Post('models')
   async listModels(@Body() body: ListModelsDto): Promise<{ models: string[] }> {
-    const models = await this.chatService.listModels(
-      body.provider,
-      body.apiKey || '',
-    );
-    return { models };
+    try {
+      const models = await this.chatService.listModels(
+        body.provider,
+        body.apiKey || '',
+      );
+      return { models };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to list models';
+      throw new HttpException({ error: message }, HttpStatus.BAD_REQUEST);
+    }
   }
 
   @Post()

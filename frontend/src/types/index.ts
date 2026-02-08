@@ -43,7 +43,7 @@ export interface CodeChange {
   isRestore?: boolean;
 }
 
-export type TabType = 'console' | 'chat' | 'history';
+export type TabType = 'console' | 'chat' | 'history' | 'code';
 
 export interface SketchSummary {
   id: string;

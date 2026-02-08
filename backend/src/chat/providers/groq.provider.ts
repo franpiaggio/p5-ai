@@ -64,11 +64,22 @@ export class GroqProvider implements LLMProvider {
       apiKey,
       baseURL: 'https://api.groq.com/openai/v1',
     });
-    const list = await client.models.list();
-    const models: string[] = [];
-    for await (const model of list) {
-      models.push(model.id);
+    try {
+      const list = await client.models.list();
+      const models: string[] = [];
+      for await (const model of list) {
+        models.push(model.id);
+      }
+      return models.sort();
+    } catch (error) {
+      if (error instanceof OpenAI.APIError) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes('invalid api key') || msg.includes('authentication')) {
+          throw new Error('Groq API: Invalid API key. Please check server configuration.');
+        }
+        throw new Error(`Groq API: ${error.message}`);
+      }
+      throw error;
     }
-    return models.sort();
   }
 }

@@ -38,6 +38,30 @@ export async function logoutApi(): Promise<void> {
   });
 }
 
+// --- API Key ---
+
+export async function saveApiKey(apiKey: string): Promise<void> {
+  await fetch(`${API_BASE}/users/me/api-key`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ apiKey }),
+  });
+}
+
+export async function getApiKey(): Promise<string | null> {
+  try {
+    const response = await fetch(`${API_BASE}/users/me/api-key`, {
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.apiKey ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // --- Sketches ---
 
 export async function createSketch(data: {
@@ -115,10 +139,7 @@ export async function fetchModels(
 
 export async function checkBackendHealth(): Promise<boolean> {
   try {
-    const res = await fetch(`${API_BASE}/chat/models`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider: 'demo' }),
+    const res = await fetch(`${API_BASE}/health`, {
       signal: AbortSignal.timeout(3000),
     });
     return res.ok;

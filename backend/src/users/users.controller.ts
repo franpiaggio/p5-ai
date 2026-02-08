@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Put,
+  Body,
   UseGuards,
   NotFoundException,
 } from '@nestjs/common';
@@ -24,5 +26,20 @@ export class UsersController {
       picture: user.picture,
       createdAt: user.createdAt,
     };
+  }
+
+  @Put('me/api-key')
+  async saveApiKey(
+    @CurrentUser() currentUser: { sub: string },
+    @Body('apiKey') apiKey: string,
+  ) {
+    await this.usersService.saveApiKey(currentUser.sub, apiKey);
+    return { ok: true };
+  }
+
+  @Get('me/api-key')
+  async getApiKey(@CurrentUser() currentUser: { sub: string }) {
+    const apiKey = await this.usersService.getApiKey(currentUser.sub);
+    return { apiKey };
   }
 }

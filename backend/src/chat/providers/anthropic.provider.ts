@@ -63,10 +63,18 @@ export class AnthropicProvider implements LLMProvider {
 
   async listModels(apiKey: string): Promise<string[]> {
     const client = new Anthropic({ apiKey });
-    const list = await client.models.list({ limit: 100 });
-    return list.data
-      .map((m) => m.id)
-      .sort();
+    try {
+      const list = await client.models.list({ limit: 100 });
+      return list.data
+        .map((m) => m.id)
+        .sort();
+    } catch (error) {
+      if (error instanceof Anthropic.APIError) {
+        const message = this.formatError(error);
+        throw new Error(message);
+      }
+      throw error;
+    }
   }
 
   private formatError(error: InstanceType<typeof Anthropic.APIError>): string {

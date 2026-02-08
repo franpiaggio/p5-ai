@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '../../store/authStore';
-import { loginWithCredentials, loginWithGoogle } from '../../services/api';
+import { useEditorStore } from '../../store/editorStore';
+import { loginWithCredentials, loginWithGoogle, getApiKey } from '../../services/api';
 
 export function LoginModal() {
   const isLoginOpen = useAuthStore((s) => s.isLoginOpen);
@@ -11,6 +12,12 @@ export function LoginModal() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const restoreApiKey = async () => {
+    if (useEditorStore.getState().llmConfig.apiKey) return;
+    const key = await getApiKey();
+    if (key) useEditorStore.getState().setLLMConfig({ apiKey: key });
+  };
 
   if (!isLoginOpen) return null;
 
@@ -23,6 +30,7 @@ export function LoginModal() {
       const result = await loginWithCredentials(username.trim(), password);
       setAuth(result.user);
       handleClose();
+      restoreApiKey();
     } catch {
       setError('Invalid username or password');
     } finally {
@@ -37,6 +45,7 @@ export function LoginModal() {
       const result = await loginWithGoogle(credentialResponse.credential);
       setAuth(result.user);
       handleClose();
+      restoreApiKey();
     } catch {
       setError('Google login failed');
     }
