@@ -18,12 +18,15 @@ The user's current code is provided for context.`;
 
 const DEMO_MODEL = 'llama-3.3-70b-versatile';
 
-// PNG: 89 50 4E 47 0D 0A 1A 0A
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-// JPEG: FF D8 FF
 const JPEG_MAGIC = [0xff, 0xd8, 0xff];
 
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB decoded
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const MAX_TOTAL_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_TOTAL_IMAGES = 12;
+const MAX_HISTORY_MESSAGES = 20;
+const MAX_HISTORY_TEXT_BYTES = 250_000;
+const MAX_MESSAGE_TEXT_BYTES = 100_000;
 
 @Injectable()
 export class ChatService {
@@ -33,11 +36,26 @@ export class ChatService {
     private groqProvider: GroqProvider,
   ) {}
 
-  private validateImages(images?: ImageAttachmentDto[]) {
-    if (!images?.length) return;
+  private estimateBase64Bytes(base64: string): number {
+    const normalized = base64.replace(/\s/g, '');
+    return Math.floor((normalized.length * 3) / 4);
+  }
+
+  private validateAndCountImages(images: ImageAttachmentDto[] | undefined, context: string): number {
+    if (!images?.length) return 0;
+
+    let totalBytes = 0;
 
     for (const img of images) {
-      // Decode and check size
+      const estimated = this.estimateBase64Bytes(img.base64);
+      totalBytes += estimated;
+
+      if (estimated > MAX_IMAGE_BYTES) {
+        throw new BadRequestException(
+          `Image in ${context} exceeds maximum size of ${MAX_IMAGE_BYTES / 1024 / 1024}MB`,
+        );
+      }
+
       let buf: Buffer;
       try {
         buf = Buffer.from(img.base64, 'base64');
@@ -47,11 +65,10 @@ export class ChatService {
 
       if (buf.length > MAX_IMAGE_BYTES) {
         throw new BadRequestException(
-          `Image exceeds maximum size of ${MAX_IMAGE_BYTES / 1024 / 1024}MB`,
+          `Image in ${context} exceeds maximum size of ${MAX_IMAGE_BYTES / 1024 / 1024}MB`,
         );
       }
 
-      // Validate magic bytes match claimed mimeType
       if (img.mimeType === 'image/png') {
         const valid = PNG_MAGIC.every((b, i) => buf[i] === b);
         if (!valid) {
@@ -68,14 +85,62 @@ export class ChatService {
         }
       }
     }
+
+    return totalBytes;
+  }
+
+  private enforceImageBudgets(request: ChatRequestDto): void {
+    let totalBytes = 0;
+    let totalCount = request.images?.length ?? 0;
+
+    totalBytes += this.validateAndCountImages(request.images, 'current message');
+
+    for (const msg of request.history) {
+      totalBytes += this.validateAndCountImages(msg.images, 'history');
+      totalCount += msg.images?.length ?? 0;
+    }
+
+    if (totalCount > MAX_TOTAL_IMAGES) {
+      throw new BadRequestException(`Too many images provided (${totalCount}). Max ${MAX_TOTAL_IMAGES} per request including history.`);
+    }
+
+    if (totalBytes > MAX_TOTAL_IMAGE_BYTES) {
+      throw new BadRequestException(
+        `Images exceed maximum combined size of ${MAX_TOTAL_IMAGE_BYTES / 1024 / 1024}MB`,
+      );
+    }
+  }
+
+  private clampHistory(history: ChatRequestDto['history']): ChatRequestDto['history'] {
+    if (!history?.length) return [];
+
+    const capped = history.slice(-MAX_HISTORY_MESSAGES);
+    const kept: typeof capped = [];
+    let textBytes = 0;
+
+    for (let i = capped.length - 1; i >= 0; i--) {
+      const msg = capped[i];
+      const content = msg.content.slice(0, MAX_MESSAGE_TEXT_BYTES);
+      const contentBytes = Buffer.byteLength(content, 'utf8');
+
+      if (contentBytes > MAX_MESSAGE_TEXT_BYTES) {
+        throw new BadRequestException('Message content is too large');
+      }
+
+      if (textBytes + contentBytes > MAX_HISTORY_TEXT_BYTES) {
+        continue;
+      }
+
+      kept.push({ ...msg, content });
+      textBytes += contentBytes;
+    }
+
+    return kept.reverse();
   }
 
   async *streamChat(request: ChatRequestDto): AsyncGenerator<string> {
-    // Validate images on current message and history
-    this.validateImages(request.images);
-    for (const msg of request.history) {
-      this.validateImages(msg.images);
-    }
+    const history = this.clampHistory(request.history);
+    this.enforceImageBudgets({ ...request, history });
 
     const messages: LLMMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -85,7 +150,7 @@ export class ChatService {
       },
     ];
 
-    for (const msg of request.history) {
+    for (const msg of history) {
       messages.push({
         role: msg.role,
         content: msg.content,

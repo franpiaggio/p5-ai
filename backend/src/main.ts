@@ -2,12 +2,25 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { json } from 'express';
+import compression from 'compression';
+import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.use(json({ limit: '10mb' }));
+
+  const baseJsonLimit = process.env.JSON_LIMIT ?? '256kb';
+  const chatJsonLimit = process.env.CHAT_JSON_LIMIT ?? '12mb';
+
+  app.use(helmet());
+  app.use(compression());
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/chat')) return next();
+    return json({ limit: baseJsonLimit })(req, res, next);
+  });
+  app.use('/api/chat', json({ limit: chatJsonLimit }));
   app.use(cookieParser());
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -15,12 +28,17 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
   app.enableCors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
+      .split(',')
+      .map((o) => o.trim())
+      .filter(Boolean),
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
+
   await app.listen(process.env.PORT ?? 3000);
 }
 bootstrap();
