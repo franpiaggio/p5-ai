@@ -16,5 +16,8 @@ dist-ssr
 .env
 .env.*
 
+# Internal docs
+internal_docs/
+
 # Claude Code
 .claude/
