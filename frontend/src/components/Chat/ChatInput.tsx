@@ -177,6 +177,10 @@ export function ChatInput({ onSend, isLoading, disabled, showAttach, children }:
             data-chat-input
             placeholder="Ask AI..."
             disabled={disabled}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             className="input-field flex-1 !w-auto text-xs disabled:opacity-40"
           />
           <button
