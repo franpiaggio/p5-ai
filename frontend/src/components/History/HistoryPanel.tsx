@@ -131,7 +131,7 @@ export function HistoryPanel() {
     return () => {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
     };
-  }, [codeHistory, code, token, sketchId]);
+  }, [codeHistory, code, user, sketchId]);
 
   const handleRestore = useCallback(
     (id: string) => {
@@ -214,7 +214,7 @@ export function HistoryPanel() {
         <div className="px-2 py-1.5 border-t border-border/40 flex items-center justify-between shrink-0">
           <span className="text-[10px] font-mono text-text-muted/30">
             {sorted.length} {sorted.length === 1 ? 'change' : 'changes'}
-            {token && <span className="ml-1 text-info/50">synced</span>}
+            {user && <span className="ml-1 text-info/50">synced</span>}
           </span>
           <button
             onClick={clearCodeHistory}

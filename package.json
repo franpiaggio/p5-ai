@@ -1,0 +1,11 @@
+{
+  "name": "p5-ai",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n back,front -c blue,green \"pnpm --dir backend start:dev\" \"pnpm --dir frontend dev\"",
+    "install:all": "pnpm --dir backend install && pnpm --dir frontend install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

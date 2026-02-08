@@ -69,6 +69,12 @@
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "better-sqlite3"
+    ]
+  },
   "jest": {
     "moduleFileExtensions": [
       "js",

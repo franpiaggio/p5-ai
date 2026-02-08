@@ -111,6 +111,22 @@ export async function fetchModels(
   return data.models ?? [];
 }
 
+// --- Health ---
+
+export async function checkBackendHealth(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/chat/models`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'demo' }),
+      signal: AbortSignal.timeout(3000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 // --- Chat ---
 
 export interface ChatRequest {

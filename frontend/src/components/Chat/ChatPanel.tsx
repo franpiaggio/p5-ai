@@ -1,6 +1,6 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore, simpleHash, extractFirstJsBlock } from '../../store/editorStore';
-import { streamChat } from '../../services/api';
+import { streamChat, checkBackendHealth } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
@@ -10,6 +10,7 @@ export function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
 
   const messages = useEditorStore((s) => s.messages);
   const addMessage = useEditorStore((s) => s.addMessage);
@@ -21,6 +22,18 @@ export function ChatPanel() {
   const setIsSettingsOpen = useEditorStore((s) => s.setIsSettingsOpen);
   const fixRequest = useEditorStore((s) => s.fixRequest);
   const setFixRequest = useEditorStore((s) => s.setFixRequest);
+
+  // Backend health check on mount + retry every 10s when offline
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const check = async () => {
+      const ok = await checkBackendHealth();
+      setBackendOnline(ok);
+      if (!ok) timer = setTimeout(check, 10_000);
+    };
+    check();
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -80,6 +93,8 @@ export function ChatPanel() {
         });
       }
 
+      if (backendOnline !== true) setBackendOnline(true);
+
       const finalState = useEditorStore.getState();
       if (finalState.autoApply && assistantContent) {
         const jsCode = extractFirstJsBlock(assistantContent);
@@ -126,13 +141,22 @@ export function ChatPanel() {
 
   const lastMessage = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMessage?.role === 'assistant' && !lastMessage.content;
+  const chatDisabled = backendOnline === false || (llmConfig.provider !== 'demo' && !llmConfig.apiKey);
 
   return (
     <ChatInput
       onSend={sendMessage}
       isLoading={isLoading}
-      disabled={llmConfig.provider !== 'demo' && !llmConfig.apiKey}
+      disabled={chatDisabled}
     >
+      {backendOnline === false && (
+        <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-error/10 border border-error/20 flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-error shrink-0" />
+          <p className="text-error text-[11px] font-mono">
+            Backend unavailable &mdash; chat is disabled. The editor still works normally.
+          </p>
+        </div>
+      )}
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-4">
