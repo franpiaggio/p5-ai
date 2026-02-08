@@ -105,6 +105,7 @@ export function ChatPanel() {
             code: jsCode,
             messageId: lastMsg.id,
             blockKey,
+            prompt: userMessage,
           });
         }
       }
@@ -148,6 +149,7 @@ export function ChatPanel() {
       onSend={sendMessage}
       isLoading={isLoading}
       disabled={chatDisabled}
+      showAttach={llmConfig.provider !== 'demo'}
     >
       {backendOnline === false && (
         <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-error/10 border border-error/20 flex items-center gap-2">

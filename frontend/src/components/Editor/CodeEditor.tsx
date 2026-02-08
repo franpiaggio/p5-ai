@@ -238,8 +238,8 @@ export function CodeEditor() {
         <DiffEditor
           height="100%"
           language="javascript"
-          original={code}
-          modified={pendingDiff.code}
+          original={pendingDiff.previousCode}
+          modified={code}
           theme="vs-dark"
           onMount={handleDiffMount}
           options={{

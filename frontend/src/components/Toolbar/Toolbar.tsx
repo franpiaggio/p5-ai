@@ -75,7 +75,7 @@ function SketchTitle() {
 
 export function Toolbar() {
   const { isRunning, setIsRunning, runSketch, setIsSettingsOpen, clearConsoleLogs,
-    sketchId, sketchTitle, code, codeHistory } = useEditorStore();
+    sketchId, sketchTitle, code, codeHistory, setPreviewCode } = useEditorStore();
   const user = useAuthStore((s) => s.user);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
   const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
@@ -94,6 +94,7 @@ export function Toolbar() {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
+        setPreviewCode(null);
         if (!user) {
           setIsLoginOpen(true);
           return;
@@ -109,7 +110,7 @@ export function Toolbar() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [user, sketchId, sketchTitle, code, codeHistory, setIsSaveSketchOpen, setIsLoginOpen]);
+  }, [user, sketchId, sketchTitle, code, codeHistory, setIsSaveSketchOpen, setIsLoginOpen, setPreviewCode]);
 
   return (
     <div className="h-11 bg-surface-raised border-b border-border/60 flex items-center px-4 gap-3 shrink-0">

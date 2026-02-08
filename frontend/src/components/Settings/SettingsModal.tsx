@@ -109,42 +109,40 @@ export function SettingsModal() {
           )}
 
           {!isDemo && (
-            <>
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
-                  API Key
-                </label>
-                <input
-                  type="password"
-                  value={llmConfig.apiKey}
-                  onChange={(e) => setLLMConfig({ apiKey: e.target.value })}
-                  placeholder={`Enter ${PROVIDER_LABELS[llmConfig.provider]} key`}
-                  className="input-field"
-                />
-                <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
-                  Stored in session only — cleared when you close the tab.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
-                  Model {loadingModels && <span className="text-accent/50">loading...</span>}
-                </label>
-                <select
-                  value={llmConfig.model}
-                  onChange={(e) => setLLMConfig({ model: e.target.value })}
-                  className="input-field"
-                >
-                  {models.map((model) => (
-                    <option key={model} value={model}>{model}</option>
-                  ))}
-                  {!models.includes(llmConfig.model) && (
-                    <option value={llmConfig.model}>{llmConfig.model}</option>
-                  )}
-                </select>
-              </div>
-            </>
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+                API Key
+              </label>
+              <input
+                type="password"
+                value={llmConfig.apiKey}
+                onChange={(e) => setLLMConfig({ apiKey: e.target.value })}
+                placeholder={`Enter ${PROVIDER_LABELS[llmConfig.provider]} key`}
+                className="input-field"
+              />
+              <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
+                Stored in session only — cleared when you close the tab.
+              </p>
+            </div>
           )}
+
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+              Model {loadingModels && <span className="text-accent/50">loading...</span>}
+            </label>
+            <select
+              value={llmConfig.model}
+              onChange={(e) => setLLMConfig({ model: e.target.value })}
+              className="input-field"
+            >
+              {models.map((model) => (
+                <option key={model} value={model}>{model}</option>
+              ))}
+              {!models.includes(llmConfig.model) && (
+                <option value={llmConfig.model}>{llmConfig.model}</option>
+              )}
+            </select>
+          </div>
         </div>
 
         <div className="mt-5 pt-4 border-t border-border/30">

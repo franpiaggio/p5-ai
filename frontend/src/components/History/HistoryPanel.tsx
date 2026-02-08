@@ -95,7 +95,10 @@ function CodeModal({
 
 export function HistoryPanel() {
   const codeHistory = useEditorStore((s) => s.codeHistory);
-  const undoCodeChange = useEditorStore((s) => s.undoCodeChange);
+  const setPendingDiff = useEditorStore((s) => s.setPendingDiff);
+  const pendingDiff = useEditorStore((s) => s.pendingDiff);
+  const previewCode = useEditorStore((s) => s.previewCode);
+  const setPreviewCode = useEditorStore((s) => s.setPreviewCode);
   const clearCodeHistory = useEditorStore((s) => s.clearCodeHistory);
   const code = useEditorStore((s) => s.code);
   const sketchId = useEditorStore((s) => s.sketchId);
@@ -134,13 +137,24 @@ export function HistoryPanel() {
   }, [codeHistory, code, user, sketchId]);
 
   const handleRestore = useCallback(
-    (id: string) => {
-      undoCodeChange(id);
+    (entry: CodeChange) => {
+      setPendingDiff({ code: entry.newCode, messageId: '', blockKey: '', isRestore: true });
     },
-    [undoCodeChange],
+    [setPendingDiff],
   );
 
+  const handlePreview = useCallback(
+    (entry: CodeChange) => {
+      setPreviewCode({ code: entry.newCode, entryId: entry.id });
+    },
+    [setPreviewCode],
+  );
+
+  const isPreviewActive = previewCode !== null;
   const sorted = [...codeHistory].reverse();
+  const currentIdx = previewCode
+    ? sorted.findIndex((e) => e.id === previewCode.entryId)
+    : sorted.findIndex((e) => e.newCode === code);
 
   return (
     <div className="h-full flex flex-col bg-surface">
@@ -158,12 +172,13 @@ export function HistoryPanel() {
           </div>
         ) : (
           sorted.map((entry, i) => {
-            const isCurrent = entry.newCode === code;
+            const isHighlighted = i === currentIdx;
+            const isRealCurrent = !isPreviewActive && isHighlighted;
             return (
               <div
                 key={entry.id}
                 className={`mb-2 p-2.5 rounded-lg border transition-colors ${
-                  isCurrent
+                  isHighlighted
                     ? 'border-info/40 bg-info/5'
                     : 'border-border/30 bg-surface-raised hover:border-border/60'
                 }`}
@@ -177,12 +192,27 @@ export function HistoryPanel() {
                       <span className="text-text-primary text-xs truncate">
                         {entry.summary || 'Code change'}
                       </span>
-                      {isCurrent && (
+                      {entry.isRestore && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/15 text-accent shrink-0">
+                          restored
+                        </span>
+                      )}
+                      {isRealCurrent && (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-info/15 text-info shrink-0">
                           current
                         </span>
                       )}
+                      {isPreviewActive && isHighlighted && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-warning/15 text-warning shrink-0">
+                          preview
+                        </span>
+                      )}
                     </div>
+                    {entry.prompt && (
+                      <span className="text-[10px] text-text-muted/50 mt-0.5 block truncate italic">
+                        &ldquo;{entry.prompt}&rdquo;
+                      </span>
+                    )}
                     <span className="text-[10px] text-text-muted/35 mt-0.5 block">
                       {formatDate(entry.timestamp)}
                     </span>
@@ -192,16 +222,22 @@ export function HistoryPanel() {
                       onClick={() => setModalEntry(entry)}
                       className="text-[10px] px-2 py-0.5 rounded border border-border/40 text-text-muted/60 hover:text-info hover:border-info/40 transition-colors"
                     >
-                      View
+                      View Diff
                     </button>
-                    {!isCurrent && (
-                      <button
-                        onClick={() => handleRestore(entry.id)}
-                        className="text-[10px] px-2 py-0.5 rounded bg-warning/15 text-warning hover:bg-warning/25 transition-colors"
-                      >
-                        Restore
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handlePreview(entry)}
+                      disabled={isRealCurrent || !!pendingDiff}
+                      className="text-[10px] px-2 py-0.5 rounded border border-info/40 text-info hover:bg-info/10 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                    >
+                      Preview
+                    </button>
+                    <button
+                      onClick={() => handleRestore(entry)}
+                      disabled={isRealCurrent || !!pendingDiff || !!entry.isRestore}
+                      className="text-[10px] px-2 py-0.5 rounded bg-warning/15 text-warning hover:bg-warning/25 transition-colors disabled:opacity-30 disabled:pointer-events-none"
+                    >
+                      Restore
+                    </button>
                   </div>
                 </div>
               </div>

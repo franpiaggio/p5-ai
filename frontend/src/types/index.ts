@@ -39,6 +39,8 @@ export interface CodeChange {
   previousCode: string;
   newCode: string;
   summary?: string;
+  prompt?: string;
+  isRestore?: boolean;
 }
 
 export type TabType = 'console' | 'chat' | 'history';

@@ -35,8 +35,11 @@ function diffSummary(oldCode: string, newCode: string): string {
 
 export interface PendingDiff {
   code: string;
+  previousCode: string;
   messageId: string;
   blockKey: string;
+  prompt?: string;
+  isRestore?: boolean;
 }
 
 const DEFAULT_CODE = `function setup() {
@@ -63,6 +66,7 @@ interface EditorState {
   codeHistory: CodeChange[];
   appliedBlocks: Record<string, true>;
   pendingDiff: PendingDiff | null;
+  previewCode: { code: string; entryId: string } | null;
   autoApply: boolean;
   sketchId: string | null;
   sketchTitle: string;
@@ -83,11 +87,11 @@ interface EditorState {
   setIsStreaming: (streaming: boolean) => void;
   setAutoApply: (auto: boolean) => void;
   clearMessages: () => void;
-  setPendingDiff: (diff: PendingDiff | null) => void;
+  setPendingDiff: (diff: Omit<PendingDiff, 'previousCode'> | null) => void;
   acceptPendingDiff: () => void;
   rejectPendingDiff: () => void;
   applyCodeFromChat: (messageId: string, newCode: string, blockKey?: string) => void;
-  undoCodeChange: (changeId: string) => void;
+  setPreviewCode: (preview: { code: string; entryId: string } | null) => void;
   clearCodeHistory: () => void;
   setSketchTitle: (title: string) => void;
   setSketchMeta: (id: string | null, title: string) => void;
@@ -120,14 +124,19 @@ export const useEditorStore = create<EditorState>()(
       codeHistory: [],
       appliedBlocks: {},
       pendingDiff: null,
+      previewCode: null,
       autoApply: true,
       sketchId: null,
       sketchTitle: 'Untitled Sketch',
       fixRequest: null,
 
-      setCode: (code) => set({ code }),
+      setCode: (code) =>
+        set((state) => ({
+          code,
+          ...(state.previewCode ? { previewCode: null, isRunning: true, runTrigger: state.runTrigger + 1 } : {}),
+        })),
       setIsRunning: (isRunning) => set({ isRunning }),
-      runSketch: () => set((state) => ({ isRunning: true, runTrigger: state.runTrigger + 1 })),
+      runSketch: () => set((state) => ({ isRunning: true, runTrigger: state.runTrigger + 1, previewCode: null })),
       setActiveTab: (activeTab) => set({ activeTab }),
 
       addMessage: (message) =>
@@ -174,12 +183,30 @@ export const useEditorStore = create<EditorState>()(
       setAutoApply: (autoApply) => set({ autoApply }),
       clearMessages: () => set({ messages: [], appliedBlocks: {} }),
 
-      setPendingDiff: (pendingDiff) => set({ pendingDiff }),
-      rejectPendingDiff: () => set({ pendingDiff: null }),
+      setPendingDiff: (pendingDiff) =>
+        set((state) => ({
+          pendingDiff: pendingDiff
+            ? { ...pendingDiff, previousCode: state.code }
+            : null,
+          previewCode: null,
+          ...(pendingDiff
+            ? { code: pendingDiff.code, isRunning: true, runTrigger: state.runTrigger + 1 }
+            : {}),
+        })),
+      rejectPendingDiff: () =>
+        set((state) => {
+          if (!state.pendingDiff) return { pendingDiff: null };
+          return {
+            code: state.pendingDiff.previousCode,
+            pendingDiff: null,
+            isRunning: true,
+            runTrigger: state.runTrigger + 1,
+          };
+        }),
       acceptPendingDiff: () =>
         set((state) => {
           if (!state.pendingDiff) return state;
-          const { code: newCode, messageId, blockKey } = state.pendingDiff;
+          const { previousCode, messageId, blockKey, isRestore, prompt } = state.pendingDiff;
           return {
             codeHistory: [
               ...state.codeHistory,
@@ -187,15 +214,14 @@ export const useEditorStore = create<EditorState>()(
                 id: `change-${++changeCounter}-${Date.now()}`,
                 messageId,
                 timestamp: Date.now(),
-                previousCode: state.code,
-                newCode,
-                summary: diffSummary(state.code, newCode),
+                previousCode,
+                newCode: state.code,
+                summary: diffSummary(previousCode, state.code),
+                ...(prompt ? { prompt } : {}),
+                ...(isRestore ? { isRestore: true } : {}),
               },
             ],
-            code: newCode,
             pendingDiff: null,
-            isRunning: true,
-            runTrigger: state.runTrigger + 1,
             appliedBlocks: blockKey
               ? { ...state.appliedBlocks, [blockKey]: true as const }
               : state.appliedBlocks,
@@ -221,12 +247,12 @@ export const useEditorStore = create<EditorState>()(
             : state.appliedBlocks,
         })),
 
-      undoCodeChange: (changeId) =>
-        set((state) => {
-          const entry = state.codeHistory.find((c) => c.id === changeId);
-          if (!entry) return state;
-          return { code: entry.previousCode };
-        }),
+
+      setPreviewCode: (previewCode) =>
+        set((state) => ({
+          previewCode,
+          ...(previewCode ? { isRunning: true, runTrigger: state.runTrigger + 1 } : { isRunning: true, runTrigger: state.runTrigger + 1 }),
+        })),
 
       clearCodeHistory: () => set({ codeHistory: [] }),
 

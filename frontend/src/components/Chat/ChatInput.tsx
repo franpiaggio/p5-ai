@@ -7,10 +7,11 @@ interface ChatInputProps {
   onSend: (message: string, images?: ImageAttachment[]) => void;
   isLoading: boolean;
   disabled: boolean;
+  showAttach: boolean;
   children: ReactNode;
 }
 
-export function ChatInput({ onSend, isLoading, disabled, children }: ChatInputProps) {
+export function ChatInput({ onSend, isLoading, disabled, showAttach, children }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -146,25 +147,29 @@ export function ChatInput({ onSend, isLoading, disabled, children }: ChatInputPr
           </div>
         )}
         <div className="flex gap-2">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg"
-            multiple
-            className="hidden"
-            onChange={handleFileSelect}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isLoading || attachedImages.length >= MAX_IMAGES}
-            className="px-2 py-2 text-xs text-text-muted hover:text-text-primary border border-border/40 rounded-md hover:bg-surface-raised transition-colors disabled:opacity-30"
-            title="Attach image (PNG/JPEG, max 4MB)"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-            </svg>
-          </button>
+          {showAttach && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg"
+                multiple
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading || attachedImages.length >= MAX_IMAGES || disabled}
+                className="px-2 py-2 text-xs text-text-muted hover:text-text-primary border border-border/40 rounded-md hover:bg-surface-raised transition-colors disabled:opacity-30"
+                title="Attach image (PNG/JPEG, max 4MB)"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+              </button>
+            </>
+          )}
           <input
             type="text"
             value={input}

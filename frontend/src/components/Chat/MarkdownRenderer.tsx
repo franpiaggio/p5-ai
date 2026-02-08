@@ -49,7 +49,11 @@ function CollapsibleCodeBlock({
     (e: React.MouseEvent) => {
       e.stopPropagation();
       if (messageId && blockKey) {
-        setPendingDiff({ code, messageId, blockKey });
+        const messages = useEditorStore.getState().messages;
+        const msgIdx = messages.findIndex((m) => m.id === messageId);
+        const userMsg = msgIdx > 0 ? messages[msgIdx - 1] : null;
+        const prompt = userMsg?.role === 'user' ? userMsg.content : undefined;
+        setPendingDiff({ code, messageId, blockKey, prompt });
       }
     },
     [messageId, blockKey, code, setPendingDiff],

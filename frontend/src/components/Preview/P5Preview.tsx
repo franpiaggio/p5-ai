@@ -83,6 +83,7 @@ export function P5Preview() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const blobUrlRef = useRef<string | null>(null);
   const code = useEditorStore((s) => s.code);
+  const previewCode = useEditorStore((s) => s.previewCode);
   const isRunning = useEditorStore((s) => s.isRunning);
   const runTrigger = useEditorStore((s) => s.runTrigger);
   const addConsoleLog = useEditorStore((s) => s.addConsoleLog);
@@ -116,7 +117,8 @@ export function P5Preview() {
       URL.revokeObjectURL(blobUrlRef.current);
     }
 
-    const html = HTML_TEMPLATE(code);
+    const activeCode = previewCode?.code ?? code;
+    const html = HTML_TEMPLATE(activeCode);
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     blobUrlRef.current = url;
@@ -128,7 +130,7 @@ export function P5Preview() {
         blobUrlRef.current = null;
       }
     };
-  }, [runTrigger]);
+  }, [runTrigger, previewCode]);
 
   if (!isRunning) {
     return (
@@ -146,11 +148,18 @@ export function P5Preview() {
   }
 
   return (
-    <iframe
-      ref={iframeRef}
-      className="h-full w-full border-0 bg-white"
-      title="p5.js Preview"
-      sandbox="allow-scripts"
-    />
+    <div className="h-full w-full relative">
+      {previewCode && (
+        <div className="absolute top-2 left-2 z-10 px-2 py-1 rounded bg-warning/90 text-black text-[10px] font-mono font-semibold shadow">
+          Preview
+        </div>
+      )}
+      <iframe
+        ref={iframeRef}
+        className="h-full w-full border-0 bg-white"
+        title="p5.js Preview"
+        sandbox="allow-scripts"
+      />
+    </div>
   );
 }
