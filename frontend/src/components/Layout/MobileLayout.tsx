@@ -12,19 +12,19 @@ function MobileDiffBar() {
   const rejectPendingDiff = useEditorStore((s) => s.rejectPendingDiff);
 
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-surface-raised border-y border-border/40">
+    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center gap-2 px-3 py-2.5 bg-surface-raised/95 backdrop-blur border-t border-border/40">
       <span className="text-[11px] font-mono text-text-muted/60 flex-1">
         Review changes
       </span>
       <button
         onClick={rejectPendingDiff}
-        className="min-h-[44px] px-4 rounded-lg border border-border/60 text-text-muted text-xs font-mono hover:border-accent hover:text-accent transition-colors"
+        className="min-h-[44px] px-5 rounded-lg border border-border/60 text-text-muted text-xs font-mono hover:border-accent hover:text-accent transition-colors"
       >
         Reject
       </button>
       <button
         onClick={acceptPendingDiff}
-        className="min-h-[44px] px-4 rounded-lg bg-success text-white text-xs font-mono font-semibold transition-opacity hover:opacity-85"
+        className="min-h-[44px] px-5 rounded-lg bg-success text-white text-xs font-mono font-semibold transition-opacity hover:opacity-85"
       >
         Accept
       </button>
@@ -134,6 +134,7 @@ export function MobileLayout() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
           </svg>
         </button>
+        {pendingDiff && <MobileDiffBar />}
       </div>
 
       <div
@@ -143,8 +144,6 @@ export function MobileLayout() {
       >
         <div className="w-10 h-1 rounded-full bg-border/60" />
       </div>
-
-      {pendingDiff && <MobileDiffBar />}
 
       <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {activeTab === 'chat' && <ChatPanel />}

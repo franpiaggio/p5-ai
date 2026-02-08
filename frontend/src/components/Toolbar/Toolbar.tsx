@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { LoginButton } from './GoogleLoginButton';
 import { UserMenu } from './UserMenu';
 import { FileMenu } from './FileMenu';
+import { MobileMenu } from './MobileMenu';
 import { updateSketch } from '../../services/api';
 
 function SketchTitle() {
@@ -47,7 +48,7 @@ function SketchTitle() {
             setEditing(false);
           }
         }}
-        className="bg-transparent border border-info/30 rounded px-2 py-0.5 text-xs font-mono text-text-primary outline-none focus:border-info/60 w-44"
+        className="bg-transparent border border-info/30 rounded px-2 py-0.5 text-xs font-mono text-text-primary outline-none focus:border-info/60 w-full max-w-44"
       />
     );
   }
@@ -148,36 +149,44 @@ export function Toolbar() {
 
   return (
     <div className="h-11 bg-surface-raised border-b border-border/60 flex items-center px-3 md:px-4 gap-2 md:gap-3 shrink-0">
-      {/* Logo */}
       <span className="text-accent font-black text-lg tracking-tight shrink-0">p5</span>
       <span className="text-info text-[10px] font-mono uppercase tracking-[0.2em] opacity-70 hidden md:block">
         AI Editor
       </span>
 
-      <FileMenu />
-      <div className="w-px h-5 bg-border/60 hidden md:block" />
+      {/* Desktop: File + separator + play/stop */}
+      <div className="hidden md:flex items-center gap-3">
+        <FileMenu />
+        <div className="w-px h-5 bg-border/60" />
+      </div>
+
       <PlayStopButtons />
+      <div className="min-w-0 flex-1">
+        <SketchTitle />
+      </div>
 
-      <SketchTitle />
+      {/* Desktop: hint + settings + user */}
+      <div className="hidden md:flex items-center gap-2">
+        <span className="text-text-muted/40 text-[10px] font-mono">
+          Alt+Enter to run
+        </span>
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="btn-icon text-text-muted/60 hover:text-info hover:bg-border/40"
+          title="Settings"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+        {user ? <UserMenu /> : <LoginButton />}
+      </div>
 
-      <div className="flex-1" />
-
-      <span className="text-text-muted/40 text-[10px] font-mono hidden md:block">
-        Alt+Enter to run
-      </span>
-
-      <button
-        onClick={() => setIsSettingsOpen(true)}
-        className="btn-icon text-text-muted/60 hover:text-info hover:bg-border/40"
-        title="Settings"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      </button>
-
-      {user ? <UserMenu /> : <LoginButton />}
+      {/* Mobile: single overflow menu */}
+      <div className="flex md:hidden">
+        <MobileMenu />
+      </div>
     </div>
   );
 }
