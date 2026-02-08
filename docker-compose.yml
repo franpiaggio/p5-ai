@@ -9,7 +9,7 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - DATABASE_PATH=/app/data/p5editor.sqlite
-      - CORS_ORIGIN=http://frontend
+      - CORS_ORIGIN=https://p5ai.franpiaggio.com
     volumes:
       - sqlite_data:/app/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
       args:
         - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       backend:
         condition: service_healthy
