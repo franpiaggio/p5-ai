@@ -77,11 +77,27 @@ export function CodeEditor() {
   const handleBeforeMount: BeforeMount = useCallback((monaco) => {
     defineCustomThemes(monaco);
     injectErrorStyles();
+
+    // Enable semantic highlighting for richer coloring (methods, properties, etc.)
+    monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true);
+    monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+      target: monaco.languages.typescript.ScriptTarget.ESNext,
+      allowJs: true,
+      checkJs: false,
+      allowNonTsExtensions: true,
+    });
   }, []);
 
   const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+
+    // Disable all diagnostics — p5.js globals would show false errors
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+    });
+
     if (!document.querySelector('[data-chat-input]:focus')) {
       editor.focus();
     }

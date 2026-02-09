@@ -30,24 +30,44 @@ export const EDITOR_THEMES: { id: EditorThemeId; label: string }[] = [
   { id: 'github-dark', label: 'GitHub Dark' },
 ];
 
+// Monaco JS tokenizer tokens (Monarch-based):
+// identifier, keyword, keyword.flow, number, number.float, number.hex,
+// string, string.escape, regexp, comment, delimiter, delimiter.bracket,
+// delimiter.parenthesis, delimiter.square, delimiter.angle, operator, type.identifier
+//
+// Semantic token types (from TS language service):
+// function, method, property, variable, parameter, class, interface, enum, type
+
 export function defineCustomThemes(monaco: typeof Monaco) {
   monaco.editor.defineTheme('p5-dark', {
     base: 'vs-dark',
     inherit: true,
     rules: [
+      // Monarch tokens
       { token: 'keyword', foreground: 'c586c0' },
-      { token: 'storage', foreground: '569cd6' },
-      { token: 'type', foreground: '4ec9b0' },
-      { token: 'entity.name.function', foreground: 'dcdcaa' },
-      { token: 'support.function', foreground: 'dcdcaa' },
-      { token: 'variable', foreground: '9cdcfe' },
-      { token: 'variable.predefined', foreground: '4fc1ff' },
+      { token: 'keyword.flow', foreground: 'c586c0' },
+      { token: 'identifier', foreground: '9cdcfe' },
+      { token: 'type.identifier', foreground: '4ec9b0' },
       { token: 'string', foreground: 'ce9178' },
+      { token: 'string.escape', foreground: 'd7ba7d' },
       { token: 'number', foreground: 'b5cea8' },
+      { token: 'number.float', foreground: 'b5cea8' },
+      { token: 'number.hex', foreground: 'b5cea8' },
       { token: 'regexp', foreground: 'd16969' },
       { token: 'comment', foreground: '6a9955', fontStyle: 'italic' },
+      { token: 'delimiter', foreground: 'd4d4d4' },
       { token: 'delimiter.bracket', foreground: 'ffd700' },
-      { token: 'constant', foreground: '4fc1ff' },
+      { token: 'operator', foreground: 'd4d4d4' },
+      // Semantic tokens
+      { token: 'function', foreground: 'dcdcaa' },
+      { token: 'method', foreground: 'dcdcaa' },
+      { token: 'property', foreground: '9cdcfe' },
+      { token: 'variable', foreground: '9cdcfe' },
+      { token: 'parameter', foreground: '9cdcfe' },
+      { token: 'class', foreground: '4ec9b0' },
+      { token: 'interface', foreground: '4ec9b0' },
+      { token: 'enum', foreground: '4ec9b0' },
+      { token: 'type', foreground: '4ec9b0' },
     ],
     colors: {
       'editor.background': '#16213e',
@@ -64,17 +84,23 @@ export function defineCustomThemes(monaco: typeof Monaco) {
     inherit: true,
     rules: [
       { token: 'keyword', foreground: 'f92672' },
-      { token: 'storage', foreground: '66d9ef', fontStyle: 'italic' },
-      { token: 'type', foreground: '66d9ef', fontStyle: 'italic' },
-      { token: 'entity.name.function', foreground: 'a6e22e' },
-      { token: 'support.function', foreground: 'a6e22e' },
-      { token: 'variable', foreground: 'f8f8f2' },
+      { token: 'keyword.flow', foreground: 'f92672' },
+      { token: 'identifier', foreground: 'f8f8f2' },
+      { token: 'type.identifier', foreground: '66d9ef', fontStyle: 'italic' },
       { token: 'string', foreground: 'e6db74' },
       { token: 'number', foreground: 'ae81ff' },
       { token: 'regexp', foreground: 'e6db74' },
       { token: 'comment', foreground: '75715e', fontStyle: 'italic' },
-      { token: 'constant', foreground: 'ae81ff' },
       { token: 'delimiter', foreground: 'f8f8f2' },
+      { token: 'operator', foreground: 'f92672' },
+      // Semantic tokens
+      { token: 'function', foreground: 'a6e22e' },
+      { token: 'method', foreground: 'a6e22e' },
+      { token: 'property', foreground: 'f8f8f2' },
+      { token: 'variable', foreground: 'f8f8f2' },
+      { token: 'parameter', foreground: 'fd971f', fontStyle: 'italic' },
+      { token: 'class', foreground: '66d9ef', fontStyle: 'italic underline' },
+      { token: 'type', foreground: '66d9ef', fontStyle: 'italic' },
     ],
     colors: {
       'editor.background': '#272822',
@@ -91,17 +117,23 @@ export function defineCustomThemes(monaco: typeof Monaco) {
     inherit: true,
     rules: [
       { token: 'keyword', foreground: 'ff7b72' },
-      { token: 'storage', foreground: 'ff7b72' },
-      { token: 'type', foreground: 'ffa657' },
-      { token: 'entity.name.function', foreground: 'd2a8ff' },
-      { token: 'support.function', foreground: 'd2a8ff' },
-      { token: 'variable', foreground: 'c9d1d9' },
+      { token: 'keyword.flow', foreground: 'ff7b72' },
+      { token: 'identifier', foreground: 'c9d1d9' },
+      { token: 'type.identifier', foreground: 'ffa657' },
       { token: 'string', foreground: 'a5d6ff' },
       { token: 'number', foreground: '79c0ff' },
       { token: 'regexp', foreground: '7ee787' },
       { token: 'comment', foreground: '8b949e', fontStyle: 'italic' },
-      { token: 'constant', foreground: '79c0ff' },
       { token: 'delimiter', foreground: 'c9d1d9' },
+      { token: 'operator', foreground: 'ff7b72' },
+      // Semantic tokens
+      { token: 'function', foreground: 'd2a8ff' },
+      { token: 'method', foreground: 'd2a8ff' },
+      { token: 'property', foreground: '79c0ff' },
+      { token: 'variable', foreground: 'c9d1d9' },
+      { token: 'parameter', foreground: 'ffa657' },
+      { token: 'class', foreground: 'ffa657' },
+      { token: 'type', foreground: 'ffa657' },
     ],
     colors: {
       'editor.background': '#0d1117',
