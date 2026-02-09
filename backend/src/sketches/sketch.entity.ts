@@ -1,17 +1,26 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
+  PrimaryColumn,
   Column,
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
+  BeforeInsert,
 } from 'typeorm';
+import { randomBytes } from 'crypto';
 import { User } from '../users/user.entity';
 
 @Entity('sketches')
 export class Sketch {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryColumn({ length: 36 })
   id: string;
+
+  @BeforeInsert()
+  generateId() {
+    if (!this.id) {
+      this.id = randomBytes(5).toString('hex');
+    }
+  }
 
   @Column()
   title: string;
