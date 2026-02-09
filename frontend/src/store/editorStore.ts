@@ -301,13 +301,14 @@ export const useEditorStore = create<EditorState>()(
 );
 
 // Sync apiKey to sessionStorage only (backend save happens on Settings close)
-useEditorStore.subscribe(
-  (state) => state.llmConfig.apiKey,
-  (key) => {
-    if (key) {
-      sessionStorage.setItem('p5-ai-editor-key', key);
-    } else {
-      sessionStorage.removeItem('p5-ai-editor-key');
-    }
-  },
-);
+let prevApiKey = useEditorStore.getState().llmConfig.apiKey;
+useEditorStore.subscribe((state) => {
+  const key = state.llmConfig.apiKey;
+  if (key === prevApiKey) return;
+  prevApiKey = key;
+  if (key) {
+    sessionStorage.setItem('p5-ai-editor-key', key);
+  } else {
+    sessionStorage.removeItem('p5-ai-editor-key');
+  }
+});
