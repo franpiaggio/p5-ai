@@ -42,7 +42,7 @@ export function UserMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-48 bg-surface-raised border border-border/60 rounded-lg shadow-2xl py-1 z-50">
+        <div className="dropdown-menu right-0 mt-2 w-48">
           <div className="px-3 py-2 border-b border-border/40">
             <p className="text-xs font-mono text-text-primary truncate">
               {user.name}
@@ -56,7 +56,7 @@ export function UserMenu() {
               setIsProfileOpen(true);
               setIsOpen(false);
             }}
-            className="w-full text-left px-3 py-2 text-xs font-mono text-text-muted hover:bg-border/30 hover:text-info transition-colors cursor-pointer"
+            className="dropdown-item"
           >
             My Sketches
           </button>
@@ -65,7 +65,7 @@ export function UserMenu() {
               logoutApi().finally(() => logout());
               setIsOpen(false);
             }}
-            className="w-full text-left px-3 py-2 text-xs font-mono text-text-muted hover:bg-border/30 hover:text-accent transition-colors cursor-pointer"
+            className="dropdown-item hover:!text-accent"
           >
             Sign Out
           </button>

@@ -98,10 +98,8 @@ export function MobileMenu() {
     logoutApi().finally(() => logout());
   };
 
-  const menuItemClass =
-    'w-full text-left px-4 py-2.5 text-xs font-mono text-text-muted hover:bg-border/30 hover:text-info transition-colors cursor-pointer';
-  const disabledClass =
-    'w-full text-left px-4 py-2.5 text-xs font-mono text-text-muted/30 cursor-not-allowed';
+  const menuItemClass = 'dropdown-item py-2.5 px-4';
+  const disabledClass = 'dropdown-item-disabled py-2.5 px-4';
 
   return (
     <div className="relative" ref={menuRef}>
@@ -115,7 +113,7 @@ export function MobileMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 w-52 bg-surface-raised border border-border/60 rounded-lg shadow-2xl py-1 z-50">
+        <div className="dropdown-menu right-0">
           {/* File actions */}
           <button onClick={handleNewSketch} className={menuItemClass}>
             New Sketch
@@ -138,14 +136,14 @@ export function MobileMenu() {
             Duplicate
           </button>
 
-          <div className="h-px bg-border/30 my-1" />
+          <div className="dropdown-separator" />
 
           {/* Settings */}
           <button onClick={handleSettings} className={menuItemClass}>
             Settings
           </button>
 
-          <div className="h-px bg-border/30 my-1" />
+          <div className="dropdown-separator" />
 
           {/* Account */}
           {user ? (
@@ -159,7 +157,7 @@ export function MobileMenu() {
               </button>
               <button
                 onClick={handleSignOut}
-                className="w-full text-left px-4 py-2.5 text-xs font-mono text-text-muted hover:bg-border/30 hover:text-accent transition-colors cursor-pointer"
+                className="dropdown-item py-2.5 px-4 hover:!text-accent"
               >
                 Sign Out
               </button>

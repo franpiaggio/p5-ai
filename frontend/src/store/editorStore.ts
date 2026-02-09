@@ -71,6 +71,7 @@ interface EditorState {
   sketchId: string | null;
   sketchTitle: string;
   fixRequest: string | null;
+  editorTheme: string;
 
   setCode: (code: string) => void;
   setIsRunning: (running: boolean) => void;
@@ -97,6 +98,7 @@ interface EditorState {
   setSketchMeta: (id: string | null, title: string) => void;
   newSketch: () => void;
   setFixRequest: (request: string | null) => void;
+  setEditorTheme: (theme: string) => void;
 }
 
 let logCounter = 0;
@@ -129,6 +131,7 @@ export const useEditorStore = create<EditorState>()(
       sketchId: null,
       sketchTitle: 'Untitled Sketch',
       fixRequest: null,
+      editorTheme: 'vs-dark',
 
       setCode: (code) =>
         set((state) => ({
@@ -259,6 +262,7 @@ export const useEditorStore = create<EditorState>()(
       setSketchTitle: (sketchTitle) => set({ sketchTitle }),
       setSketchMeta: (sketchId, sketchTitle) => set({ sketchId, sketchTitle }),
       setFixRequest: (fixRequest) => set({ fixRequest }),
+      setEditorTheme: (editorTheme) => set({ editorTheme }),
       newSketch: () =>
         set((state) => ({
           code: DEFAULT_CODE,
@@ -286,6 +290,7 @@ export const useEditorStore = create<EditorState>()(
         },
         codeHistory: state.codeHistory,
         autoApply: state.autoApply,
+        editorTheme: state.editorTheme,
         sketchId: state.sketchId,
         sketchTitle: state.sketchTitle,
       }),

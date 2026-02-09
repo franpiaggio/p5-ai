@@ -2,94 +2,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import Editor, { DiffEditor, type OnMount, type DiffOnMount, type BeforeMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { useEditorStore } from '../../store/editorStore';
-
-function DiffToolbar() {
-  const acceptPendingDiff = useEditorStore((s) => s.acceptPendingDiff);
-  const rejectPendingDiff = useEditorStore((s) => s.rejectPendingDiff);
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        rejectPendingDiff();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        acceptPendingDiff();
-      }
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [acceptPendingDiff, rejectPendingDiff]);
-
-  return (
-    <div
-      style={{
-        position: 'absolute',
-        top: 8,
-        right: 20,
-        zIndex: 10,
-        display: 'flex',
-        gap: 6,
-        alignItems: 'center',
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 8,
-        padding: '6px 10px',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-        fontFamily: 'monospace',
-        fontSize: 11,
-      }}
-    >
-      <span style={{ color: 'var(--color-text-muted)', marginRight: 4 }}>
-        Review changes
-      </span>
-      <button
-        onClick={rejectPendingDiff}
-        style={{
-          background: 'transparent',
-          border: '1px solid var(--color-border)',
-          color: 'var(--color-text-muted)',
-          padding: '4px 12px',
-          borderRadius: 5,
-          cursor: 'pointer',
-          fontSize: 11,
-          fontFamily: 'monospace',
-          transition: 'all 0.15s',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#ff5555';
-          e.currentTarget.style.color = '#ff5555';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = 'var(--color-border)';
-          e.currentTarget.style.color = 'var(--color-text-muted)';
-        }}
-      >
-        Reject <span style={{ opacity: 0.5 }}>Esc</span>
-      </button>
-      <button
-        onClick={acceptPendingDiff}
-        style={{
-          background: 'var(--color-success, #22c55e)',
-          border: 'none',
-          color: '#fff',
-          padding: '4px 12px',
-          borderRadius: 5,
-          cursor: 'pointer',
-          fontSize: 11,
-          fontFamily: 'monospace',
-          fontWeight: 600,
-          transition: 'opacity 0.15s',
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
-        onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-      >
-        Accept <span style={{ opacity: 0.7 }}>Ctrl+Enter</span>
-      </button>
-    </div>
-  );
-}
+import { DiffToolbar } from './DiffToolbar';
+import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles } from './editorConfig';
 
 export function CodeEditor() {
   const code = useEditorStore((s) => s.code);
@@ -98,6 +12,7 @@ export function CodeEditor() {
   const clearConsoleLogs = useEditorStore((s) => s.clearConsoleLogs);
   const editorErrors = useEditorStore((s) => s.editorErrors);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
+  const editorTheme = useEditorStore((s) => s.editorTheme);
 
   const runRef = useRef(runSketch);
   const clearRef = useRef(clearConsoleLogs);
@@ -120,7 +35,6 @@ export function CodeEditor() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Update Monaco markers and line decorations when editorErrors change
   useEffect(() => {
     if (!editorRef.current || !monacoRef.current) return;
 
@@ -160,61 +74,20 @@ export function CodeEditor() {
     decorationsRef.current = editorRef.current.createDecorationsCollection(decorations);
   }, [editorErrors]);
 
-  const handleBeforeMount: BeforeMount = useCallback(() => {
-    const id = 'editor-custom-styles';
-    if (document.getElementById(id)) return;
-    const style = document.createElement('style');
-    style.id = id;
-    style.textContent = `
-      .error-line-decoration {
-        background-color: rgba(255, 85, 85, 0.15) !important;
-      }
-      .error-glyph-margin {
-        background-color: #ff5555;
-        border-radius: 50%;
-        margin-left: 5px;
-        width: 8px !important;
-        height: 8px !important;
-      }
-      .error-line-number {
-        color: #ff5555 !important;
-        font-weight: bold !important;
-      }
-    `;
-    document.head.appendChild(style);
+  const handleBeforeMount: BeforeMount = useCallback((monaco) => {
+    defineCustomThemes(monaco);
+    injectErrorStyles();
   }, []);
 
   const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    // Only focus editor if user isn't already focused on chat input
     if (!document.querySelector('[data-chat-input]:focus')) {
       editor.focus();
     }
   }, []);
 
-  const editorOptions = {
-    minimap: { enabled: false },
-    fontSize: 13,
-    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-    fontLigatures: true,
-    lineNumbers: 'on' as const,
-    scrollBeyondLastLine: false,
-    automaticLayout: true,
-    tabSize: 2,
-    wordWrap: 'on' as const,
-    padding: { top: 8 },
-    renderLineHighlight: 'gutter' as const,
-    cursorBlinking: 'smooth' as const,
-    cursorSmoothCaretAnimation: 'on' as const,
-    smoothScrolling: true,
-    bracketPairColorization: { enabled: true },
-    glyphMargin: true,
-  };
-
-  // Scroll DiffEditor to first change once diffs are computed
   const handleDiffMount: DiffOnMount = useCallback((editor) => {
-    // getLineChanges() can be null until the diff is computed, so poll briefly
     const tryScroll = (retries: number) => {
       const changes = editor.getLineChanges();
       if (changes && changes.length > 0) {
@@ -226,11 +99,9 @@ export function CodeEditor() {
         requestAnimationFrame(() => tryScroll(retries - 1));
       }
     };
-    // Give Monaco ~10 frames to compute the diff
     requestAnimationFrame(() => tryScroll(10));
   }, []);
 
-  // When pending diff is active, show inline diff editor
   if (pendingDiff) {
     return (
       <div className="h-full w-full" style={{ position: 'relative' }}>
@@ -240,10 +111,10 @@ export function CodeEditor() {
           language="javascript"
           original={pendingDiff.previousCode}
           modified={code}
-          theme="vs-dark"
+          theme={editorTheme}
           onMount={handleDiffMount}
           options={{
-            ...editorOptions,
+            ...EDITOR_OPTIONS,
             readOnly: true,
             renderSideBySide: false,
             renderOverviewRuler: false,
@@ -263,8 +134,8 @@ export function CodeEditor() {
         onChange={(value) => setCode(value || '')}
         beforeMount={handleBeforeMount}
         onMount={handleMount}
-        theme="vs-dark"
-        options={editorOptions}
+        theme={editorTheme}
+        options={EDITOR_OPTIONS}
       />
     </div>
   );

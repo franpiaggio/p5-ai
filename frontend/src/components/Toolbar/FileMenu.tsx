@@ -3,6 +3,7 @@ import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { updateSketch, createSketch } from '../../services/api';
 
+
 export function FileMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -17,6 +18,7 @@ export function FileMenu() {
   const user = useAuthStore((s) => s.user);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
   const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
+  const setIsProfileOpen = useAuthStore((s) => s.setIsProfileOpen);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -86,19 +88,19 @@ export function FileMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 w-52 bg-surface-raised border border-border/60 rounded-lg shadow-2xl py-1 z-50">
+        <div className="dropdown-menu left-0">
           <button
             onClick={handleNewSketch}
-            className="w-full text-left px-3 py-2 text-xs font-mono text-text-muted hover:bg-border/30 hover:text-info transition-colors cursor-pointer flex justify-between"
+            className="dropdown-item flex justify-between"
           >
             New Sketch
           </button>
 
-          <div className="h-px bg-border/30 my-1" />
+          <div className="dropdown-separator" />
 
           <button
             onClick={handleSave}
-            className="w-full text-left px-3 py-2 text-xs font-mono text-text-muted hover:bg-border/30 hover:text-info transition-colors cursor-pointer flex justify-between"
+            className="dropdown-item flex justify-between"
           >
             <span>Save</span>
             <span className="text-text-muted/30 text-[10px]">Ctrl+S</span>
@@ -115,7 +117,7 @@ export function FileMenu() {
             Save As...
           </button>
 
-          <div className="h-px bg-border/30 my-1" />
+          <div className="dropdown-separator" />
 
           <button
             onClick={handleDuplicate}
@@ -128,6 +130,18 @@ export function FileMenu() {
           >
             Duplicate
           </button>
+
+          {user && (
+            <>
+              <div className="dropdown-separator" />
+              <button
+                onClick={() => { setIsOpen(false); setIsProfileOpen(true); }}
+                className="dropdown-item"
+              >
+                My Sketches
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

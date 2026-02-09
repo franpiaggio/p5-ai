@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useEditorStore } from '../../store/editorStore';
+import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { getSketches, getSketch, deleteSketch } from '../../services/api';
 import type { SketchSummary } from '../../types';
 
@@ -21,6 +22,9 @@ export function ProfileModal() {
         .finally(() => setLoading(false));
     }
   }, [isProfileOpen]);
+
+  const handleClose = useCallback(() => setIsProfileOpen(false), [setIsProfileOpen]);
+  useEscapeClose(isProfileOpen, handleClose);
 
   if (!isProfileOpen) return null;
 
@@ -56,15 +60,15 @@ export function ProfileModal() {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) setIsProfileOpen(false);
       }}
     >
-      <div className="bg-surface-raised rounded-xl p-6 w-full max-w-lg border border-border/60 shadow-2xl max-h-[80vh] flex flex-col">
+      <div className="modal-panel max-w-lg max-h-[80vh] flex flex-col">
         <div className="flex justify-between items-center mb-5">
           <div>
-            <h2 className="text-base font-mono font-semibold text-text-primary tracking-wide">
+            <h2 className="modal-title">
               My Sketches
             </h2>
             {user && (
@@ -75,7 +79,7 @@ export function ProfileModal() {
           </div>
           <button
             onClick={() => setIsProfileOpen(false)}
-            className="text-text-muted/40 hover:text-accent transition-colors"
+            className="modal-close"
           >
             <svg
               className="w-5 h-5"

@@ -81,6 +81,47 @@ select option {
   @apply w-8 h-8 rounded-md flex items-center justify-center transition-all duration-150;
 }
 
+.dropdown-menu {
+  @apply absolute top-full mt-1 w-52 bg-surface-raised border border-border/60 rounded-lg shadow-2xl py-1 z-50;
+}
+
+.dropdown-item {
+  @apply w-full text-left px-3 py-2 text-xs font-mono text-text-muted
+         hover:bg-border/30 hover:text-info transition-colors cursor-pointer;
+}
+
+.dropdown-item-disabled {
+  @apply w-full text-left px-3 py-2 text-xs font-mono text-text-muted/30 cursor-not-allowed;
+}
+
+.dropdown-separator {
+  @apply h-px bg-border/30 my-1;
+}
+
+.modal-backdrop {
+  @apply fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50;
+}
+
+.modal-panel {
+  @apply bg-surface-raised rounded-xl p-6 w-full border border-border/60 shadow-2xl;
+}
+
+.modal-title {
+  @apply text-base font-mono font-semibold text-text-primary tracking-wide;
+}
+
+.modal-close {
+  @apply text-text-muted/40 hover:text-accent transition-colors;
+}
+
+.tab-btn {
+  @apply px-4 py-2 text-xs font-mono tracking-wide transition-colors relative;
+}
+
+.tab-indicator {
+  @apply absolute bottom-0 left-2 right-2 h-[2px];
+}
+
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); }
   30% { transform: translateY(-4px); }

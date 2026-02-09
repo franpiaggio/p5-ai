@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '../../store/authStore';
 import { useEditorStore } from '../../store/editorStore';
@@ -51,28 +52,30 @@ export function LoginModal() {
     }
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsLoginOpen(false);
     setUsername('');
     setPassword('');
     setError('');
-  };
+  }, [setIsLoginOpen]);
+
+  useEscapeClose(isLoginOpen, handleClose);
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="bg-surface-raised rounded-xl p-6 w-full max-w-sm border border-border/60 shadow-2xl">
+      <div className="modal-panel max-w-sm">
         <div className="flex justify-between items-center mb-5">
-          <h2 className="text-base font-mono font-semibold text-text-primary tracking-wide">
+          <h2 className="modal-title">
             Sign In
           </h2>
           <button
             onClick={handleClose}
-            className="text-text-muted/40 hover:text-accent transition-colors"
+            className="modal-close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />

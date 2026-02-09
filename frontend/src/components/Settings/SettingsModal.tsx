@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
 import { fetchModels, getApiKey, saveApiKey } from '../../services/api';
 import type { LLMConfig } from '../../types';
+import { EDITOR_THEMES } from '../Editor/editorConfig';
 
 const FALLBACK_MODELS: Record<string, string[]> = {
   demo: ['llama-3.3-70b-versatile'],
@@ -23,6 +25,8 @@ export function SettingsModal() {
   const setLLMConfig = useEditorStore((s) => s.setLLMConfig);
   const autoApply = useEditorStore((s) => s.autoApply);
   const setAutoApply = useEditorStore((s) => s.setAutoApply);
+  const editorTheme = useEditorStore((s) => s.editorTheme);
+  const setEditorTheme = useEditorStore((s) => s.setEditorTheme);
   const user = useAuthStore((s) => s.user);
 
   const [models, setModels] = useState<string[]>(FALLBACK_MODELS[llmConfig.provider] ?? []);
@@ -71,13 +75,15 @@ export function SettingsModal() {
     return () => { cancelled = true; };
   }, [isSettingsOpen, llmConfig.provider, llmConfig.apiKey]);
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     const currentKey = useEditorStore.getState().llmConfig.apiKey;
     if (user && currentKey && currentKey !== keyOnOpenRef.current) {
       saveApiKey(currentKey).catch(() => {});
     }
     setIsSettingsOpen(false);
-  };
+  }, [user, setIsSettingsOpen]);
+
+  useEscapeClose(isSettingsOpen, handleClose);
 
   if (!isSettingsOpen) return null;
 
@@ -85,19 +91,19 @@ export function SettingsModal() {
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="bg-surface-raised rounded-xl p-6 w-full max-w-md border border-border/60 shadow-2xl">
+      <div className="modal-panel max-w-md">
         <div className="flex justify-between items-center mb-5">
-          <h2 className="text-base font-mono font-semibold text-text-primary tracking-wide">
+          <h2 className="modal-title">
             Settings
           </h2>
           <button
             onClick={handleClose}
-            className="text-text-muted/40 hover:text-accent transition-colors"
+            className="modal-close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
@@ -173,7 +179,22 @@ export function SettingsModal() {
           </div>
         </div>
 
-        <div className="mt-5 pt-4 border-t border-border/30">
+        <div className="mt-5 pt-4 border-t border-border/30 space-y-4">
+          <div>
+            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+              Editor Theme
+            </label>
+            <select
+              value={editorTheme}
+              onChange={(e) => setEditorTheme(e.target.value)}
+              className="input-field"
+            >
+              {EDITOR_THEMES.map((t) => (
+                <option key={t.id} value={t.id}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+
           <label className="flex items-center justify-between cursor-pointer">
             <div>
               <span className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-0.5">

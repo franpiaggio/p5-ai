@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
 import { useEditorStore } from '../../store/editorStore';
 import { createSketch } from '../../services/api';
@@ -44,28 +45,30 @@ export function SaveSketchModal() {
     }
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsSaveSketchOpen(false);
     setTitle('');
     setDescription('');
     setError('');
-  };
+  }, [setIsSaveSketchOpen]);
+
+  useEscapeClose(isSaveSketchOpen, handleClose);
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
+      className="modal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="bg-surface-raised rounded-xl p-6 w-full max-w-md border border-border/60 shadow-2xl">
+      <div className="modal-panel max-w-md">
         <div className="flex justify-between items-center mb-5">
-          <h2 className="text-base font-mono font-semibold text-text-primary tracking-wide">
+          <h2 className="modal-title">
             Save Sketch
           </h2>
           <button
             onClick={handleClose}
-            className="text-text-muted/40 hover:text-accent transition-colors"
+            className="modal-close"
           >
             <svg
               className="w-5 h-5"
