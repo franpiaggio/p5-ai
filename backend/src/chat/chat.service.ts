@@ -69,8 +69,8 @@ const DEMO_MODEL = 'llama-3.3-70b-versatile';
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const JPEG_MAGIC = [0xff, 0xd8, 0xff];
 
-const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
-const MAX_TOTAL_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024;
 const MAX_TOTAL_IMAGES = 12;
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_TEXT_BYTES = 250_000;

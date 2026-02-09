@@ -1,8 +1,8 @@
 import type { ImageAttachment } from '../../types';
 
 export const MAX_IMAGES = 4;
-export const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4MB per image
-export const MAX_TOTAL_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB combined
+export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB per image
+export const MAX_TOTAL_IMAGE_BYTES = 20 * 1024 * 1024; // 20MB combined
 export const ACCEPTED_TYPES = ['image/png', 'image/jpeg'];
 export const SAFE_MIME_TYPES = new Set(['image/png', 'image/jpeg']);
 
@@ -26,7 +26,7 @@ export function fileToImageAttachment(file: File): Promise<ImageAttachment> {
       return;
     }
     if (file.size > MAX_IMAGE_SIZE) {
-      reject(new Error('Image must be under 4MB'));
+      reject(new Error('Image must be under 10MB'));
       return;
     }
     const reader = new FileReader();
@@ -51,12 +51,12 @@ export function validateAttachments(images: ImageAttachment[]): string | null {
   let totalBytes = 0;
   for (const img of images) {
     const estimated = estimateBase64Bytes(img.base64);
-    if (estimated > MAX_IMAGE_SIZE) return 'Each image must be under 4MB.';
+    if (estimated > MAX_IMAGE_SIZE) return 'Each image must be under 10MB.';
     totalBytes += estimated;
   }
 
   if (totalBytes > MAX_TOTAL_IMAGE_BYTES) {
-    return 'Images together must stay under 8MB.';
+    return 'Images together must stay under 20MB.';
   }
 
   return null;

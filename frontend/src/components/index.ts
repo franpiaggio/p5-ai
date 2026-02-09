@@ -8,3 +8,4 @@ export { SettingsModal } from './Settings/SettingsModal';
 export { PanelHeader, ResizeHandle, SplitPane, Panel } from './Layout';
 export { ProfileModal } from './Sketches/ProfileModal';
 export { SaveSketchModal } from './Sketches/SaveSketchModal';
+export { SketchesGrid } from './Sketches/SketchesGrid';

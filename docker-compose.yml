@@ -9,6 +9,7 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - DATABASE_PATH=/app/data/p5editor.sqlite
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - CORS_ORIGIN=https://p5ai.franpiaggio.com
     volumes:
       - sqlite_data:/app/data

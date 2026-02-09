@@ -49,6 +49,7 @@ export interface SketchSummary {
   id: string;
   title: string;
   description?: string;
+  thumbnail?: string | null;
   createdAt: string;
   updatedAt: string;
 }

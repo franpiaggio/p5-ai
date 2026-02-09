@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { updateSketch, createSketch } from '../../services/api';
+import { capturePreview } from '../Preview/P5Preview';
 
 
 export function FileMenu() {
@@ -18,7 +19,6 @@ export function FileMenu() {
   const user = useAuthStore((s) => s.user);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
   const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
-  const setIsProfileOpen = useAuthStore((s) => s.setIsProfileOpen);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -43,7 +43,8 @@ export function FileMenu() {
     }
     if (sketchId) {
       try {
-        await updateSketch(sketchId, { title: sketchTitle, code, codeHistory });
+        const thumbnail = await capturePreview();
+        await updateSketch(sketchId, { title: sketchTitle, code, codeHistory, thumbnail });
       } catch (err) {
         console.error('Failed to save:', err);
       }
@@ -135,7 +136,7 @@ export function FileMenu() {
             <>
               <div className="dropdown-separator" />
               <button
-                onClick={() => { setIsOpen(false); setIsProfileOpen(true); }}
+                onClick={() => { setIsOpen(false); useEditorStore.getState().setCurrentPage('sketches'); }}
                 className="dropdown-item"
               >
                 My Sketches

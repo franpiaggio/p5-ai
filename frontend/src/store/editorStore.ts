@@ -45,12 +45,16 @@ export interface PendingDiff {
 }
 
 const DEFAULT_CODE = `function setup() {
-  createCanvas(400, 400);
+  createCanvas(windowWidth, windowHeight);
 }
 
 function draw() {
   background(220);
   circle(mouseX, mouseY, 50);
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
 }`;
 
 interface EditorState {
@@ -76,6 +80,7 @@ interface EditorState {
   editorTheme: string;
   editorLanguage: EditorLanguage;
   transpiler: ((code: string) => Promise<string>) | null;
+  currentPage: 'editor' | 'sketches';
 
   setCode: (code: string) => void;
   setIsRunning: (running: boolean) => void;
@@ -105,6 +110,7 @@ interface EditorState {
   setEditorTheme: (theme: string) => void;
   setEditorLanguage: (language: EditorLanguage) => void;
   setTranspiler: (transpiler: ((code: string) => Promise<string>) | null) => void;
+  setCurrentPage: (page: 'editor' | 'sketches') => void;
 }
 
 let logCounter = 0;
@@ -140,6 +146,7 @@ export const useEditorStore = create<EditorState>()(
       editorTheme: 'p5-dark',
       editorLanguage: 'javascript' as EditorLanguage,
       transpiler: null,
+      currentPage: 'editor' as const,
 
       setCode: (code) =>
         set((state) => ({
@@ -273,6 +280,7 @@ export const useEditorStore = create<EditorState>()(
       setEditorTheme: (editorTheme) => set({ editorTheme }),
       setEditorLanguage: (editorLanguage) => set({ editorLanguage }),
       setTranspiler: (transpiler) => set({ transpiler }),
+      setCurrentPage: (currentPage) => set({ currentPage }),
       newSketch: () =>
         set((state) => ({
           code: DEFAULT_CODE,
@@ -316,13 +324,40 @@ export const useEditorStore = create<EditorState>()(
   )
 );
 
-// Sync sketchId to URL
+// Sync sketchId to URL (only when on editor page)
 let prevSketchId = useEditorStore.getState().sketchId;
 useEditorStore.subscribe((state) => {
+  if (state.currentPage !== 'editor') return;
   const id = state.sketchId;
   if (id === prevSketchId) return;
   prevSketchId = id;
   history.replaceState(null, '', id ? `/sketch/${id}` : '/');
+});
+
+// Sync currentPage to URL
+let prevPage = useEditorStore.getState().currentPage;
+useEditorStore.subscribe((state) => {
+  if (state.currentPage === prevPage) return;
+  prevPage = state.currentPage;
+  if (state.currentPage === 'sketches') {
+    history.pushState(null, '', '/sketches');
+  } else {
+    const id = state.sketchId;
+    history.pushState(null, '', id ? `/sketch/${id}` : '/');
+    prevSketchId = id;
+  }
+});
+
+// Handle browser back/forward button
+window.addEventListener('popstate', () => {
+  const path = window.location.pathname;
+  if (path === '/sketches') {
+    useEditorStore.setState({ currentPage: 'sketches' });
+    prevPage = 'sketches';
+  } else {
+    useEditorStore.setState({ currentPage: 'editor' });
+    prevPage = 'editor';
+  }
 });
 
 // Sync apiKey to sessionStorage only (backend save happens on Settings close)

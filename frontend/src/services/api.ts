@@ -68,6 +68,7 @@ export async function createSketch(data: {
   title: string;
   code: string;
   description?: string;
+  thumbnail?: string | null;
 }): Promise<SketchFull> {
   const response = await fetch(`${API_BASE}/sketches`, {
     method: 'POST',
@@ -107,7 +108,7 @@ export async function getSketch(id: string): Promise<SketchFull> {
 
 export async function updateSketch(
   id: string,
-  data: { title?: string; code?: string; description?: string; codeHistory?: unknown[] },
+  data: { title?: string; code?: string; description?: string; thumbnail?: string | null; codeHistory?: unknown[] },
 ): Promise<SketchFull> {
   const response = await fetch(`${API_BASE}/sketches/${id}`, {
     method: 'PUT',

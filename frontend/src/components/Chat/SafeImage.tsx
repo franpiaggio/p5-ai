@@ -1,4 +1,4 @@
-import { useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { createBlobUrl } from './imageUtils';
 import type { ImageAttachment } from '../../types';
 
@@ -8,11 +8,13 @@ export function SafeImage({ img, className, alt, onClick }: {
   alt: string;
   onClick?: () => void;
 }) {
-  const blobUrl = useMemo(() => createBlobUrl(img), [img]);
+  const [blobUrl, setBlobUrl] = useState('');
 
   useEffect(() => {
-    return () => { if (blobUrl) URL.revokeObjectURL(blobUrl); };
-  }, [blobUrl]);
+    const url = createBlobUrl(img);
+    setBlobUrl(url);
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [img]);
 
   if (!blobUrl) return null;
   return <img src={blobUrl} alt={alt} className={className} onClick={onClick} />;

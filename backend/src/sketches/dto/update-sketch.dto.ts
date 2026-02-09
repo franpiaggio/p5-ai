@@ -49,6 +49,11 @@ export class UpdateSketchDto {
   description?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(500_000)
+  thumbnail?: string;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CodeHistoryEntryDto)

@@ -63,6 +63,21 @@ const HTML_BEFORE_CODE = `<!DOCTYPE html>
     console.info = (...a) => { parent.postMessage({ type: 'info', message: fmt(a) }, '*'); _info.apply(console, a); };
     console.error = (...a) => { parent.postMessage({ type: 'error', message: fmt(a) }, '*'); _err.apply(console, a); };
     console.warn = (...a) => { parent.postMessage({ type: 'warn', message: fmt(a) }, '*'); _warn.apply(console, a); };
+
+    window.addEventListener('message', (e) => {
+      if (e.data?.type === 'capture') {
+        const c = document.querySelector('canvas');
+        if (!c) { parent.postMessage({ type: 'capture', dataUrl: null }, '*'); return; }
+        const max = 320;
+        const scale = Math.min(max / c.width, max / c.height, 1);
+        const t = document.createElement('canvas');
+        t.width = Math.round(c.width * scale);
+        t.height = Math.round(c.height * scale);
+        const ctx = t.getContext('2d');
+        ctx.drawImage(c, 0, 0, t.width, t.height);
+        parent.postMessage({ type: 'capture', dataUrl: t.toDataURL('image/webp', 0.7) }, '*');
+      }
+    });
   <\/script>
   <script>
 `;
@@ -78,6 +93,23 @@ const LINE_OFFSET = HTML_BEFORE_CODE.split('\n').length - 1;
 
 const HTML_TEMPLATE = (code: string) =>
   HTML_BEFORE_CODE.replace('{{LINE_OFFSET}}', String(LINE_OFFSET)) + code + HTML_AFTER_CODE;
+
+// Module-level ref for thumbnail capture
+let _iframeEl: HTMLIFrameElement | null = null;
+
+/** Request a thumbnail data URL from the running preview iframe. */
+export function capturePreview(): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!_iframeEl?.contentWindow) { resolve(null); return; }
+    const timeout = setTimeout(() => { cleanup(); resolve(null); }, 2000);
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'capture') { cleanup(); resolve(e.data.dataUrl ?? null); }
+    };
+    const cleanup = () => { clearTimeout(timeout); window.removeEventListener('message', handler); };
+    window.addEventListener('message', handler);
+    _iframeEl.contentWindow.postMessage({ type: 'capture' }, '*');
+  });
+}
 
 export function P5Preview() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -104,6 +136,12 @@ export function P5Preview() {
       }
     }
   }, [addConsoleLog, addEditorError]);
+
+  // Keep module-level ref in sync for capturePreview()
+  useEffect(() => {
+    _iframeEl = iframeRef.current;
+    return () => { _iframeEl = null; };
+  });
 
   useEffect(() => {
     window.addEventListener('message', handleMessage);

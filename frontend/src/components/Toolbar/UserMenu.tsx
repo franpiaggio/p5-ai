@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { useEditorStore } from '../../store/editorStore';
 import { logoutApi } from '../../services/api';
 
 export function UserMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const setIsProfileOpen = useAuthStore((s) => s.setIsProfileOpen);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export function UserMenu() {
           </div>
           <button
             onClick={() => {
-              setIsProfileOpen(true);
+              useEditorStore.getState().setCurrentPage('sketches');
               setIsOpen(false);
             }}
             className="dropdown-item"

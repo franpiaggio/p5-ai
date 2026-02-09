@@ -13,4 +13,9 @@ export class CreateSketchDto {
   @IsString()
   @MaxLength(1000)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500_000)
+  thumbnail?: string;
 }

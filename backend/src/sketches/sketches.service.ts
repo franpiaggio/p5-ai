@@ -28,7 +28,7 @@ export class SketchesService {
     return this.sketchesRepository.find({
       where: { userId },
       order: { updatedAt: 'DESC' },
-      select: ['id', 'title', 'description', 'createdAt', 'updatedAt'],
+      select: ['id', 'title', 'description', 'thumbnail', 'createdAt', 'updatedAt'],
     });
   }
 

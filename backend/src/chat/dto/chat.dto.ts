@@ -13,7 +13,7 @@ import { Type } from 'class-transformer';
 
 export class ImageAttachmentDto {
   @IsString()
-  @MaxLength(6_000_000) // ~4.5MB base64
+  @MaxLength(14_000_000) // ~10MB base64
   base64: string;
 
   @IsIn(['image/png', 'image/jpeg'])

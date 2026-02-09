@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { updateSketch, createSketch, logoutApi } from '../../services/api';
+import { capturePreview } from '../Preview/P5Preview';
 import { EDITOR_THEMES } from '../Editor/editorConfig';
 import type { EditorLanguage } from '../../store/editorStore';
 
@@ -25,7 +26,6 @@ export function MobileMenu() {
   const logout = useAuthStore((s) => s.logout);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
   const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
-  const setIsProfileOpen = useAuthStore((s) => s.setIsProfileOpen);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -52,7 +52,8 @@ export function MobileMenu() {
     }
     if (sketchId) {
       try {
-        await updateSketch(sketchId, { title: sketchTitle, code, codeHistory });
+        const thumbnail = await capturePreview();
+        await updateSketch(sketchId, { title: sketchTitle, code, codeHistory, thumbnail });
       } catch (err) {
         console.error('Failed to save:', err);
       }
@@ -91,7 +92,7 @@ export function MobileMenu() {
 
   const handleSketches = () => {
     close();
-    setIsProfileOpen(true);
+    useEditorStore.getState().setCurrentPage('sketches');
   };
 
   const handleSignIn = () => {

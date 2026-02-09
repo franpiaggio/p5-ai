@@ -3,6 +3,7 @@ import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
 import { useEditorStore } from '../../store/editorStore';
 import { createSketch } from '../../services/api';
+import { capturePreview } from '../Preview/P5Preview';
 
 export function SaveSketchModal() {
   const isSaveSketchOpen = useAuthStore((s) => s.isSaveSketchOpen);
@@ -38,10 +39,12 @@ export function SaveSketchModal() {
     setSaving(true);
     setError('');
     try {
+      const thumbnail = await capturePreview();
       const saved = await createSketch({
         title: title.trim(),
         code,
         description: description.trim() || undefined,
+        thumbnail,
       });
       setSketchMeta(saved.id, saved.title);
       setIsSaveSketchOpen(false);

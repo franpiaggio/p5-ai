@@ -31,6 +31,9 @@ export class Sketch {
   @Column({ nullable: true })
   description: string;
 
+  @Column({ type: 'text', nullable: true, default: null })
+  thumbnail: string | null;
+
   @Column({ type: 'simple-json', nullable: true, default: null })
   codeHistory: Array<{
     id: string;
