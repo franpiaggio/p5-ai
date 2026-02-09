@@ -31,8 +31,7 @@ const SYSTEM_PROMPT = `You are an expert creative coding assistant specializing 
 - Consider fade trails: background(r, g, b, alpha) with low alpha instead of solid clear
 - Vary scales — large elements with small details create visual interest
 
-## INTERACTIVITY
-Every sketch should have at least one interaction:
+## INTERACTIVITY (only when relevant or requested)
 - mouseX/mouseY: control visual parameters (size, color, speed, angle) via map()
 - mouseIsPressed/mousePressed(): generate elements, toggle states, apply forces
 - keyPressed(): toggle modes, reset, save frame
