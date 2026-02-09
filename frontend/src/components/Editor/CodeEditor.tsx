@@ -4,6 +4,7 @@ import type * as Monaco from 'monaco-editor';
 import { useEditorStore } from '../../store/editorStore';
 import { DiffToolbar } from './DiffToolbar';
 import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles } from './editorConfig';
+import { P5_TYPE_DEFS } from './p5Types';
 
 export function CodeEditor() {
   const code = useEditorStore((s) => s.code);
@@ -86,6 +87,12 @@ export function CodeEditor() {
       checkJs: false,
       allowNonTsExtensions: true,
     });
+
+    // Add p5.js type declarations so Monaco recognizes p5 globals as functions
+    monaco.languages.typescript.javascriptDefaults.addExtraLib(
+      P5_TYPE_DEFS,
+      'p5-global.d.ts',
+    );
   }, []);
 
   const handleMount: OnMount = useCallback((editor, monaco) => {
