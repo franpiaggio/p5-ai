@@ -133,15 +133,24 @@ export function P5Preview() {
   }, [runTrigger, previewCode]);
 
   if (!isRunning) {
+    const handleRun = () => {
+      useEditorStore.getState().clearConsoleLogs();
+      useEditorStore.getState().runSketch();
+    };
+
     return (
       <div className="h-full w-full flex flex-col items-center justify-center bg-surface gap-3">
-        <div className="w-12 h-12 rounded-xl bg-border/40 flex items-center justify-center">
+        <button
+          onClick={handleRun}
+          className="w-12 h-12 rounded-xl bg-border/40 hover:bg-accent/20 flex items-center justify-center transition-colors cursor-pointer"
+        >
           <svg className="w-6 h-6 text-info/50" fill="currentColor" viewBox="0 0 24 24">
             <path d="M8 5v14l11-7z" />
           </svg>
-        </div>
+        </button>
         <span className="text-text-muted/40 text-xs font-mono">
-          Alt+Enter to run
+          <span className="hidden md:inline">Alt+Enter to run</span>
+          <span className="md:hidden">Tap to run</span>
         </span>
       </div>
     );

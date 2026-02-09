@@ -260,7 +260,7 @@ export const useEditorStore = create<EditorState>()(
       setSketchMeta: (sketchId, sketchTitle) => set({ sketchId, sketchTitle }),
       setFixRequest: (fixRequest) => set({ fixRequest }),
       newSketch: () =>
-        set({
+        set((state) => ({
           code: DEFAULT_CODE,
           sketchId: null,
           sketchTitle: 'Untitled Sketch',
@@ -268,8 +268,12 @@ export const useEditorStore = create<EditorState>()(
           codeHistory: [],
           appliedBlocks: {},
           pendingDiff: null,
+          previewCode: null,
           consoleLogs: [],
-        }),
+          editorErrors: [],
+          isRunning: true,
+          runTrigger: state.runTrigger + 1,
+        })),
     }),
     {
       name: 'p5-ai-editor',
@@ -296,28 +300,14 @@ export const useEditorStore = create<EditorState>()(
   )
 );
 
-// Sync apiKey to sessionStorage + debounced backend save
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;
-
-useEditorStore.subscribe((state) => {
-  const key = state.llmConfig.apiKey;
-  if (key) {
-    sessionStorage.setItem('p5-ai-editor-key', key);
-  } else {
-    sessionStorage.removeItem('p5-ai-editor-key');
-  }
-
-  // Debounced save to backend if logged in
-  if (saveTimeout) clearTimeout(saveTimeout);
-  if (key) {
-    saveTimeout = setTimeout(async () => {
-      try {
-        const { useAuthStore } = await import('./authStore');
-        if (useAuthStore.getState().user) {
-          const { saveApiKey } = await import('../services/api');
-          saveApiKey(key);
-        }
-      } catch { /* ignore */ }
-    }, 1000);
-  }
-});
+// Sync apiKey to sessionStorage only (backend save happens on Settings close)
+useEditorStore.subscribe(
+  (state) => state.llmConfig.apiKey,
+  (key) => {
+    if (key) {
+      sessionStorage.setItem('p5-ai-editor-key', key);
+    } else {
+      sessionStorage.removeItem('p5-ai-editor-key');
+    }
+  },
+);

@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
-import { fetchModels, getApiKey } from '../../services/api';
+import { fetchModels, getApiKey, saveApiKey } from '../../services/api';
 import type { LLMConfig } from '../../types';
 
 const FALLBACK_MODELS: Record<string, string[]> = {
@@ -27,6 +27,7 @@ export function SettingsModal() {
 
   const [models, setModels] = useState<string[]>(FALLBACK_MODELS[llmConfig.provider] ?? []);
   const [loadingModels, setLoadingModels] = useState(false);
+  const keyOnOpenRef = useRef('');
 
   // Auto-fetch API key from backend if logged in and key is empty (e.g. page refresh)
   useEffect(() => {
@@ -35,6 +36,13 @@ export function SettingsModal() {
       if (key) setLLMConfig({ apiKey: key });
     });
   }, [isSettingsOpen, user]);
+
+  // Track the key value when modal opens
+  useEffect(() => {
+    if (isSettingsOpen) {
+      keyOnOpenRef.current = llmConfig.apiKey;
+    }
+  }, [isSettingsOpen]);
 
   useEffect(() => {
     if (!isSettingsOpen) return;
@@ -63,6 +71,14 @@ export function SettingsModal() {
     return () => { cancelled = true; };
   }, [isSettingsOpen, llmConfig.provider, llmConfig.apiKey]);
 
+  const handleClose = () => {
+    const currentKey = useEditorStore.getState().llmConfig.apiKey;
+    if (user && currentKey && currentKey !== keyOnOpenRef.current) {
+      saveApiKey(currentKey).catch(() => {});
+    }
+    setIsSettingsOpen(false);
+  };
+
   if (!isSettingsOpen) return null;
 
   const isDemo = llmConfig.provider === 'demo';
@@ -71,7 +87,7 @@ export function SettingsModal() {
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50"
       onClick={(e) => {
-        if (e.target === e.currentTarget) setIsSettingsOpen(false);
+        if (e.target === e.currentTarget) handleClose();
       }}
     >
       <div className="bg-surface-raised rounded-xl p-6 w-full max-w-md border border-border/60 shadow-2xl">
@@ -80,7 +96,7 @@ export function SettingsModal() {
             Settings
           </h2>
           <button
-            onClick={() => setIsSettingsOpen(false)}
+            onClick={handleClose}
             className="text-text-muted/40 hover:text-accent transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -203,7 +219,7 @@ export function SettingsModal() {
 
         <div className="mt-6 flex justify-end">
           <button
-            onClick={() => setIsSettingsOpen(false)}
+            onClick={handleClose}
             className="btn-primary px-5"
           >
             Done

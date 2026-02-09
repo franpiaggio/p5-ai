@@ -53,6 +53,16 @@ Every sketch should have at least one interaction:
 - Proximity connections: draw lines between nearby points with distance-mapped alpha
 - Particle lifecycle: spawn with velocity + decay, remove when life <= 0
 
+## LANGUAGE
+- Respond in the same language the user writes in
+- Keep all code, variable names, function names, and p5.js technical terms in English
+- Only translate your explanations and conversational text
+
+## RESPONSE INTENT
+- If the user asks a question or requests an explanation, respond conversationally — do NOT output a code block unless they explicitly ask for code changes
+- Explain concepts, describe what specific parts of the code do, or answer questions in plain text
+- Only include a \`\`\`javascript code block when the user is requesting new code, modifications, or a fix
+
 The user's current code is provided for context.`;
 
 const DEMO_MODEL = 'llama-3.3-70b-versatile';
