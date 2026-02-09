@@ -11,15 +11,20 @@ import {
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { SketchesService } from './sketches.service';
-import type { CreateSketchDto } from './dto/create-sketch.dto';
-import type { UpdateSketchDto } from './dto/update-sketch.dto';
+import { CreateSketchDto } from './dto/create-sketch.dto';
+import { UpdateSketchDto } from './dto/update-sketch.dto';
 
 @Controller('api/sketches')
-@UseGuards(AuthGuard)
 export class SketchesController {
   constructor(private sketchesService: SketchesService) {}
 
+  @Get('public/:id')
+  findOnePublic(@Param('id') id: string) {
+    return this.sketchesService.findOnePublic(id);
+  }
+
   @Post()
+  @UseGuards(AuthGuard)
   create(
     @CurrentUser() user: { sub: string },
     @Body() dto: CreateSketchDto,
@@ -28,11 +33,13 @@ export class SketchesController {
   }
 
   @Get()
+  @UseGuards(AuthGuard)
   findAll(@CurrentUser() user: { sub: string }) {
     return this.sketchesService.findAllByUser(user.sub);
   }
 
   @Get(':id')
+  @UseGuards(AuthGuard)
   findOne(
     @Param('id') id: string,
     @CurrentUser() user: { sub: string },
@@ -41,6 +48,7 @@ export class SketchesController {
   }
 
   @Put(':id')
+  @UseGuards(AuthGuard)
   update(
     @Param('id') id: string,
     @CurrentUser() user: { sub: string },
@@ -50,6 +58,7 @@ export class SketchesController {
   }
 
   @Delete(':id')
+  @UseGuards(AuthGuard)
   remove(
     @Param('id') id: string,
     @CurrentUser() user: { sub: string },

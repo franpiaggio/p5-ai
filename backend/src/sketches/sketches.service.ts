@@ -6,8 +6,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Sketch } from './sketch.entity';
-import type { CreateSketchDto } from './dto/create-sketch.dto';
-import type { UpdateSketchDto } from './dto/update-sketch.dto';
+import { CreateSketchDto } from './dto/create-sketch.dto';
+import { UpdateSketchDto } from './dto/update-sketch.dto';
 
 @Injectable()
 export class SketchesService {
@@ -30,6 +30,12 @@ export class SketchesService {
       order: { updatedAt: 'DESC' },
       select: ['id', 'title', 'description', 'createdAt', 'updatedAt'],
     });
+  }
+
+  async findOnePublic(id: string): Promise<Sketch> {
+    const sketch = await this.sketchesRepository.findOne({ where: { id } });
+    if (!sketch) throw new NotFoundException('Sketch not found');
+    return sketch;
   }
 
   async findOne(id: string, userId: string): Promise<Sketch> {

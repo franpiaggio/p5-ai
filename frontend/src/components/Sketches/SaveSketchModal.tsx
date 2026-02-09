@@ -15,6 +15,15 @@ export function SaveSketchModal() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const handleClose = useCallback(() => {
+    setIsSaveSketchOpen(false);
+    setTitle('');
+    setDescription('');
+    setError('');
+  }, [setIsSaveSketchOpen]);
+
+  useEscapeClose(isSaveSketchOpen, handleClose);
+
   // Pre-fill title from store when modal opens
   useEffect(() => {
     if (isSaveSketchOpen) {
@@ -44,15 +53,6 @@ export function SaveSketchModal() {
       setSaving(false);
     }
   };
-
-  const handleClose = useCallback(() => {
-    setIsSaveSketchOpen(false);
-    setTitle('');
-    setDescription('');
-    setError('');
-  }, [setIsSaveSketchOpen]);
-
-  useEscapeClose(isSaveSketchOpen, handleClose);
 
   return (
     <div

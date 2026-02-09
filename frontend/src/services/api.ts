@@ -88,6 +88,14 @@ export async function getSketches(): Promise<SketchSummary[]> {
   return response.json();
 }
 
+export async function getPublicSketch(id: string): Promise<SketchFull> {
+  const response = await fetch(`${API_BASE}/sketches/public/${id}`, {
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!response.ok) throw new Error('Failed to fetch sketch');
+  return response.json();
+}
+
 export async function getSketch(id: string): Promise<SketchFull> {
   const response = await fetch(`${API_BASE}/sketches/${id}`, {
     headers: { 'Content-Type': 'application/json' },

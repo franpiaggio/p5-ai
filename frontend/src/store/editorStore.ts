@@ -316,6 +316,15 @@ export const useEditorStore = create<EditorState>()(
   )
 );
 
+// Sync sketchId to URL
+let prevSketchId = useEditorStore.getState().sketchId;
+useEditorStore.subscribe((state) => {
+  const id = state.sketchId;
+  if (id === prevSketchId) return;
+  prevSketchId = id;
+  history.replaceState(null, '', id ? `/sketch/${id}` : '/');
+});
+
 // Sync apiKey to sessionStorage only (backend save happens on Settings close)
 let prevApiKey = useEditorStore.getState().llmConfig.apiKey;
 useEditorStore.subscribe((state) => {
