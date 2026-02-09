@@ -8,7 +8,6 @@ export function ProfileModal() {
   const isProfileOpen = useAuthStore((s) => s.isProfileOpen);
   const setIsProfileOpen = useAuthStore((s) => s.setIsProfileOpen);
   const user = useAuthStore((s) => s.user);
-  const setCode = useEditorStore((s) => s.setCode);
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
   const [sketches, setSketches] = useState<SketchSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -28,11 +27,18 @@ export function ProfileModal() {
   const handleLoad = async (id: string) => {
     try {
       const sketch = await getSketch(id);
-      setCode(sketch.code);
+      useEditorStore.setState({
+        code: sketch.code,
+        isRunning: false,
+        previewCode: null,
+        pendingDiff: null,
+        consoleLogs: [],
+        editorErrors: [],
+        messages: [],
+        appliedBlocks: {},
+        ...(sketch.codeHistory ? { codeHistory: sketch.codeHistory } : {}),
+      });
       setSketchMeta(sketch.id, sketch.title);
-      if (sketch.codeHistory) {
-        useEditorStore.setState({ codeHistory: sketch.codeHistory });
-      }
       setIsProfileOpen(false);
     } catch (error) {
       console.error('Failed to load sketch:', error);
