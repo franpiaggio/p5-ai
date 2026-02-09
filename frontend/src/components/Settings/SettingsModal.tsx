@@ -4,7 +4,6 @@ import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
 import { fetchModels, getApiKey, saveApiKey } from '../../services/api';
 import type { LLMConfig } from '../../types';
-import { EDITOR_THEMES } from '../Editor/editorConfig';
 
 const FALLBACK_MODELS: Record<string, string[]> = {
   demo: ['llama-3.3-70b-versatile'],
@@ -25,8 +24,6 @@ export function SettingsModal() {
   const setLLMConfig = useEditorStore((s) => s.setLLMConfig);
   const autoApply = useEditorStore((s) => s.autoApply);
   const setAutoApply = useEditorStore((s) => s.setAutoApply);
-  const editorTheme = useEditorStore((s) => s.editorTheme);
-  const setEditorTheme = useEditorStore((s) => s.setEditorTheme);
   const user = useAuthStore((s) => s.user);
 
   const [models, setModels] = useState<string[]>(FALLBACK_MODELS[llmConfig.provider] ?? []);
@@ -180,21 +177,6 @@ export function SettingsModal() {
         </div>
 
         <div className="mt-5 pt-4 border-t border-border/30 space-y-4">
-          <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
-              Editor Theme
-            </label>
-            <select
-              value={editorTheme}
-              onChange={(e) => setEditorTheme(e.target.value)}
-              className="input-field"
-            >
-              {EDITOR_THEMES.map((t) => (
-                <option key={t.id} value={t.id}>{t.label}</option>
-              ))}
-            </select>
-          </div>
-
           <label className="flex items-center justify-between cursor-pointer">
             <div>
               <span className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-0.5">

@@ -153,6 +153,7 @@ export async function checkBackendHealth(): Promise<boolean> {
 export interface ChatRequest {
   message: string;
   code: string;
+  language?: 'javascript' | 'typescript';
   history: Message[];
   config: LLMConfig;
   images?: ImageAttachment[];

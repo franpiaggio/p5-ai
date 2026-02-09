@@ -24,9 +24,9 @@ export function registerFunctionCallTokenProvider(monaco: typeof Monaco) {
     tokenModifiers: [],
   };
 
-  monaco.languages.registerDocumentSemanticTokensProvider('javascript', {
+  const provider = {
     getLegend: () => legend,
-    provideDocumentSemanticTokens(model) {
+    provideDocumentSemanticTokens(model: Monaco.editor.ITextModel) {
       const lines = model.getLinesContent();
       const data: number[] = [];
       let prevLine = 0;
@@ -55,7 +55,10 @@ export function registerFunctionCallTokenProvider(monaco: typeof Monaco) {
       return { data: new Uint32Array(data) };
     },
     releaseDocumentSemanticTokens() {},
-  });
+  };
+
+  monaco.languages.registerDocumentSemanticTokensProvider('javascript', provider);
+  monaco.languages.registerDocumentSemanticTokensProvider('typescript', provider);
 }
 
 export const EDITOR_OPTIONS = {

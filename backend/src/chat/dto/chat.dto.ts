@@ -64,6 +64,10 @@ export class ChatRequestDto {
   @MaxLength(500_000)
   code: string;
 
+  @IsOptional()
+  @IsIn(['javascript', 'typescript'])
+  language?: 'javascript' | 'typescript';
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => MessageDto)

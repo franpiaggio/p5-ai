@@ -74,6 +74,7 @@ export function ChatPanel() {
       for await (const chunk of streamChat({
         message: userMessage,
         code: currentState.code,
+        language: currentState.editorLanguage,
         history: currentState.messages.slice(0, -1),
         config: currentState.llmConfig,
         ...(images?.length ? { images } : {}),

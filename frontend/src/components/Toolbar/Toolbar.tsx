@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { LoginButton } from './GoogleLoginButton';
 import { UserMenu } from './UserMenu';
 import { FileMenu } from './FileMenu';
+import { CodeMenu } from './CodeMenu';
 import { MobileMenu } from './MobileMenu';
 import { updateSketch } from '../../services/api';
 
@@ -154,9 +155,10 @@ export function Toolbar() {
         AI Editor
       </span>
 
-      {/* Desktop: File + separator + play/stop */}
+      {/* Desktop: File + Code + separator + play/stop */}
       <div className="hidden md:flex items-center gap-3">
         <FileMenu />
+        <CodeMenu />
         <div className="w-px h-5 bg-border/60" />
       </div>
 

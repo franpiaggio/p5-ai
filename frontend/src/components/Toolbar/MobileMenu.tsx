@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { updateSketch, createSketch, logoutApi } from '../../services/api';
+import { EDITOR_THEMES } from '../Editor/editorConfig';
+import type { EditorLanguage } from '../../store/editorStore';
 
 export function MobileMenu() {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,6 +16,10 @@ export function MobileMenu() {
   const newSketch = useEditorStore((s) => s.newSketch);
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
   const setIsSettingsOpen = useEditorStore((s) => s.setIsSettingsOpen);
+  const editorLanguage = useEditorStore((s) => s.editorLanguage);
+  const setEditorLanguage = useEditorStore((s) => s.setEditorLanguage);
+  const editorTheme = useEditorStore((s) => s.editorTheme);
+  const setEditorTheme = useEditorStore((s) => s.setEditorTheme);
 
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -135,6 +141,48 @@ export function MobileMenu() {
           >
             Duplicate
           </button>
+
+          <div className="dropdown-separator" />
+
+          {/* Language */}
+          <div className="px-4 py-1.5 text-[9px] font-mono uppercase tracking-widest text-text-muted/40">
+            Language
+          </div>
+          {(['javascript', 'typescript'] as EditorLanguage[]).map((lang) => (
+            <button
+              key={lang}
+              onClick={() => { setEditorLanguage(lang); close(); }}
+              className={`${menuItemClass} flex items-center justify-between`}
+            >
+              <span>{lang === 'javascript' ? 'JavaScript' : 'TypeScript'}</span>
+              {editorLanguage === lang && (
+                <svg className="w-3.5 h-3.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          ))}
+
+          <div className="dropdown-separator" />
+
+          {/* Theme */}
+          <div className="px-4 py-1.5 text-[9px] font-mono uppercase tracking-widest text-text-muted/40">
+            Theme
+          </div>
+          {EDITOR_THEMES.map((theme) => (
+            <button
+              key={theme.id}
+              onClick={() => { setEditorTheme(theme.id); close(); }}
+              className={`${menuItemClass} flex items-center justify-between`}
+            >
+              <span>{theme.label}</span>
+              {editorTheme === theme.id && (
+                <svg className="w-3.5 h-3.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+            </button>
+          ))}
 
           <div className="dropdown-separator" />
 

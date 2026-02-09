@@ -113,18 +113,30 @@ export function P5Preview() {
   useEffect(() => {
     if (!iframeRef.current || !isRunning) return;
 
-    if (blobUrlRef.current) {
-      URL.revokeObjectURL(blobUrlRef.current);
-    }
+    let cancelled = false;
 
-    const activeCode = previewCode?.code ?? code;
-    const html = HTML_TEMPLATE(activeCode);
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    blobUrlRef.current = url;
-    iframeRef.current.src = url;
+    (async () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+
+      const activeCode = previewCode?.code ?? code;
+      const { transpiler, editorLanguage } = useEditorStore.getState();
+      const jsCode = editorLanguage === 'typescript' && transpiler
+        ? await transpiler(activeCode)
+        : activeCode;
+
+      if (cancelled || !iframeRef.current) return;
+
+      const html = HTML_TEMPLATE(jsCode);
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
+      iframeRef.current.src = url;
+    })();
 
     return () => {
+      cancelled = true;
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;

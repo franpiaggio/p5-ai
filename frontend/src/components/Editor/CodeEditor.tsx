@@ -14,6 +14,7 @@ export function CodeEditor() {
   const editorErrors = useEditorStore((s) => s.editorErrors);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
   const editorTheme = useEditorStore((s) => s.editorTheme);
+  const editorLanguage = useEditorStore((s) => s.editorLanguage);
 
   const runRef = useRef(runSketch);
   const clearRef = useRef(clearConsoleLogs);
@@ -80,30 +81,43 @@ export function CodeEditor() {
     injectErrorStyles();
     registerFunctionCallTokenProvider(monaco);
 
-    // Enable semantic highlighting for richer coloring (methods, properties, etc.)
-    monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true);
-    monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+    const compilerOptions = {
       target: monaco.languages.typescript.ScriptTarget.ESNext,
       allowJs: true,
       checkJs: false,
       allowNonTsExtensions: true,
-    });
+      noEmit: true,
+    };
 
-    // Add p5.js type declarations so Monaco recognizes p5 globals as functions
-    monaco.languages.typescript.javascriptDefaults.addExtraLib(
-      P5_TYPE_DEFS,
-      'p5-global.d.ts',
-    );
+    // Configure both JS and TS defaults so language switching works without remount
+    monaco.languages.typescript.typescriptDefaults.setEagerModelSync(true);
+    monaco.languages.typescript.typescriptDefaults.setCompilerOptions(compilerOptions);
+    monaco.languages.typescript.typescriptDefaults.addExtraLib(P5_TYPE_DEFS, 'p5-global.d.ts');
+
+    monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true);
+    monaco.languages.typescript.javascriptDefaults.setCompilerOptions(compilerOptions);
+    monaco.languages.typescript.javascriptDefaults.addExtraLib(P5_TYPE_DEFS, 'p5-global.d.ts');
   }, []);
 
   const handleMount: OnMount = useCallback((editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
 
-    // Disable all diagnostics — p5.js globals would show false errors
-    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
-      noSemanticValidation: true,
-      noSyntaxValidation: true,
+    // Disable semantic validation (p5 globals cause false errors), keep syntax validation
+    const diagOptions = { noSemanticValidation: true, noSyntaxValidation: false };
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(diagOptions);
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions(diagOptions);
+
+    // Register transpiler using Monaco's TypeScript worker
+    const setTranspiler = useEditorStore.getState().setTranspiler;
+    setTranspiler(async (code: string) => {
+      const worker = await monaco.languages.typescript.getTypeScriptWorker();
+      const model = editor.getModel();
+      if (!model) return code;
+      const client = await worker(model.uri);
+      const result = await client.getEmitOutput(model.uri.toString());
+      const jsFile = result.outputFiles.find((f: { name: string }) => f.name.endsWith('.js'));
+      return jsFile ? jsFile.text : code;
     });
 
     if (!document.querySelector('[data-chat-input]:focus')) {
@@ -132,7 +146,7 @@ export function CodeEditor() {
         <DiffToolbar />
         <DiffEditor
           height="100%"
-          language="javascript"
+          language={editorLanguage}
           original={pendingDiff.previousCode}
           modified={code}
           theme={editorTheme}
@@ -153,7 +167,8 @@ export function CodeEditor() {
     <div className="h-full w-full">
       <Editor
         height="100%"
-        defaultLanguage="javascript"
+        language={editorLanguage}
+        path={editorLanguage === 'typescript' ? 'sketch.ts' : 'sketch.js'}
         value={code}
         onChange={(value) => setCode(value || '')}
         beforeMount={handleBeforeMount}

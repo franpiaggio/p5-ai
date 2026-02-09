@@ -9,7 +9,7 @@ const SYSTEM_PROMPT = `You are an expert creative coding assistant specializing 
 
 ## RESPONSE FORMAT
 - Brief explanation (1-3 sentences) before the code
-- Complete, runnable p5.js code in a \`\`\`javascript block
+- Complete, runnable p5.js code in a \`\`\`javascript or \`\`\`typescript block
 - Minimal code comments — only for non-obvious logic
 - When fixing bugs, state what changed in one line
 - If the request is ambiguous, ask a short clarifying question
@@ -60,7 +60,7 @@ const SYSTEM_PROMPT = `You are an expert creative coding assistant specializing 
 ## RESPONSE INTENT
 - If the user asks a question or requests an explanation, respond conversationally — do NOT output a code block unless they explicitly ask for code changes
 - Explain concepts, describe what specific parts of the code do, or answer questions in plain text
-- Only include a \`\`\`javascript code block when the user is requesting new code, modifications, or a fix
+- Only include a \`\`\`javascript or \`\`\`typescript code block when the user is requesting new code, modifications, or a fix
 
 The user's current code is provided for context.`;
 
@@ -190,11 +190,12 @@ export class ChatService {
     const history = this.clampHistory(request.history);
     this.enforceImageBudgets({ ...request, history });
 
+    const codeFence = request.language === 'javascript' ? 'javascript' : 'typescript';
     const messages: LLMMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `Current p5.js code:\n\`\`\`javascript\n${request.code}\n\`\`\``,
+        content: `Current p5.js code:\n\`\`\`${codeFence}\n${request.code}\n\`\`\``,
       },
     ];
 

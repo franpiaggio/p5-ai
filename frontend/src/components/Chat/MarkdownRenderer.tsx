@@ -30,7 +30,8 @@ function CollapsibleCodeBlock({
   const appliedBlocks = useEditorStore((s) => s.appliedBlocks);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
 
-  const isJS = language === 'javascript' || language === 'js' || language === 'jsx';
+  const isJS = language === 'javascript' || language === 'js' || language === 'jsx'
+    || language === 'typescript' || language === 'ts' || language === 'tsx';
   const lineCount = code.split('\n').length;
   const blockKey = messageId ? `${messageId}:${simpleHash(code)}` : '';
   const isApplied = blockKey ? !!appliedBlocks[blockKey] : false;

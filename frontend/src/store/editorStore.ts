@@ -10,9 +10,9 @@ export function simpleHash(str: string): string {
   return hash.toString(36);
 }
 
-/** Extract first JS code block from markdown. Returns null if none found. */
+/** Extract first JS/TS code block from markdown. Returns null if none found. */
 export function extractFirstJsBlock(markdown: string): string | null {
-  const match = /```(?:javascript|js|jsx)\s*\n([\s\S]*?)```/.exec(markdown);
+  const match = /```(?:javascript|js|jsx|typescript|ts|tsx)\s*\n([\s\S]*?)```/.exec(markdown);
   return match ? match[1].replace(/\n$/, '') : null;
 }
 
@@ -32,6 +32,8 @@ function diffSummary(oldCode: string, newCode: string): string {
   if (parts.length === 0) return 'No visible changes';
   return `${parts.join(' / ')} lines`;
 }
+
+export type EditorLanguage = 'javascript' | 'typescript';
 
 export interface PendingDiff {
   code: string;
@@ -72,6 +74,8 @@ interface EditorState {
   sketchTitle: string;
   fixRequest: string | null;
   editorTheme: string;
+  editorLanguage: EditorLanguage;
+  transpiler: ((code: string) => Promise<string>) | null;
 
   setCode: (code: string) => void;
   setIsRunning: (running: boolean) => void;
@@ -99,6 +103,8 @@ interface EditorState {
   newSketch: () => void;
   setFixRequest: (request: string | null) => void;
   setEditorTheme: (theme: string) => void;
+  setEditorLanguage: (language: EditorLanguage) => void;
+  setTranspiler: (transpiler: ((code: string) => Promise<string>) | null) => void;
 }
 
 let logCounter = 0;
@@ -131,7 +137,9 @@ export const useEditorStore = create<EditorState>()(
       sketchId: null,
       sketchTitle: 'Untitled Sketch',
       fixRequest: null,
-      editorTheme: 'vs-dark',
+      editorTheme: 'p5-dark',
+      editorLanguage: 'javascript' as EditorLanguage,
+      transpiler: null,
 
       setCode: (code) =>
         set((state) => ({
@@ -263,6 +271,8 @@ export const useEditorStore = create<EditorState>()(
       setSketchMeta: (sketchId, sketchTitle) => set({ sketchId, sketchTitle }),
       setFixRequest: (fixRequest) => set({ fixRequest }),
       setEditorTheme: (editorTheme) => set({ editorTheme }),
+      setEditorLanguage: (editorLanguage) => set({ editorLanguage }),
+      setTranspiler: (transpiler) => set({ transpiler }),
       newSketch: () =>
         set((state) => ({
           code: DEFAULT_CODE,
@@ -291,6 +301,7 @@ export const useEditorStore = create<EditorState>()(
         codeHistory: state.codeHistory,
         autoApply: state.autoApply,
         editorTheme: state.editorTheme,
+        editorLanguage: state.editorLanguage,
         sketchId: state.sketchId,
         sketchTitle: state.sketchTitle,
       }),
