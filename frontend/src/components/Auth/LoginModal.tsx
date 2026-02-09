@@ -14,13 +14,22 @@ export function LoginModal() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const handleClose = useCallback(() => {
+    setIsLoginOpen(false);
+    setUsername('');
+    setPassword('');
+    setError('');
+  }, [setIsLoginOpen]);
+
+  useEscapeClose(isLoginOpen, handleClose);
+
+  if (!isLoginOpen) return null;
+
   const restoreApiKey = async () => {
     if (useEditorStore.getState().llmConfig.apiKey) return;
     const key = await getApiKey();
     if (key) useEditorStore.getState().setLLMConfig({ apiKey: key });
   };
-
-  if (!isLoginOpen) return null;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,15 +60,6 @@ export function LoginModal() {
       setError('Google login failed');
     }
   };
-
-  const handleClose = useCallback(() => {
-    setIsLoginOpen(false);
-    setUsername('');
-    setPassword('');
-    setError('');
-  }, [setIsLoginOpen]);
-
-  useEscapeClose(isLoginOpen, handleClose);
 
   return (
     <div
