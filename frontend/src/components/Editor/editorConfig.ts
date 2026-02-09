@@ -1,5 +1,63 @@
 import type * as Monaco from 'monaco-editor';
 
+// JS keywords to exclude from function-call highlighting
+const JS_KEYWORDS = new Set([
+  'break', 'case', 'catch', 'continue', 'debugger', 'default', 'delete',
+  'do', 'else', 'finally', 'for', 'function', 'if', 'in', 'instanceof',
+  'new', 'return', 'switch', 'this', 'throw', 'try', 'typeof', 'var',
+  'void', 'while', 'with', 'class', 'const', 'enum', 'export', 'extends',
+  'import', 'super', 'implements', 'interface', 'let', 'package', 'private',
+  'protected', 'public', 'static', 'yield', 'of', 'from', 'as', 'async',
+  'await',
+]);
+
+const FUNC_CALL_RE = /\b([a-zA-Z_$]\w*)\s*(?=\()/g;
+
+/**
+ * Registers a semantic token provider that marks every function call
+ * (identifier followed by "(") as a `function` semantic token.
+ * This is more reliable than depending on Monaco's TS worker for JS files.
+ */
+export function registerFunctionCallTokenProvider(monaco: typeof Monaco) {
+  const legend: Monaco.languages.SemanticTokensLegend = {
+    tokenTypes: ['function'],
+    tokenModifiers: [],
+  };
+
+  monaco.languages.registerDocumentSemanticTokensProvider('javascript', {
+    getLegend: () => legend,
+    provideDocumentSemanticTokens(model) {
+      const lines = model.getLinesContent();
+      const data: number[] = [];
+      let prevLine = 0;
+      let prevChar = 0;
+
+      for (let i = 0; i < lines.length; i++) {
+        FUNC_CALL_RE.lastIndex = 0;
+        const line = lines[i];
+        let match;
+        while ((match = FUNC_CALL_RE.exec(line)) !== null) {
+          const name = match[1];
+          if (JS_KEYWORDS.has(name)) continue;
+          const col = match.index;
+          data.push(
+            i - prevLine,
+            prevLine === i ? col - prevChar : col,
+            name.length,
+            0, // tokenType index → 'function'
+            0, // tokenModifiers → none
+          );
+          prevLine = i;
+          prevChar = col;
+        }
+      }
+
+      return { data: new Uint32Array(data) };
+    },
+    releaseDocumentSemanticTokens() {},
+  });
+}
+
 export const EDITOR_OPTIONS = {
   minimap: { enabled: false },
   fontSize: 13,

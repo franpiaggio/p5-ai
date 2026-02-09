@@ -3,7 +3,7 @@ import Editor, { DiffEditor, type OnMount, type DiffOnMount, type BeforeMount } 
 import type * as Monaco from 'monaco-editor';
 import { useEditorStore } from '../../store/editorStore';
 import { DiffToolbar } from './DiffToolbar';
-import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles } from './editorConfig';
+import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles, registerFunctionCallTokenProvider } from './editorConfig';
 import { P5_TYPE_DEFS } from './p5Types';
 
 export function CodeEditor() {
@@ -78,6 +78,7 @@ export function CodeEditor() {
   const handleBeforeMount: BeforeMount = useCallback((monaco) => {
     defineCustomThemes(monaco);
     injectErrorStyles();
+    registerFunctionCallTokenProvider(monaco);
 
     // Enable semantic highlighting for richer coloring (methods, properties, etc.)
     monaco.languages.typescript.javascriptDefaults.setEagerModelSync(true);
