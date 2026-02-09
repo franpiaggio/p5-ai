@@ -174,6 +174,7 @@ export async function* streamChat(request: ChatRequest): AsyncGenerator<string> 
       }),
     });
   } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
     throw new Error('Cannot connect to backend. Is it running on localhost:3000?');
   }
 
@@ -188,33 +189,38 @@ export async function* streamChat(request: ChatRequest): AsyncGenerator<string> 
   const decoder = new TextDecoder();
   let buffer = '';
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || ''; // Keep incomplete line in buffer
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6).trim();
-        if (data === '[DONE]') return;
-        if (!data) continue;
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') return;
+          if (!data) continue;
 
-        try {
-          const parsed = JSON.parse(data);
-          if (parsed.error) {
-            throw new Error(parsed.error);
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) {
+              throw new Error(parsed.error);
+            }
+            if (parsed.content) {
+              yield parsed.content;
+            }
+          } catch (e) {
+            if (e instanceof SyntaxError) continue; // Skip invalid JSON
+            throw e; // Re-throw other errors
           }
-          if (parsed.content) {
-            yield parsed.content;
-          }
-        } catch (e) {
-          if (e instanceof SyntaxError) continue; // Skip invalid JSON
-          throw e; // Re-throw other errors
         }
       }
     }
+  } catch (error) {
+    if (error instanceof TypeError && /network|abort|terminated/i.test(error.message)) return;
+    throw error;
   }
 }
