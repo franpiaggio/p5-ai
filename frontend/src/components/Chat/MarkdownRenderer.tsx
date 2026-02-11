@@ -25,11 +25,7 @@ function CollapsibleCodeBlock({
   messageId?: string;
   isGenerating?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(() => {
-    const saved = expandedState.get(stableKey);
-    if (saved !== undefined) return saved;
-    return !!isGenerating;
-  });
+  const [expanded, setExpanded] = useState(() => expandedState.get(stableKey) ?? false);
   const setPendingDiff = useEditorStore((s) => s.setPendingDiff);
   const appliedBlocks = useEditorStore((s) => s.appliedBlocks);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
@@ -188,19 +184,54 @@ function CollapsibleCodeBlock({
         )}
       </div>
       {expanded && (
-        <pre
-          style={{
-            margin: 0,
-            padding: '10px',
-            fontSize: '11px',
-            lineHeight: '1.5',
-            background: 'var(--color-surface-raised)',
-            overflow: 'auto',
-            color: 'var(--color-text-primary)',
-          }}
-        >
-          <code>{code}</code>
-        </pre>
+        <div style={{ position: 'relative' }}>
+          <pre
+            style={{
+              margin: 0,
+              padding: '10px',
+              paddingBottom: isGenerating ? '36px' : '10px',
+              fontSize: '11px',
+              lineHeight: '1.5',
+              background: 'var(--color-surface-raised)',
+              overflow: 'auto',
+              maxHeight: '300px',
+              color: 'var(--color-text-primary)',
+            }}
+          >
+            <code>{code}</code>
+          </pre>
+          {isGenerating && (
+            <div
+              style={{
+                position: 'sticky',
+                bottom: 0,
+                display: 'flex',
+                justifyContent: 'center',
+                padding: '4px 0',
+                background: 'linear-gradient(transparent, var(--color-surface-raised) 40%)',
+              }}
+            >
+              <button
+                onClick={handleToggle}
+                style={{
+                  background: 'var(--color-surface)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: '4px',
+                  padding: '2px 12px',
+                  fontSize: '10px',
+                  fontFamily: 'monospace',
+                  color: 'var(--color-text-muted)',
+                  cursor: 'pointer',
+                  transition: 'opacity 0.15s',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.7')}
+                onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+              >
+                Hide
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
