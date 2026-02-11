@@ -39,7 +39,7 @@ export class AnthropicProvider implements LLMProvider {
     try {
       const stream = client.messages.stream({
         model,
-        max_tokens: 4096,
+        max_tokens: 16_384,
         system: systemMessage?.content || '',
         messages: chatMessages,
       });

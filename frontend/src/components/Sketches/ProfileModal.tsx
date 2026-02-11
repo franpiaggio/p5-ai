@@ -33,6 +33,7 @@ export function ProfileModal() {
         editorErrors: [],
         messages: [],
         appliedBlocks: {},
+        showSuggestion: false,
         ...(sketch.codeHistory ? { codeHistory: sketch.codeHistory } : {}),
       });
       setSketchMeta(sketch.id, sketch.title);

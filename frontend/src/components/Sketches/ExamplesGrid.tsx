@@ -117,6 +117,7 @@ export function ExamplesGrid() {
         appliedBlocks: {},
         codeHistory: [],
         currentPage: 'editor',
+        showSuggestion: false,
       });
     });
   };

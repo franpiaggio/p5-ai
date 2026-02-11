@@ -34,6 +34,16 @@ import {
   voronoiDiagram,
   smokeParticles,
   concentricPulseRings,
+  pendulumWave,
+  auroraBorelais,
+  generativeCityscape,
+  morphingPolygons,
+  neonTunnel,
+  fallingLeaves,
+  moirePattern,
+  ripplePond,
+  magneticFieldLines,
+  doublePendulum,
 } from './sketches';
 
 export const SKETCH_EXAMPLES: SketchExample[] = [
@@ -66,6 +76,16 @@ export const SKETCH_EXAMPLES: SketchExample[] = [
   voronoiDiagram,
   smokeParticles,
   concentricPulseRings,
+  pendulumWave,
+  auroraBorelais,
+  generativeCityscape,
+  morphingPolygons,
+  neonTunnel,
+  fallingLeaves,
+  moirePattern,
+  ripplePond,
+  magneticFieldLines,
+  doublePendulum,
 ];
 
 /** Pick a random example. Rotates through so the same one doesn't repeat back-to-back. */

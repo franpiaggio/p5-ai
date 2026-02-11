@@ -46,6 +46,7 @@ interface EditorState {
   isStreaming: boolean;
   codeHistory: CodeChange[];
   appliedBlocks: Record<string, true>;
+  rejectedBlocks: Record<string, true>;
   pendingDiff: PendingDiff | null;
   previewCode: { code: string; entryId: string } | null;
   autoApply: boolean;
@@ -62,6 +63,7 @@ interface EditorState {
   streamingCode: string | null;
   lastSavedCode: string;
   pendingNavigation: (() => void) | null;
+  showSuggestion: boolean;
 
   setCode: (code: string) => void;
   setIsRunning: (running: boolean) => void;
@@ -125,6 +127,7 @@ export const useEditorStore = create<EditorState>()(
       isStreaming: false,
       codeHistory: [],
       appliedBlocks: {},
+      rejectedBlocks: {},
       pendingDiff: null,
       previewCode: null,
       autoApply: true,
@@ -141,6 +144,7 @@ export const useEditorStore = create<EditorState>()(
       streamingCode: null,
       lastSavedCode: DEFAULT_CODE,
       pendingNavigation: null,
+      showSuggestion: true,
 
       setCode: (code) =>
         set((state) => ({
@@ -199,7 +203,7 @@ export const useEditorStore = create<EditorState>()(
       setIsStreaming: (isStreaming) => set({ isStreaming }),
       setAutoApply: (autoApply) => set({ autoApply }),
       setAutoSave: (autoSave) => set({ autoSave }),
-      clearMessages: () => set({ messages: [], appliedBlocks: {} }),
+      clearMessages: () => set({ messages: [], appliedBlocks: {}, rejectedBlocks: {} }),
 
       setPendingDiff: (pendingDiff) =>
         set((state) => ({
@@ -214,11 +218,13 @@ export const useEditorStore = create<EditorState>()(
       rejectPendingDiff: () =>
         set((state) => {
           if (!state.pendingDiff) return { pendingDiff: null };
+          const { blockKey } = state.pendingDiff;
           return {
             code: state.pendingDiff.previousCode,
             pendingDiff: null,
             isRunning: true,
             runTrigger: state.runTrigger + 1,
+            ...(blockKey ? { rejectedBlocks: { ...state.rejectedBlocks, [blockKey]: true as const } } : {}),
           };
         }),
       acceptPendingDiff: () =>
@@ -307,12 +313,14 @@ export const useEditorStore = create<EditorState>()(
           messages: [],
           codeHistory: [],
           appliedBlocks: {},
+          rejectedBlocks: {},
           pendingDiff: null,
           previewCode: null,
           consoleLogs: [],
           editorErrors: [],
           isRunning: true,
           runTrigger: state.runTrigger + 1,
+          showSuggestion: true,
         })),
     }),
     {
@@ -351,6 +359,16 @@ export const useEditorStore = create<EditorState>()(
         state.providerKeys = keys;
         const provider = state.llmConfig.provider as keyof ProviderKeys;
         state.llmConfig = { ...state.llmConfig, apiKey: keys[provider] ?? '' };
+        // If no saved sketch, reset to initial state on reload.
+        // Only persisted sketches (with sketchId in URL) survive a refresh.
+        if (!state.sketchId) {
+          state.code = DEFAULT_CODE;
+          state.codeHistory = [];
+          state.sketchTitle = 'Untitled Sketch';
+          state.showSuggestion = true;
+        } else {
+          state.showSuggestion = false;
+        }
         // Ensure lastSavedCode matches code on rehydrate so we don't
         // false-positive the unsaved-changes guard after a reload.
         state.lastSavedCode = state.code;

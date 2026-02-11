@@ -3,6 +3,7 @@ import Editor, { DiffEditor, type OnMount, type DiffOnMount, type BeforeMount } 
 import type * as Monaco from 'monaco-editor';
 import { useEditorStore } from '../../store/editorStore';
 import { DiffToolbar } from './DiffToolbar';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles, registerFunctionCallTokenProvider } from './editorConfig';
 import { P5_TYPE_DEFS } from './p5Types';
 
@@ -17,6 +18,7 @@ export function CodeEditor() {
   const editorLanguage = useEditorStore((s) => s.editorLanguage);
   const streamingCode = useEditorStore((s) => s.streamingCode);
   const isLoading = useEditorStore((s) => s.isLoading);
+  const isMobile = useIsMobile();
 
   const runRef = useRef(runSketch);
   const clearRef = useRef(clearConsoleLogs);
@@ -190,13 +192,14 @@ export function CodeEditor() {
   if (pendingDiff) {
     return (
       <div className="h-full w-full" style={{ position: 'relative' }}>
-        <DiffToolbar />
+        {!isMobile && <DiffToolbar />}
         <DiffEditor
           height="100%"
           language={editorLanguage}
           original={pendingDiff.previousCode}
           modified={code}
           theme={editorTheme}
+          beforeMount={handleBeforeMount}
           onMount={handleDiffMount}
           options={{
             ...EDITOR_OPTIONS,

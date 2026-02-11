@@ -30,7 +30,7 @@ export class ChatController {
     res.flushHeaders();
 
     // Stream timeout: 2 minutes max
-    res.setTimeout(120_000, () => {
+    res.setTimeout(300_000, () => {
       res.write(`data: ${JSON.stringify({ error: 'Stream timeout exceeded' })}\n\n`);
       res.end();
     });

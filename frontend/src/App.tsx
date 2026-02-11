@@ -57,6 +57,7 @@ function App() {
           editorErrors: [],
           messages: [],
           appliedBlocks: {},
+          showSuggestion: false,
           ...(sketch.codeHistory ? { codeHistory: sketch.codeHistory } : {}),
         });
         useEditorStore.getState().setSketchMeta(sketch.id, sketch.title);

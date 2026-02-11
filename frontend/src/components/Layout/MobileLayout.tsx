@@ -28,9 +28,9 @@ export function MobileLayout() {
 
   const { size, containerRef, handleMouseDown, handleTouchStart } = useResizable({
     direction: 'vertical',
-    initialSize: 35,
+    initialSize: 75,
     minSize: 15,
-    maxSize: 75,
+    maxSize: 85,
   });
 
   if (isFullscreen) {
@@ -65,7 +65,6 @@ export function MobileLayout() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />
           </svg>
         </button>
-        {pendingDiff && <MobileDiffBar />}
       </div>
 
       <div
@@ -83,6 +82,7 @@ export function MobileLayout() {
         {activeTab === 'history' && <HistoryPanel />}
       </div>
 
+      {pendingDiff && <MobileDiffBar />}
       <MobileTabBar />
     </div>
   );

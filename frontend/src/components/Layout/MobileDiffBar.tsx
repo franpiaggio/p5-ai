@@ -5,7 +5,7 @@ export function MobileDiffBar() {
   const rejectPendingDiff = useEditorStore((s) => s.rejectPendingDiff);
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 z-10 flex items-center gap-2 px-3 py-2.5 bg-surface-raised/95 backdrop-blur border-t border-border/40">
+    <div className="shrink-0 flex items-center gap-2 px-3 py-2.5 bg-surface-raised border-t border-border/40">
       <span className="text-[11px] font-mono text-text-muted/60 flex-1">
         Review changes
       </span>

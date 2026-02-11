@@ -42,10 +42,11 @@ window.addEventListener('popstate', () => {
   }
 });
 
-// Warn before closing/reloading with unsaved changes (skip when auto-save is on)
+// Warn before closing/reloading with unsaved changes
+// Skip only when auto-save is on AND we have a saved sketch (auto-save needs a sketchId)
 window.addEventListener('beforeunload', (e) => {
-  const { code, lastSavedCode, autoSave } = useEditorStore.getState();
-  if (!autoSave && code !== lastSavedCode) {
+  const { code, lastSavedCode, autoSave, sketchId } = useEditorStore.getState();
+  if (code !== lastSavedCode && !(autoSave && sketchId)) {
     e.preventDefault();
   }
 });

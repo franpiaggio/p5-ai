@@ -10,6 +10,7 @@ import { PendingDiffBanner } from './PendingDiffBanner';
 import { SketchSuggestion } from './SketchSuggestion';
 import type { SketchExample } from '../../data/sketchExamples';
 import { guardUnsaved } from '../../utils/unsavedGuard';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import type { ImageAttachment } from '../../types';
 
 const JS_FENCE_OPEN = /```(?:javascript|js|jsx|typescript|ts|tsx)\s*\n/;
@@ -36,6 +37,7 @@ export function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
+  const mountedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
 
@@ -51,6 +53,8 @@ export function ChatPanel() {
   const setFixRequest = useEditorStore((s) => s.setFixRequest);
   const streamingCode = useEditorStore((s) => s.streamingCode);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
+  const showSuggestion = useEditorStore((s) => s.showSuggestion);
+  const isMobile = useIsMobile();
 
   // Backend health check on mount + retry every 10s when offline
   useEffect(() => {
@@ -72,8 +76,10 @@ export function ChatPanel() {
 
   useEffect(() => {
     if (isNearBottomRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      const behavior = mountedRef.current ? 'smooth' : 'instant';
+      messagesEndRef.current?.scrollIntoView({ behavior });
     }
+    mountedRef.current = true;
   }, [messages]);
 
   const sendMessage = useCallback(async (userMessage: string, images?: ImageAttachment[]) => {
@@ -205,6 +211,7 @@ export function ChatPanel() {
         pendingDiff: { code: example.code, previousCode: state.code, messageId: lastMsg.id, blockKey, prompt: example.prompt },
         previewCode: null,
         code: example.code,
+        lastSavedCode: example.code,
         isRunning: true,
         runTrigger: state.runTrigger + 1,
       };
@@ -224,7 +231,8 @@ export function ChatPanel() {
 
   const lastMessage = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMessage?.role === 'assistant' && !lastMessage.content;
-  const chatDisabled = backendOnline === false || (llmConfig.provider !== 'demo' && !llmConfig.apiKey) || !!pendingDiff;
+  const missingApiKey = llmConfig.provider !== 'demo' && !llmConfig.apiKey;
+  const chatDisabled = backendOnline === false || backendOnline === null || missingApiKey || !!pendingDiff;
 
   return (
     <ChatInput
@@ -233,6 +241,14 @@ export function ChatPanel() {
       disabled={chatDisabled}
       showAttach={llmConfig.provider !== 'demo'}
     >
+      {backendOnline === null && (
+        <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-border/10 border border-border/20 flex items-center gap-2">
+          <div className="w-3 h-3 border-[1.5px] border-text-muted/20 border-t-text-muted/60 rounded-full animate-spin shrink-0" />
+          <p className="text-text-muted/60 text-[11px] font-mono">
+            Connecting...
+          </p>
+        </div>
+      )}
       {backendOnline === false && (
         <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-error/10 border border-error/20 flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-error shrink-0" />
@@ -241,8 +257,25 @@ export function ChatPanel() {
           </p>
         </div>
       )}
+      {backendOnline === true && missingApiKey && (
+        <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-warning/10 border border-warning/20 flex items-center gap-2">
+          <svg className="w-3.5 h-3.5 text-warning/70 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+          </svg>
+          <p className="text-text-muted/70 text-[11px] font-mono">
+            Add your API key to start chatting.{' '}
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="text-info hover:text-info/80 underline underline-offset-2 cursor-pointer"
+            >
+              Open Settings
+            </button>
+          </p>
+        </div>
+      )}
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
-        {messages.length === 0 ? (
+        {messages.length === 0 && showSuggestion ? (
           <div className="flex flex-col items-center justify-end h-full gap-3 text-center px-4 pb-3">
             <div className="w-full max-w-xs">
               <SketchSuggestion onSelect={handleExampleSelect} />
@@ -264,7 +297,7 @@ export function ChatPanel() {
           })
         )}
         {streamingCode !== null && <GeneratingCodeIndicator onCancel={cancelStreaming} />}
-        {pendingDiff && <PendingDiffBanner />}
+        {pendingDiff && !isMobile && <PendingDiffBanner />}
         <div ref={messagesEndRef} />
       </div>
     </ChatInput>

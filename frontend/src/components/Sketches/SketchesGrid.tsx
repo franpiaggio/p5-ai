@@ -22,6 +22,7 @@ export function SketchesGrid() {
         editorErrors: [],
         messages: [],
         appliedBlocks: {},
+        showSuggestion: false,
         ...(sketch.codeHistory ? { codeHistory: sketch.codeHistory } : {}),
       });
       setSketchMeta(sketch.id, sketch.title);
@@ -59,6 +60,7 @@ export function SketchesGrid() {
         messages: [],
         appliedBlocks: {},
         codeHistory: [],
+        showSuggestion: false,
       });
       setSketchMeta(saved.id, saved.title);
       useEditorStore.getState().setCurrentPage('editor');

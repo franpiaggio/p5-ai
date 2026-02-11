@@ -31,6 +31,7 @@ export function CollapsibleCodeBlock({
 
   const setPendingDiff = useEditorStore((s) => s.setPendingDiff);
   const appliedBlocks = useEditorStore((s) => s.appliedBlocks);
+  const rejectedBlocks = useEditorStore((s) => s.rejectedBlocks);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
 
   const isJS = language === 'javascript' || language === 'js' || language === 'jsx'
@@ -38,6 +39,7 @@ export function CollapsibleCodeBlock({
   const lineCount = code.split('\n').length;
   const blockKey = messageId ? `${messageId}:${simpleHash(code)}` : '';
   const isApplied = blockKey ? !!appliedBlocks[blockKey] : false;
+  const isRejected = blockKey ? !!rejectedBlocks[blockKey] : false;
 
   const handleToggle = useCallback(() => {
     const next = !(expandedState.get(stableKey) ?? false);
@@ -79,7 +81,7 @@ export function CollapsibleCodeBlock({
         margin: '8px 0',
         borderRadius: '6px',
         overflow: 'hidden',
-        border: `1px solid ${isApplied ? 'var(--color-success)' : 'var(--color-border)'}`,
+        border: `1px solid ${isApplied ? 'var(--color-success)' : isRejected ? 'var(--color-error)' : 'var(--color-border)'}`,
         transition: 'border-color 0.2s',
       }}
     >
@@ -186,6 +188,19 @@ export function CollapsibleCodeBlock({
                   }}
                 >
                   Applied
+                </span>
+              ) : isRejected ? (
+                <span
+                  style={{
+                    background: 'color-mix(in srgb, var(--color-error) 20%, transparent)',
+                    color: 'var(--color-error)',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  Rejected
                 </span>
               ) : isPending ? (
                 <span
