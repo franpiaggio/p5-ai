@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useEditorStore, simpleHash } from '../../store/editorStore';
 
@@ -26,6 +26,15 @@ function CollapsibleCodeBlock({
   isGenerating?: boolean;
 }) {
   const [expanded, setExpanded] = useState(() => expandedState.get(stableKey) ?? false);
+  const preRef = useRef<HTMLPreElement>(null);
+
+  // Auto-scroll to bottom while generating and expanded
+  useEffect(() => {
+    if (expanded && isGenerating && preRef.current) {
+      preRef.current.scrollTop = preRef.current.scrollHeight;
+    }
+  }, [expanded, isGenerating, code]);
+
   const setPendingDiff = useEditorStore((s) => s.setPendingDiff);
   const appliedBlocks = useEditorStore((s) => s.appliedBlocks);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
@@ -184,48 +193,18 @@ function CollapsibleCodeBlock({
         )}
       </div>
       {expanded && (
-        <div style={{ position: 'relative' }}>
+        <div className="relative">
           <pre
-            style={{
-              margin: 0,
-              padding: '10px',
-              paddingBottom: isGenerating ? '36px' : '10px',
-              fontSize: '11px',
-              lineHeight: '1.5',
-              background: 'var(--color-surface-raised)',
-              overflow: 'auto',
-              maxHeight: '300px',
-              color: 'var(--color-text-primary)',
-            }}
+            ref={preRef}
+            className={`m-0 p-2.5 text-[11px] leading-relaxed bg-surface-raised overflow-auto max-h-[300px] text-text-primary ${isGenerating ? 'pb-9' : ''}`}
           >
             <code>{code}</code>
           </pre>
           {isGenerating && (
-            <div
-              style={{
-                position: 'sticky',
-                bottom: 0,
-                display: 'flex',
-                justifyContent: 'center',
-                padding: '4px 0',
-                background: 'linear-gradient(transparent, var(--color-surface-raised) 40%)',
-              }}
-            >
+            <div className="sticky bottom-0 flex justify-center py-1 bg-gradient-to-b from-transparent to-surface-raised">
               <button
                 onClick={handleToggle}
-                style={{
-                  background: 'var(--color-surface)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: '4px',
-                  padding: '2px 12px',
-                  fontSize: '10px',
-                  fontFamily: 'monospace',
-                  color: 'var(--color-text-muted)',
-                  cursor: 'pointer',
-                  transition: 'opacity 0.15s',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.7')}
-                onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                className="bg-surface border border-border rounded px-3 py-0.5 text-[10px] font-mono text-text-muted cursor-pointer transition-opacity hover:opacity-70"
               >
                 Hide
               </button>
