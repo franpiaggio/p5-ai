@@ -2,8 +2,9 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { OpenAIProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { GroqProvider } from './providers/groq.provider';
+import { DeepSeekProvider } from './providers/deepseek.provider';
 import { ChatRequestDto, ImageAttachmentDto } from './dto/chat.dto';
-import type { LLMMessage } from './providers/llm.interface';
+import type { LLMMessage, LLMProvider } from './providers/llm.interface';
 
 const SYSTEM_PROMPT = `You are an expert creative coding assistant specializing in p5.js and generative art.
 
@@ -82,6 +83,7 @@ export class ChatService {
     private openaiProvider: OpenAIProvider,
     private anthropicProvider: AnthropicProvider,
     private groqProvider: GroqProvider,
+    private deepseekProvider: DeepSeekProvider,
   ) {}
 
   private estimateBase64Bytes(base64: string): number {
@@ -222,10 +224,14 @@ export class ChatService {
       return;
     }
 
-    const provider =
-      request.config.provider === 'openai'
-        ? this.openaiProvider
-        : this.anthropicProvider;
+    const providers: Record<string, LLMProvider> = {
+      openai: this.openaiProvider,
+      anthropic: this.anthropicProvider,
+      deepseek: this.deepseekProvider,
+    };
+
+    const provider = providers[request.config.provider];
+    if (!provider) throw new Error(`Unknown provider: ${request.config.provider}`);
 
     yield* provider.stream(messages, request.config.model, request.config.apiKey);
   }
@@ -236,6 +242,8 @@ export class ChatService {
         return this.openaiProvider.listModels(apiKey);
       case 'anthropic':
         return this.anthropicProvider.listModels(apiKey);
+      case 'deepseek':
+        return this.deepseekProvider.listModels(apiKey);
       case 'demo': {
         const groqKey = process.env.GROQ_API_KEY;
         if (!groqKey) return ['llama-3.3-70b-versatile'];

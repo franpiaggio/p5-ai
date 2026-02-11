@@ -9,12 +9,14 @@ const FALLBACK_MODELS: Record<string, string[]> = {
   demo: ['llama-3.3-70b-versatile'],
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
   anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
   demo: 'Demo (free)',
   openai: 'OpenAI',
   anthropic: 'Anthropic',
+  deepseek: 'DeepSeek',
 };
 
 export function SettingsModal() {
