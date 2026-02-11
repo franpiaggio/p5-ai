@@ -25,7 +25,11 @@ function CollapsibleCodeBlock({
   messageId?: string;
   isGenerating?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(() => expandedState.get(stableKey) ?? false);
+  const [expanded, setExpanded] = useState(() => {
+    const saved = expandedState.get(stableKey);
+    if (saved !== undefined) return saved;
+    return !!isGenerating;
+  });
   const setPendingDiff = useEditorStore((s) => s.setPendingDiff);
   const appliedBlocks = useEditorStore((s) => s.appliedBlocks);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
