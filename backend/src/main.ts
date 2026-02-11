@@ -13,7 +13,14 @@ async function bootstrap() {
   const chatJsonLimit = process.env.CHAT_JSON_LIMIT ?? '12mb';
 
   app.use(helmet());
-  app.use(compression());
+  app.use(
+    compression({
+      filter: (req, res) => {
+        if (res.getHeader('Content-Type') === 'text/event-stream') return false;
+        return compression.filter(req, res);
+      },
+    }),
+  );
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/chat')) return next();
     return json({ limit: baseJsonLimit })(req, res, next);
