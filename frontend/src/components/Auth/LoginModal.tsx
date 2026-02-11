@@ -3,7 +3,8 @@ import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuthStore } from '../../store/authStore';
 import { useEditorStore } from '../../store/editorStore';
-import { loginWithCredentials, loginWithGoogle, getApiKey } from '../../services/api';
+import { loginWithCredentials, loginWithGoogle, getProviderKeys } from '../../services/api';
+import type { LLMConfig } from '../../types';
 
 export function LoginModal() {
   const isLoginOpen = useAuthStore((s) => s.isLoginOpen);
@@ -25,10 +26,13 @@ export function LoginModal() {
 
   if (!isLoginOpen) return null;
 
-  const restoreApiKey = async () => {
-    if (useEditorStore.getState().llmConfig.apiKey) return;
-    const key = await getApiKey();
-    if (key) useEditorStore.getState().setLLMConfig({ apiKey: key });
+  const restoreApiKeys = async () => {
+    if (!useEditorStore.getState().storeApiKeys) return;
+    const keys = await getProviderKeys();
+    const store = useEditorStore.getState();
+    for (const [provider, key] of Object.entries(keys)) {
+      if (key) store.setProviderKey(provider as LLMConfig['provider'], key);
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -40,7 +44,7 @@ export function LoginModal() {
       const result = await loginWithCredentials(username.trim(), password);
       setAuth(result.user);
       handleClose();
-      restoreApiKey();
+      restoreApiKeys();
     } catch {
       setError('Invalid username or password');
     } finally {
@@ -55,7 +59,7 @@ export function LoginModal() {
       const result = await loginWithGoogle(credentialResponse.credential);
       setAuth(result.user);
       handleClose();
-      restoreApiKey();
+      restoreApiKeys();
     } catch {
       setError('Google login failed');
     }

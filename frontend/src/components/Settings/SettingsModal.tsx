@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
-import { fetchModels, getApiKey, saveApiKey } from '../../services/api';
+import { fetchModels, getProviderKeys, saveProviderKey, clearProviderKey as clearProviderKeyApi } from '../../services/api';
 import type { LLMConfig } from '../../types';
 
 const FALLBACK_MODELS: Record<string, string[]> = {
@@ -26,26 +26,27 @@ export function SettingsModal() {
   const setLLMConfig = useEditorStore((s) => s.setLLMConfig);
   const autoApply = useEditorStore((s) => s.autoApply);
   const setAutoApply = useEditorStore((s) => s.setAutoApply);
+  const providerKeys = useEditorStore((s) => s.providerKeys);
+  const setProviderKey = useEditorStore((s) => s.setProviderKey);
+  const clearProviderKey = useEditorStore((s) => s.clearProviderKey);
+  const storeApiKeys = useEditorStore((s) => s.storeApiKeys);
+  const setStoreApiKeys = useEditorStore((s) => s.setStoreApiKeys);
   const user = useAuthStore((s) => s.user);
 
   const [models, setModels] = useState<string[]>(FALLBACK_MODELS[llmConfig.provider] ?? []);
   const [loadingModels, setLoadingModels] = useState(false);
-  const keyOnOpenRef = useRef('');
 
-  // Auto-fetch API key from backend if logged in and key is empty (e.g. page refresh)
+  // Auto-fetch keys from backend if logged in + storeApiKeys enabled + no keys in session
   useEffect(() => {
-    if (!isSettingsOpen || !user || llmConfig.apiKey) return;
-    getApiKey().then((key) => {
-      if (key) setLLMConfig({ apiKey: key });
+    if (!isSettingsOpen || !user || !storeApiKeys) return;
+    const hasAnyKey = Object.values(providerKeys).some(Boolean);
+    if (hasAnyKey) return;
+    getProviderKeys().then((keys) => {
+      for (const [provider, key] of Object.entries(keys)) {
+        if (key) setProviderKey(provider as LLMConfig['provider'], key);
+      }
     });
-  }, [isSettingsOpen, user]);
-
-  // Track the key value when modal opens
-  useEffect(() => {
-    if (isSettingsOpen) {
-      keyOnOpenRef.current = llmConfig.apiKey;
-    }
-  }, [isSettingsOpen]);
+  }, [isSettingsOpen, user, storeApiKeys]);
 
   useEffect(() => {
     if (!isSettingsOpen) return;
@@ -75,18 +76,30 @@ export function SettingsModal() {
   }, [isSettingsOpen, llmConfig.provider, llmConfig.apiKey]);
 
   const handleClose = useCallback(() => {
-    const currentKey = useEditorStore.getState().llmConfig.apiKey;
-    if (user && currentKey && currentKey !== keyOnOpenRef.current) {
-      saveApiKey(currentKey).catch(() => {});
+    // Save current provider's key to backend if storeApiKeys enabled
+    if (user && storeApiKeys) {
+      const { llmConfig: cfg, providerKeys: keys } = useEditorStore.getState();
+      const currentKey = keys[cfg.provider];
+      if (currentKey && cfg.provider !== 'demo') {
+        saveProviderKey(cfg.provider, currentKey).catch(() => {});
+      }
     }
     setIsSettingsOpen(false);
-  }, [user, setIsSettingsOpen]);
+  }, [user, storeApiKeys, setIsSettingsOpen]);
 
   useEscapeClose(isSettingsOpen, handleClose);
 
   if (!isSettingsOpen) return null;
 
   const isDemo = llmConfig.provider === 'demo';
+  const currentKey = providerKeys[llmConfig.provider] ?? '';
+
+  const handleClear = () => {
+    clearProviderKey(llmConfig.provider);
+    if (user && storeApiKeys) {
+      clearProviderKeyApi(llmConfig.provider).catch(() => {});
+    }
+  };
 
   return (
     <div
@@ -122,7 +135,6 @@ export function SettingsModal() {
                 setLLMConfig({
                   provider,
                   model: FALLBACK_MODELS[provider][0],
-                  apiKey: provider === 'demo' ? '' : llmConfig.apiKey,
                 });
               }}
               className="input-field"
@@ -144,19 +156,46 @@ export function SettingsModal() {
               <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
                 API Key
               </label>
-              <input
-                type="password"
-                value={llmConfig.apiKey}
-                onChange={(e) => setLLMConfig({ apiKey: e.target.value })}
-                placeholder={`Enter ${PROVIDER_LABELS[llmConfig.provider]} key`}
-                className="input-field"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={currentKey}
+                  onChange={(e) => setProviderKey(llmConfig.provider, e.target.value)}
+                  placeholder={`Enter ${PROVIDER_LABELS[llmConfig.provider]} key`}
+                  className="input-field flex-1"
+                />
+                {currentKey && (
+                  <button
+                    onClick={handleClear}
+                    className="px-2.5 rounded-lg border border-border/30 text-text-muted/50 hover:text-accent hover:border-accent/30 transition-colors"
+                    title="Clear key"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
               <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
-                {user
+                {user && storeApiKeys
                   ? 'Encrypted & saved to your account.'
                   : 'Stored in session only — cleared when you close the tab.'}
               </p>
             </div>
+          )}
+
+          {!isDemo && user && (
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={storeApiKeys}
+                onChange={(e) => setStoreApiKeys(e.target.checked)}
+                className="rounded border-border/50 accent-accent"
+              />
+              <span className="text-[10px] font-mono text-text-muted/50">
+                Store my API keys (encrypted on server)
+              </span>
+            </label>
           )}
 
           <div>

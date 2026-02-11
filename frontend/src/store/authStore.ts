@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useEditorStore } from './editorStore';
 
 export interface AuthUser {
   id: string;
@@ -30,7 +31,16 @@ export const useAuthStore = create<AuthState>()(
       isLoginOpen: false,
 
       setAuth: (user) => set({ user }),
-      logout: () => set({ user: null }),
+      logout: () => {
+        // Clear API keys from editor store on logout
+        const editorStore = useEditorStore.getState();
+        editorStore.setStoreApiKeys(false);
+        // Clear all provider keys
+        for (const provider of Object.keys(editorStore.providerKeys)) {
+          editorStore.clearProviderKey(provider as 'openai' | 'anthropic' | 'deepseek' | 'demo');
+        }
+        set({ user: null });
+      },
       setIsProfileOpen: (isProfileOpen) => set({ isProfileOpen }),
       setIsSaveSketchOpen: (isSaveSketchOpen) => set({ isSaveSketchOpen }),
       setIsLoginOpen: (isLoginOpen) => set({ isLoginOpen }),

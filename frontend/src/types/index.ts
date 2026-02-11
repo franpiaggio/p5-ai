@@ -43,6 +43,8 @@ export interface CodeChange {
   isRestore?: boolean;
 }
 
+export type ProviderKeys = Partial<Record<LLMConfig['provider'], string>>;
+
 export type TabType = 'console' | 'chat' | 'history' | 'code';
 
 export interface SketchSummary {

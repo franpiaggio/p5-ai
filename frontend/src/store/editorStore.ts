@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Message, ConsoleLog, LLMConfig, TabType, EditorError, CodeChange } from '../types';
+import type { Message, ConsoleLog, LLMConfig, TabType, EditorError, CodeChange, ProviderKeys } from '../types';
 
 export function simpleHash(str: string): string {
   let hash = 0;
@@ -81,6 +81,8 @@ interface EditorState {
   editorLanguage: EditorLanguage;
   transpiler: ((code: string) => Promise<string>) | null;
   currentPage: 'editor' | 'sketches';
+  providerKeys: ProviderKeys;
+  storeApiKeys: boolean;
 
   setCode: (code: string) => void;
   setIsRunning: (running: boolean) => void;
@@ -111,6 +113,9 @@ interface EditorState {
   setEditorLanguage: (language: EditorLanguage) => void;
   setTranspiler: (transpiler: ((code: string) => Promise<string>) | null) => void;
   setCurrentPage: (page: 'editor' | 'sketches') => void;
+  setProviderKey: (provider: LLMConfig['provider'], key: string) => void;
+  clearProviderKey: (provider: LLMConfig['provider']) => void;
+  setStoreApiKeys: (store: boolean) => void;
 }
 
 let logCounter = 0;
@@ -147,6 +152,8 @@ export const useEditorStore = create<EditorState>()(
       editorLanguage: 'javascript' as EditorLanguage,
       transpiler: null,
       currentPage: 'editor' as const,
+      providerKeys: {} as ProviderKeys,
+      storeApiKeys: false,
 
       setCode: (code) =>
         set((state) => ({
@@ -191,9 +198,14 @@ export const useEditorStore = create<EditorState>()(
       clearEditorErrors: () => set({ editorErrors: [] }),
 
       setLLMConfig: (config) =>
-        set((state) => ({
-          llmConfig: { ...state.llmConfig, ...config },
-        })),
+        set((state) => {
+          const merged = { ...state.llmConfig, ...config };
+          // When provider changes, derive apiKey from providerKeys
+          if (config.provider && config.provider !== state.llmConfig.provider && !('apiKey' in config)) {
+            merged.apiKey = state.providerKeys[config.provider] ?? '';
+          }
+          return { llmConfig: merged };
+        }),
 
       setIsSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
       setIsLoading: (isLoading) => set({ isLoading }),
@@ -281,6 +293,20 @@ export const useEditorStore = create<EditorState>()(
       setEditorLanguage: (editorLanguage) => set({ editorLanguage }),
       setTranspiler: (transpiler) => set({ transpiler }),
       setCurrentPage: (currentPage) => set({ currentPage }),
+      setProviderKey: (provider, key) =>
+        set((state) => {
+          const providerKeys = { ...state.providerKeys, [provider]: key };
+          const apiKey = state.llmConfig.provider === provider ? key : state.llmConfig.apiKey;
+          return { providerKeys, llmConfig: { ...state.llmConfig, apiKey } };
+        }),
+      clearProviderKey: (provider) =>
+        set((state) => {
+          const providerKeys = { ...state.providerKeys };
+          delete providerKeys[provider];
+          const apiKey = state.llmConfig.provider === provider ? '' : state.llmConfig.apiKey;
+          return { providerKeys, llmConfig: { ...state.llmConfig, apiKey } };
+        }),
+      setStoreApiKeys: (storeApiKeys) => set({ storeApiKeys }),
       newSketch: () =>
         set((state) => ({
           code: DEFAULT_CODE,
@@ -312,13 +338,24 @@ export const useEditorStore = create<EditorState>()(
         editorLanguage: state.editorLanguage,
         sketchId: state.sketchId,
         sketchTitle: state.sketchTitle,
+        storeApiKeys: state.storeApiKeys,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        const stored = sessionStorage.getItem('p5-ai-editor-key');
+        // Migrate legacy single-key sessionStorage
+        const legacyKey = sessionStorage.getItem('p5-ai-editor-key');
+        const stored = sessionStorage.getItem('p5-ai-editor-keys');
+        let keys: ProviderKeys = {};
         if (stored) {
-          state.llmConfig = { ...state.llmConfig, apiKey: stored };
+          try { keys = JSON.parse(stored); } catch { /* ignore */ }
+        } else if (legacyKey) {
+          // Legacy: assign to current provider
+          keys = { [state.llmConfig.provider]: legacyKey };
+          sessionStorage.setItem('p5-ai-editor-keys', JSON.stringify(keys));
+          sessionStorage.removeItem('p5-ai-editor-key');
         }
+        state.providerKeys = keys;
+        state.llmConfig = { ...state.llmConfig, apiKey: keys[state.llmConfig.provider] ?? '' };
       },
     }
   )
@@ -360,15 +397,15 @@ window.addEventListener('popstate', () => {
   }
 });
 
-// Sync apiKey to sessionStorage only (backend save happens on Settings close)
-let prevApiKey = useEditorStore.getState().llmConfig.apiKey;
+// Sync providerKeys to sessionStorage (backend save happens on Settings close)
+let prevProviderKeys = useEditorStore.getState().providerKeys;
 useEditorStore.subscribe((state) => {
-  const key = state.llmConfig.apiKey;
-  if (key === prevApiKey) return;
-  prevApiKey = key;
-  if (key) {
-    sessionStorage.setItem('p5-ai-editor-key', key);
+  if (state.providerKeys === prevProviderKeys) return;
+  prevProviderKeys = state.providerKeys;
+  const hasKeys = Object.values(state.providerKeys).some(Boolean);
+  if (hasKeys) {
+    sessionStorage.setItem('p5-ai-editor-keys', JSON.stringify(state.providerKeys));
   } else {
-    sessionStorage.removeItem('p5-ai-editor-key');
+    sessionStorage.removeItem('p5-ai-editor-keys');
   }
 });

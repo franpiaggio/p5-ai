@@ -38,10 +38,10 @@ export async function logoutApi(): Promise<void> {
   });
 }
 
-// --- API Key ---
+// --- API Keys (per-provider) ---
 
-export async function saveApiKey(apiKey: string): Promise<void> {
-  await fetch(`${API_BASE}/users/me/api-key`, {
+export async function saveProviderKey(provider: string, apiKey: string): Promise<void> {
+  await fetch(`${API_BASE}/users/me/api-keys/${provider}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
@@ -49,17 +49,24 @@ export async function saveApiKey(apiKey: string): Promise<void> {
   });
 }
 
-export async function getApiKey(): Promise<string | null> {
+export async function getProviderKeys(): Promise<Record<string, string>> {
   try {
-    const response = await fetch(`${API_BASE}/users/me/api-key`, {
+    const response = await fetch(`${API_BASE}/users/me/api-keys`, {
       credentials: 'include',
     });
-    if (!response.ok) return null;
+    if (!response.ok) return {};
     const data = await response.json();
-    return data.apiKey ?? null;
+    return data.keys ?? {};
   } catch {
-    return null;
+    return {};
   }
+}
+
+export async function clearProviderKey(provider: string): Promise<void> {
+  await fetch(`${API_BASE}/users/me/api-keys/${provider}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  });
 }
 
 // --- Sketches ---

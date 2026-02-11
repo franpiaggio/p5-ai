@@ -66,17 +66,54 @@ export class UsersService {
     return this.usersRepository.exists({ where: { username } });
   }
 
-  async saveApiKey(userId: string, apiKey: string): Promise<void> {
-    const encrypted = encrypt(apiKey, this.encryptionSecret);
-    await this.usersRepository.update(userId, { encryptedApiKey: encrypted });
-  }
-
-  async getApiKey(userId: string): Promise<string | null> {
+  private async loadKeyMap(userId: string): Promise<Record<string, string>> {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
       select: ['id', 'encryptedApiKey'],
     });
-    if (!user?.encryptedApiKey) return null;
-    return decrypt(user.encryptedApiKey, this.encryptionSecret);
+    if (!user?.encryptedApiKey) return {};
+    try {
+      const decrypted = decrypt(user.encryptedApiKey, this.encryptionSecret);
+      if (!decrypted) return {};
+      const parsed = JSON.parse(decrypted);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, string>;
+      }
+      return {};
+    } catch {
+      // Legacy single-string format or corrupted — treat as empty
+      return {};
+    }
+  }
+
+  private async saveKeyMap(
+    userId: string,
+    map: Record<string, string>,
+  ): Promise<void> {
+    const hasKeys = Object.keys(map).length > 0;
+    const encrypted = hasKeys
+      ? encrypt(JSON.stringify(map), this.encryptionSecret)
+      : (null as unknown as string);
+    await this.usersRepository.update(userId, { encryptedApiKey: encrypted });
+  }
+
+  async saveProviderKey(
+    userId: string,
+    provider: string,
+    apiKey: string,
+  ): Promise<void> {
+    const map = await this.loadKeyMap(userId);
+    map[provider] = apiKey;
+    await this.saveKeyMap(userId, map);
+  }
+
+  async getProviderKeys(userId: string): Promise<Record<string, string>> {
+    return this.loadKeyMap(userId);
+  }
+
+  async clearProviderKey(userId: string, provider: string): Promise<void> {
+    const map = await this.loadKeyMap(userId);
+    delete map[provider];
+    await this.saveKeyMap(userId, map);
   }
 }
