@@ -32,6 +32,7 @@ export function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
+  const abortRef = useRef<AbortController | null>(null);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
 
   const messages = useEditorStore((s) => s.messages);
@@ -89,6 +90,9 @@ export function ChatPanel() {
     setIsLoading(true);
     setIsStreaming(true);
 
+    const abortController = new AbortController();
+    abortRef.current = abortController;
+
     try {
       let assistantContent = '';
       let firstChunk = true;
@@ -103,7 +107,7 @@ export function ChatPanel() {
         history: currentState.messages.slice(0, -1),
         config: currentState.llmConfig,
         ...(images?.length ? { images } : {}),
-      })) {
+      }, abortController.signal)) {
         if (firstChunk) {
           firstChunk = false;
           setIsStreaming(false);
@@ -174,10 +178,16 @@ export function ChatPanel() {
         return { messages: newMessages };
       });
     } finally {
+      abortRef.current = null;
       setIsLoading(false);
       setIsStreaming(false);
     }
   }, [addMessage, setIsLoading, setIsStreaming, setIsSettingsOpen]);
+
+  const cancelStreaming = useCallback(() => {
+    abortRef.current?.abort();
+    useEditorStore.setState({ streamingCode: null });
+  }, []);
 
   useEffect(() => {
     if (fixRequest && !isLoading) {
@@ -214,7 +224,7 @@ export function ChatPanel() {
               </svg>
             </div>
             <p className="text-text-muted/30 text-xs font-mono">
-              Ask AI to help with your sketch
+              Describe your idea to get started
             </p>
           </div>
         ) : (
@@ -232,7 +242,7 @@ export function ChatPanel() {
             );
           })
         )}
-        {streamingCode !== null && <GeneratingCodeIndicator />}
+        {streamingCode !== null && <GeneratingCodeIndicator onCancel={cancelStreaming} />}
         {pendingDiff && <PendingDiffBanner />}
         <div ref={messagesEndRef} />
       </div>

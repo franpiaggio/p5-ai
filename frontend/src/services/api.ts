@@ -175,7 +175,7 @@ export interface ChatRequest {
   images?: ImageAttachment[];
 }
 
-export async function* streamChat(request: ChatRequest): AsyncGenerator<string> {
+export async function* streamChat(request: ChatRequest, signal?: AbortSignal): AsyncGenerator<string> {
   let response: Response;
 
   try {
@@ -188,6 +188,7 @@ export async function* streamChat(request: ChatRequest): AsyncGenerator<string> 
         ...request,
         history: request.history.slice(-10),
       }),
+      signal,
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return;

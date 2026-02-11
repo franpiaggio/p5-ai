@@ -19,7 +19,8 @@ const SYSTEM_PROMPT = `You are an expert creative coding assistant specializing 
 - Always use global mode with setup() and draw()
 - Only vanilla p5.js — no external libraries unless explicitly requested
 - Use colorMode(HSB, 360, 100, 100, 100) for richer palettes
-- Include windowResized() { resizeCanvas(windowWidth, windowHeight); } when using full-screen canvas
+- ALWAYS use createCanvas(windowWidth, windowHeight) and include windowResized() { resizeCanvas(windowWidth, windowHeight); } so the sketch fills the viewport and adapts to resize — unless the user explicitly requests a fixed size
+- Sketches must be responsive by default — never hardcode pixel dimensions for the canvas
 
 ## PERFORMANCE (critical — sketches run on mobile too)
 - Target 60fps on mid-range phones: keep draw() under ~8ms

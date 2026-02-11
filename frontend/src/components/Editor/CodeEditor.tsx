@@ -178,8 +178,11 @@ export function CodeEditor() {
             renderSideBySide: false,
             renderOverviewRuler: false,
             glyphMargin: false,
+            scrollbar: { vertical: 'hidden', horizontal: 'hidden' },
           }}
         />
+        {/* Block manual scroll/interaction during streaming */}
+        <div className="absolute inset-0" />
       </div>
     );
   }

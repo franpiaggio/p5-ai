@@ -44,13 +44,25 @@ export interface PendingDiff {
   isRestore?: boolean;
 }
 
-const DEFAULT_CODE = `function setup() {
+const DEFAULT_CODE = `let x, y, vx, vy, r = 20;
+
+function setup() {
   createCanvas(windowWidth, windowHeight);
+  x = width / 2;
+  y = height / 2;
+  vx = 3;
+  vy = 2;
 }
 
 function draw() {
-  background(220);
-  circle(mouseX, mouseY, 50);
+  background(30);
+  x += vx;
+  y += vy;
+  if (x < r || x > width - r) vx *= -1;
+  if (y < r || y > height - r) vy *= -1;
+  fill(255);
+  noStroke();
+  circle(x, y, r * 2);
 }
 
 function windowResized() {
@@ -128,8 +140,8 @@ export const useEditorStore = create<EditorState>()(
   persist(
     (set) => ({
       code: DEFAULT_CODE,
-      isRunning: false,
-      runTrigger: 0,
+      isRunning: true,
+      runTrigger: 1,
       activeTab: 'chat',
       messages: [],
       consoleLogs: [],

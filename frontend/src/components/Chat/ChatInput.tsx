@@ -178,7 +178,7 @@ export function ChatInput({ onSend, isLoading, disabled, showAttach, children }:
             data-lpignore="true"
             data-1p-ignore="true"
             data-form-type="other"
-            placeholder="Ask AI..."
+            placeholder="Describe your idea..."
             disabled={disabled}
             autoComplete="one-time-code"
             autoCorrect="off"
