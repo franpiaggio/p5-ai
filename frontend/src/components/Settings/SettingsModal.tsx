@@ -2,22 +2,9 @@ import { useEffect, useState, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
-import { fetchModels, getProviderKeys, saveProviderKey, clearProviderKey as clearProviderKeyApi } from '../../services/api';
+import { useModelList, FALLBACK_MODELS, PROVIDER_LABELS } from '../../hooks/useModelList';
+import { getProviderKeys, saveProviderKey, clearProviderKey as clearProviderKeyApi } from '../../services/api';
 import type { LLMConfig, ProviderKeys } from '../../types';
-
-const FALLBACK_MODELS: Record<string, string[]> = {
-  demo: ['llama-3.3-70b-versatile'],
-  openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
-  anthropic: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307'],
-  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
-};
-
-const PROVIDER_LABELS: Record<string, string> = {
-  demo: 'Demo (free)',
-  openai: 'OpenAI',
-  anthropic: 'Anthropic',
-  deepseek: 'DeepSeek',
-};
 
 interface Draft {
   provider: LLMConfig['provider'];
@@ -33,9 +20,12 @@ export function SettingsModal() {
   const user = useAuthStore((s) => s.user);
 
   const [draft, setDraft] = useState<Draft | null>(null);
-  const [models, setModels] = useState<string[]>([]);
-  const [loadingModels, setLoadingModels] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const { models, loadingModels } = useModelList(
+    draft?.provider ?? 'demo',
+    draft?.keys[draft?.provider ?? 'demo'] ?? '',
+  );
 
   // Initialize draft from store when modal opens
   useEffect(() => {
@@ -51,7 +41,6 @@ export function SettingsModal() {
       storeApiKeys: s.storeApiKeys,
       autoApply: s.autoApply,
     });
-    setModels(FALLBACK_MODELS[s.llmConfig.provider] ?? []);
   }, [isSettingsOpen]);
 
   // Auto-fetch keys from backend on open
@@ -63,34 +52,6 @@ export function SettingsModal() {
       setDraft((prev) => prev ? { ...prev, keys: { ...prev.keys, ...keys } } : prev);
     });
   }, [draft?.storeApiKeys, user, isSettingsOpen]);
-
-  // Fetch models when provider or key changes in draft
-  useEffect(() => {
-    if (!draft) return;
-
-    const { provider } = draft;
-    const apiKey = draft.keys[provider] ?? '';
-
-    if (provider !== 'demo' && !apiKey) {
-      setModels(FALLBACK_MODELS[provider] ?? []);
-      return;
-    }
-
-    let cancelled = false;
-    setLoadingModels(true);
-
-    fetchModels(provider, apiKey).then((fetched) => {
-      if (cancelled) return;
-      setModels(fetched.length > 0 ? fetched : FALLBACK_MODELS[provider] ?? []);
-      setLoadingModels(false);
-    }).catch(() => {
-      if (cancelled) return;
-      setModels(FALLBACK_MODELS[provider] ?? []);
-      setLoadingModels(false);
-    });
-
-    return () => { cancelled = true; };
-  }, [draft?.provider, draft?.keys[draft?.provider ?? 'demo']]);
 
   const handleSave = useCallback(async () => {
     if (!draft) return;

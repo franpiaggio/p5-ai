@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useEditorStore, simpleHash, extractFirstJsBlock } from '../../store/editorStore';
+import { useEditorStore } from '../../store/editorStore';
+import { simpleHash, extractFirstJsBlock } from '../../utils/codeUtils';
 import { streamChat, checkBackendHealth } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';

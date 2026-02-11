@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { getSketches, getSketch, deleteSketch } from '../../services/api';
+import { getSketches, getSketch, deleteSketch, createSketch } from '../../services/api';
 import type { SketchSummary } from '../../types';
 
 export function SketchesGrid() {
@@ -43,6 +43,34 @@ export function SketchesGrid() {
       setSketches((prev) => prev.filter((s) => s.id !== id));
     } catch (error) {
       console.error('Failed to delete sketch:', error);
+    }
+  };
+
+  const handleDuplicate = async (id: string) => {
+    try {
+      const sketch = await getSketch(id);
+      const saved = await createSketch({
+        title: `Copy of ${sketch.title}`,
+        code: sketch.code,
+        description: sketch.description || undefined,
+        thumbnail: sketch.thumbnail || undefined,
+      });
+      useEditorStore.setState({
+        code: saved.code,
+        isRunning: true,
+        runTrigger: useEditorStore.getState().runTrigger + 1,
+        previewCode: null,
+        pendingDiff: null,
+        consoleLogs: [],
+        editorErrors: [],
+        messages: [],
+        appliedBlocks: {},
+        codeHistory: [],
+      });
+      setSketchMeta(saved.id, saved.title);
+      useEditorStore.getState().setCurrentPage('editor');
+    } catch (error) {
+      console.error('Failed to duplicate sketch:', error);
     }
   };
 
@@ -147,6 +175,12 @@ export function SketchesGrid() {
                       className="px-3 py-1.5 text-[11px] font-mono rounded bg-info/10 text-info hover:bg-info/20 transition-colors cursor-pointer"
                     >
                       Load
+                    </button>
+                    <button
+                      onClick={() => handleDuplicate(sketch.id)}
+                      className="px-3 py-1.5 text-[11px] font-mono rounded bg-info/10 text-info hover:bg-info/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                    >
+                      Duplicate
                     </button>
                     <button
                       onClick={() => handleDelete(sketch.id)}
