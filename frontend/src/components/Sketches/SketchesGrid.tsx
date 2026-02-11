@@ -49,7 +49,7 @@ export function SketchesGrid() {
   const goBack = () => useEditorStore.getState().setCurrentPage('editor');
 
   return (
-    <div className="h-screen bg-surface flex flex-col">
+    <div className="h-dvh bg-surface flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-border/40">
         <button

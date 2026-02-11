@@ -120,7 +120,7 @@ export function ChatInput({ onSend, isLoading, disabled, showAttach, children }:
 
       {children}
 
-      <form onSubmit={handleSubmit} className="p-2 border-t border-border/40 shrink-0">
+      <form onSubmit={handleSubmit} autoComplete="off" className="p-2 border-t border-border/40 shrink-0">
         {imageError && (
           <div className="mb-2 px-1 text-[11px] font-mono text-error">
             {imageError}
@@ -175,12 +175,16 @@ export function ChatInput({ onSend, isLoading, disabled, showAttach, children }:
             value={input}
             onChange={(e) => setInput(e.target.value)}
             data-chat-input
+            data-lpignore="true"
+            data-1p-ignore="true"
+            data-form-type="other"
             placeholder="Ask AI..."
             disabled={disabled}
-            autoComplete="off"
+            autoComplete="one-time-code"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
+            enterKeyHint="send"
             className="input-field flex-1 !w-auto text-xs disabled:opacity-40"
           />
           <button

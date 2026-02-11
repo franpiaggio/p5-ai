@@ -83,6 +83,7 @@ interface EditorState {
   currentPage: 'editor' | 'sketches';
   providerKeys: ProviderKeys;
   storeApiKeys: boolean;
+  streamingCode: string | null;
 
   setCode: (code: string) => void;
   setIsRunning: (running: boolean) => void;
@@ -116,6 +117,7 @@ interface EditorState {
   setProviderKey: (provider: LLMConfig['provider'], key: string) => void;
   clearProviderKey: (provider: LLMConfig['provider']) => void;
   setStoreApiKeys: (store: boolean) => void;
+  setStreamingCode: (code: string | null) => void;
 }
 
 let logCounter = 0;
@@ -154,6 +156,7 @@ export const useEditorStore = create<EditorState>()(
       currentPage: 'editor' as const,
       providerKeys: {} as ProviderKeys,
       storeApiKeys: false,
+      streamingCode: null,
 
       setCode: (code) =>
         set((state) => ({
@@ -307,6 +310,7 @@ export const useEditorStore = create<EditorState>()(
           return { providerKeys, llmConfig: { ...state.llmConfig, apiKey } };
         }),
       setStoreApiKeys: (storeApiKeys) => set({ storeApiKeys }),
+      setStreamingCode: (streamingCode) => set({ streamingCode }),
       newSketch: () =>
         set((state) => ({
           code: DEFAULT_CODE,

@@ -18,6 +18,7 @@ dist-ssr
 
 # Internal docs
 internal_docs/
+docs/
 
 # Claude Code
 .claude/

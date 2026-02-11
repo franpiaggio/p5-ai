@@ -13,6 +13,7 @@ import { getPublicSketch } from './services/api';
 function App() {
   const isMobile = useIsMobile();
   const currentPage = useEditorStore((s) => s.currentPage);
+  const streamingCode = useEditorStore((s) => s.streamingCode);
   const user = useAuthStore((s) => s.user);
 
   // Detect /sketches route on mount
@@ -68,7 +69,7 @@ function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-surface overflow-hidden">
+    <div className="h-dvh flex flex-col bg-surface overflow-hidden">
       <Toolbar />
 
       {isMobile ? (
@@ -76,7 +77,17 @@ function App() {
       ) : (
         <SplitPane direction="horizontal" initialSize={50}>
           <SplitPane direction="vertical" initialSize={65}>
-            <Panel label="Sketch">
+            <Panel
+              label="Sketch"
+              rightContent={streamingCode !== null ? (
+                <div className="flex items-center gap-1.5 text-[10px] font-mono text-info"
+                  style={{ animation: 'generating-pulse 1.5s ease-in-out infinite' }}
+                >
+                  <div className="w-3 h-3 border-[1.5px] border-info/30 border-t-info rounded-full animate-spin" />
+                  <span>Writing…</span>
+                </div>
+              ) : undefined}
+            >
               <CodeEditor />
             </Panel>
             <BottomPanel />

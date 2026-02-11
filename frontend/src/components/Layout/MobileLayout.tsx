@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useResizable } from '../../hooks/useResizable';
 import { P5Preview } from '../Preview/P5Preview';
@@ -14,6 +14,18 @@ export function MobileLayout() {
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  const enterFullscreen = useCallback(() => {
+    history.pushState({ fullscreen: true }, '');
+    setIsFullscreen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handlePopState = () => setIsFullscreen(false);
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isFullscreen]);
+
   const { size, containerRef, handleMouseDown, handleTouchStart } = useResizable({
     direction: 'vertical',
     initialSize: 35,
@@ -28,7 +40,7 @@ export function MobileLayout() {
           <P5Preview />
         </div>
         <button
-          onClick={() => setIsFullscreen(false)}
+          onClick={() => { history.back(); }}
           className="absolute top-2 right-2 z-10 btn-icon bg-surface/80 backdrop-blur border border-border/40 text-text-muted/60 hover:text-text-primary"
           title="Exit fullscreen"
         >
@@ -45,7 +57,7 @@ export function MobileLayout() {
       <div className="shrink-0 relative" style={{ height: `${size}%` }}>
         <P5Preview />
         <button
-          onClick={() => setIsFullscreen(true)}
+          onClick={enterFullscreen}
           className="absolute top-2 right-2 z-10 btn-icon bg-surface/80 backdrop-blur border border-border/40 text-text-muted/60 hover:text-text-primary"
           title="Fullscreen"
         >

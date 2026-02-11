@@ -15,12 +15,15 @@ export function CodeEditor() {
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
   const editorTheme = useEditorStore((s) => s.editorTheme);
   const editorLanguage = useEditorStore((s) => s.editorLanguage);
+  const streamingCode = useEditorStore((s) => s.streamingCode);
+  const isLoading = useEditorStore((s) => s.isLoading);
 
   const runRef = useRef(runSketch);
   const clearRef = useRef(clearConsoleLogs);
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof Monaco | null>(null);
   const decorationsRef = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null);
+  const streamingDiffRef = useRef<Monaco.editor.IStandaloneDiffEditor | null>(null);
 
   runRef.current = runSketch;
   clearRef.current = clearConsoleLogs;
@@ -140,6 +143,47 @@ export function CodeEditor() {
     requestAnimationFrame(() => tryScroll(10));
   }, []);
 
+  const handleStreamingDiffMount: DiffOnMount = useCallback((editor) => {
+    streamingDiffRef.current = editor;
+    const modified = editor.getModifiedEditor();
+    const lineCount = modified.getModel()?.getLineCount() || 1;
+    modified.revealLine(lineCount);
+  }, []);
+
+  useEffect(() => {
+    if (streamingCode === null) {
+      streamingDiffRef.current = null;
+      return;
+    }
+    if (streamingDiffRef.current) {
+      const modified = streamingDiffRef.current.getModifiedEditor();
+      const lineCount = modified.getModel()?.getLineCount() || 1;
+      modified.revealLine(lineCount);
+    }
+  }, [streamingCode]);
+
+  if (streamingCode !== null) {
+    return (
+      <div className="h-full w-full relative">
+        <DiffEditor
+          height="100%"
+          language={editorLanguage}
+          original={code}
+          modified={streamingCode}
+          theme={editorTheme}
+          onMount={handleStreamingDiffMount}
+          options={{
+            ...EDITOR_OPTIONS,
+            readOnly: true,
+            renderSideBySide: false,
+            renderOverviewRuler: false,
+            glyphMargin: false,
+          }}
+        />
+      </div>
+    );
+  }
+
   if (pendingDiff) {
     return (
       <div className="h-full w-full" style={{ position: 'relative' }}>
@@ -174,7 +218,7 @@ export function CodeEditor() {
         beforeMount={handleBeforeMount}
         onMount={handleMount}
         theme={editorTheme}
-        options={EDITOR_OPTIONS}
+        options={{ ...EDITOR_OPTIONS, readOnly: isLoading }}
       />
     </div>
   );

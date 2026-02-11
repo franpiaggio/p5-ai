@@ -4,7 +4,29 @@ import { streamChat, checkBackendHealth } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
+import { GeneratingCodeIndicator } from './GeneratingCodeIndicator';
+import { PendingDiffBanner } from './PendingDiffBanner';
 import type { ImageAttachment } from '../../types';
+
+const JS_FENCE_OPEN = /```(?:javascript|js|jsx|typescript|ts|tsx)\s*\n/;
+
+/** Split streaming content into chat text (no code) and code for the editor. */
+function parseStreamContent(content: string) {
+  const openMatch = JS_FENCE_OPEN.exec(content);
+  if (!openMatch) return { chatContent: content, codeContent: null as string | null };
+
+  const before = content.slice(0, openMatch.index);
+  const codeStart = openMatch.index + openMatch[0].length;
+  const rest = content.slice(codeStart);
+  const closeIdx = rest.indexOf('\n```');
+
+  if (closeIdx === -1) {
+    return { chatContent: before.trimEnd(), codeContent: rest };
+  }
+  const code = rest.slice(0, closeIdx);
+  const after = rest.slice(closeIdx + 4); // skip \n```
+  return { chatContent: (before + after).trimEnd(), codeContent: code };
+}
 
 export function ChatPanel() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -22,6 +44,8 @@ export function ChatPanel() {
   const setIsSettingsOpen = useEditorStore((s) => s.setIsSettingsOpen);
   const fixRequest = useEditorStore((s) => s.fixRequest);
   const setFixRequest = useEditorStore((s) => s.setFixRequest);
+  const streamingCode = useEditorStore((s) => s.streamingCode);
+  const pendingDiff = useEditorStore((s) => s.pendingDiff);
 
   // Backend health check on mount + retry every 10s when offline
   useEffect(() => {
@@ -68,6 +92,7 @@ export function ChatPanel() {
     try {
       let assistantContent = '';
       let firstChunk = true;
+      let hasCodeFence = false;
       addMessage({ role: 'assistant', content: '' });
 
       const currentState = useEditorStore.getState();
@@ -84,17 +109,34 @@ export function ChatPanel() {
           setIsStreaming(false);
         }
         assistantContent += chunk;
+
+        const { chatContent, codeContent } = parseStreamContent(assistantContent);
+        if (codeContent !== null) hasCodeFence = true;
+
         useEditorStore.setState((state) => {
           const newMessages = [...state.messages];
           newMessages[newMessages.length - 1] = {
             ...newMessages[newMessages.length - 1],
-            content: assistantContent,
+            content: hasCodeFence ? chatContent : assistantContent,
           };
-          return { messages: newMessages };
+          return {
+            messages: newMessages,
+            ...(codeContent !== null ? { streamingCode: codeContent } : {}),
+          };
         });
       }
 
       if (backendOnline !== true) setBackendOnline(true);
+
+      // Restore full message content (with code block) and clear streaming
+      useEditorStore.setState((state) => {
+        const newMessages = [...state.messages];
+        newMessages[newMessages.length - 1] = {
+          ...newMessages[newMessages.length - 1],
+          content: assistantContent,
+        };
+        return { messages: newMessages, streamingCode: null };
+      });
 
       const finalState = useEditorStore.getState();
       if (finalState.autoApply && assistantContent) {
@@ -143,7 +185,7 @@ export function ChatPanel() {
 
   const lastMessage = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMessage?.role === 'assistant' && !lastMessage.content;
-  const chatDisabled = backendOnline === false || (llmConfig.provider !== 'demo' && !llmConfig.apiKey);
+  const chatDisabled = backendOnline === false || (llmConfig.provider !== 'demo' && !llmConfig.apiKey) || !!pendingDiff;
 
   return (
     <ChatInput
@@ -187,6 +229,8 @@ export function ChatPanel() {
             );
           })
         )}
+        {streamingCode !== null && <GeneratingCodeIndicator />}
+        {pendingDiff && <PendingDiffBanner />}
         <div ref={messagesEndRef} />
       </div>
     </ChatInput>

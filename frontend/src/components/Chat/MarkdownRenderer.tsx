@@ -27,10 +27,11 @@ function CollapsibleCodeBlock({
 }) {
   const [expanded, setExpanded] = useState(() => expandedState.get(stableKey) ?? false);
   const preRef = useRef<HTMLPreElement>(null);
+  const isNearBottomRef = useRef(false);
 
-  // Auto-scroll to bottom while generating and expanded
+  // Auto-scroll only if user is already near the bottom
   useEffect(() => {
-    if (expanded && isGenerating && preRef.current) {
+    if (expanded && isGenerating && preRef.current && isNearBottomRef.current) {
       preRef.current.scrollTop = preRef.current.scrollHeight;
     }
   }, [expanded, isGenerating, code]);
@@ -46,14 +47,24 @@ function CollapsibleCodeBlock({
   const isApplied = blockKey ? !!appliedBlocks[blockKey] : false;
 
   const handleToggle = useCallback(() => {
-    setExpanded((prev) => {
-      const next = !prev;
-      expandedState.set(stableKey, next);
-      return next;
-    });
+    const next = !(expandedState.get(stableKey) ?? false);
+    expandedState.set(stableKey, next);
+    setExpanded(next);
   }, [stableKey]);
 
+  const [copied, setCopied] = useState(false);
   const isPending = pendingDiff?.blockKey === blockKey && !!blockKey;
+
+  const handleCopy = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      navigator.clipboard.writeText(code).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    },
+    [code],
+  );
 
   const handleApply = useCallback(
     (e: React.MouseEvent) => {
@@ -141,76 +152,97 @@ function CollapsibleCodeBlock({
             </span>
           )}
         </span>
-        {isJS && (
-          isApplied ? (
-            <span
-              style={{
-                background: 'color-mix(in srgb, var(--color-success) 20%, transparent)',
-                color: 'var(--color-success)',
-                border: 'none',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                fontSize: '10px',
-                fontFamily: 'monospace',
-              }}
-            >
-              Applied
-            </span>
-          ) : isPending ? (
-            <span
-              style={{
-                background: 'color-mix(in srgb, var(--color-warning) 20%, transparent)',
-                color: 'var(--color-warning)',
-                padding: '2px 8px',
-                borderRadius: '4px',
-                fontSize: '10px',
-                fontFamily: 'monospace',
-              }}
-            >
-              Reviewing...
-            </span>
-          ) : (
+        {!isGenerating && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
-              onClick={handleApply}
+              onClick={handleCopy}
+              title="Copy code"
               style={{
-                background: 'var(--color-accent)',
-                color: '#fff',
+                background: 'none',
                 border: 'none',
-                padding: '2px 10px',
-                borderRadius: '4px',
                 cursor: 'pointer',
-                fontSize: '10px',
-                fontFamily: 'monospace',
-                fontWeight: 600,
-                transition: 'opacity 0.15s',
+                padding: '2px',
+                color: copied ? 'var(--color-success)' : 'var(--color-text-muted)',
+                transition: 'color 0.15s',
+                display: 'flex',
+                alignItems: 'center',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
-              onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
             >
-              Apply
+              {copied ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+              )}
             </button>
-          )
+            {isJS && (
+              isApplied ? (
+                <span
+                  style={{
+                    background: 'color-mix(in srgb, var(--color-success) 20%, transparent)',
+                    color: 'var(--color-success)',
+                    border: 'none',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  Applied
+                </span>
+              ) : isPending ? (
+                <span
+                  style={{
+                    background: 'color-mix(in srgb, var(--color-warning) 20%, transparent)',
+                    color: 'var(--color-warning)',
+                    padding: '2px 8px',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    fontFamily: 'monospace',
+                  }}
+                >
+                  Reviewing...
+                </span>
+              ) : (
+                <button
+                  onClick={handleApply}
+                  style={{
+                    background: 'var(--color-accent)',
+                    color: '#fff',
+                    border: 'none',
+                    padding: '2px 10px',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    fontFamily: 'monospace',
+                    fontWeight: 600,
+                    transition: 'opacity 0.15s',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+                >
+                  Apply
+                </button>
+              )
+            )}
+          </span>
         )}
       </div>
       {expanded && (
-        <div className="relative">
-          <pre
-            ref={preRef}
-            className={`m-0 p-2.5 text-[11px] leading-relaxed bg-surface-raised overflow-auto max-h-[300px] text-text-primary ${isGenerating ? 'pb-9' : ''}`}
-          >
-            <code>{code}</code>
-          </pre>
-          {isGenerating && (
-            <div className="sticky bottom-0 flex justify-center py-1 bg-gradient-to-b from-transparent to-surface-raised">
-              <button
-                onClick={handleToggle}
-                className="bg-surface border border-border rounded px-3 py-0.5 text-[10px] font-mono text-text-muted cursor-pointer transition-opacity hover:opacity-70"
-              >
-                Hide
-              </button>
-            </div>
-          )}
-        </div>
+        <pre
+          ref={preRef}
+          onScroll={() => {
+            const el = preRef.current;
+            if (el) isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+          }}
+          className="m-0 p-2.5 text-[11px] leading-relaxed bg-surface-raised overflow-auto max-h-[300px] text-text-primary"
+        >
+          <code>{code}</code>
+        </pre>
       )}
     </div>
   );
