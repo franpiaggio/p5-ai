@@ -42,15 +42,6 @@ window.addEventListener('popstate', () => {
   }
 });
 
-// Warn before closing/reloading with unsaved changes
-// Skip only when auto-save is on AND we have a saved sketch (auto-save needs a sketchId)
-window.addEventListener('beforeunload', (e) => {
-  const { code, lastSavedCode, autoSave, sketchId } = useEditorStore.getState();
-  if (code !== lastSavedCode && !(autoSave && sketchId)) {
-    e.preventDefault();
-  }
-});
-
 // Sync providerKeys to sessionStorage (backend save happens on Settings close)
 let prevProviderKeys = useEditorStore.getState().providerKeys;
 useEditorStore.subscribe((state) => {

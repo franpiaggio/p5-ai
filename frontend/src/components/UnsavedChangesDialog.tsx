@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useEditorStore } from '../store/editorStore';
 import { useAuthStore } from '../store/authStore';
 import { useUpdateSketch, useCreateSketch } from '../hooks/useSketches';
@@ -13,6 +14,8 @@ export function UnsavedChangesDialog() {
   const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
   const updateSketchMut = useUpdateSketch();
   const createSketchMut = useCreateSketch();
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!pendingNavigation) return null;
 
@@ -28,6 +31,8 @@ export function UnsavedChangesDialog() {
 
   const saveAndContinue = async () => {
     const action = pendingNavigation;
+    setSaving(true);
+    setError(null);
     try {
       const thumbnail = await capturePreview();
       if (sketchId) {
@@ -39,7 +44,9 @@ export function UnsavedChangesDialog() {
       useEditorStore.setState({ lastSavedCode: code, pendingNavigation: null });
       action();
     } catch (err) {
-      console.error('Failed to save:', err);
+      setError('Failed to save. Try again or discard.');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -67,25 +74,32 @@ export function UnsavedChangesDialog() {
           </div>
         </div>
 
+        {error && (
+          <p className="text-[10px] font-mono text-error mt-3">{error}</p>
+        )}
+
         <div className="flex justify-end gap-2 mt-5">
           <button
             onClick={dismiss}
-            className="px-3 py-1.5 text-[11px] font-mono text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+            disabled={saving}
+            className="px-3 py-1.5 text-[11px] font-mono text-text-muted hover:text-text-primary transition-colors cursor-pointer disabled:opacity-40"
           >
             Cancel
           </button>
           <button
             onClick={discard}
-            className="px-3 py-1.5 text-[11px] font-mono rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors cursor-pointer"
+            disabled={saving}
+            className="px-3 py-1.5 text-[11px] font-mono rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors cursor-pointer disabled:opacity-40"
           >
             Discard
           </button>
           {user ? (
             <button
               onClick={saveAndContinue}
+              disabled={saving}
               className="btn-primary px-4 text-[11px]"
             >
-              Save
+              {saving ? 'Saving...' : 'Save'}
             </button>
           ) : (
             <button

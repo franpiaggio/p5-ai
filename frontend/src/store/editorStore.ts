@@ -359,8 +359,6 @@ export const useEditorStore = create<EditorState>()(
         state.providerKeys = keys;
         const provider = state.llmConfig.provider as keyof ProviderKeys;
         state.llmConfig = { ...state.llmConfig, apiKey: keys[provider] ?? '' };
-        // If no saved sketch, reset to initial state on reload.
-        // Only persisted sketches (with sketchId in URL) survive a refresh.
         if (!state.sketchId) {
           state.code = DEFAULT_CODE;
           state.codeHistory = [];

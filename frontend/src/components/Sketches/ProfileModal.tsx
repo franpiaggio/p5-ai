@@ -23,10 +23,12 @@ export function ProfileModal() {
   const loadSketch = async (id: string) => {
     try {
       const sketch = await getSketch(id);
+      const { runTrigger } = useEditorStore.getState();
       useEditorStore.setState({
         code: sketch.code,
         lastSavedCode: sketch.code,
-        isRunning: false,
+        isRunning: true,
+        runTrigger: runTrigger + 1,
         previewCode: null,
         pendingDiff: null,
         consoleLogs: [],

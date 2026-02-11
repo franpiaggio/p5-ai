@@ -1,8 +1,17 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { SKETCH_EXAMPLES } from '../../data/sketchExamples';
 import { buildPreviewHtml } from '../Preview/previewTemplate';
 import { guardUnsaved } from '../../utils/unsavedGuard';
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 const CAPTURE_RENDER_DELAY_MS = 600;
 const CAPTURE_TIMEOUT_MS = 8000;
@@ -98,8 +107,10 @@ function ExamplePreview({ code }: { code: string }) {
 }
 
 export function ExamplesGrid() {
+  const shuffled = useMemo(() => shuffle(SKETCH_EXAMPLES), []);
+
   const loadExample = (idx: number) => {
-    const example = SKETCH_EXAMPLES[idx];
+    const example = shuffled[idx];
     guardUnsaved(() => {
       const { runTrigger } = useEditorStore.getState();
       useEditorStore.setState({
@@ -148,7 +159,7 @@ export function ExamplesGrid() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
-          {SKETCH_EXAMPLES.map((example, idx) => (
+          {shuffled.map((example, idx) => (
             <div
               key={idx}
               onClick={() => loadExample(idx)}

@@ -12,10 +12,12 @@ export function SketchesGrid() {
   const loadSketch = async (id: string) => {
     try {
       const sketch = await getSketch(id);
+      const { runTrigger } = useEditorStore.getState();
       useEditorStore.setState({
         code: sketch.code,
         lastSavedCode: sketch.code,
-        isRunning: false,
+        isRunning: true,
+        runTrigger: runTrigger + 1,
         previewCode: null,
         pendingDiff: null,
         consoleLogs: [],
@@ -95,15 +97,23 @@ export function SketchesGrid() {
             <h1 className="text-sm font-mono text-text-primary">My Sketches</h1>
           </div>
         </div>
-        <button
-          onClick={handleNewSketch}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono rounded bg-accent text-white hover:bg-accent/80 transition-colors cursor-pointer"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => useEditorStore.getState().setCurrentPage('examples')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono rounded bg-border/30 text-text-muted hover:text-text-primary hover:bg-border/50 transition-colors cursor-pointer"
+          >
+            Explore Examples
+          </button>
+          <button
+            onClick={handleNewSketch}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono rounded bg-accent text-white hover:bg-accent/80 transition-colors cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New
+          </button>
+        </div>
       </div>
 
       {/* Content */}
