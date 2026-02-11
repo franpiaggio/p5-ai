@@ -48,23 +48,39 @@ export function SketchesGrid() {
 
   const goBack = () => useEditorStore.getState().setCurrentPage('editor');
 
+  const handleNewSketch = () => {
+    useEditorStore.getState().newSketch();
+    useEditorStore.getState().setCurrentPage('editor');
+  };
+
   return (
     <div className="h-dvh bg-surface flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 sm:px-6 py-4 border-b border-border/40">
-        <button
-          onClick={goBack}
-          className="p-1.5 rounded hover:bg-border/30 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <div className="flex items-center gap-2">
-          <span className="text-info font-bold text-base">p5</span>
-          <span className="text-text-muted/30">|</span>
-          <h1 className="text-sm font-mono text-text-primary">My Sketches</h1>
+      <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-border/40">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={goBack}
+            className="p-1.5 rounded hover:bg-border/30 text-text-muted hover:text-text-primary transition-colors cursor-pointer"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2">
+            <span className="text-info font-bold text-base">p5</span>
+            <span className="text-text-muted/30">|</span>
+            <h1 className="text-sm font-mono text-text-primary">My Sketches</h1>
+          </div>
         </div>
+        <button
+          onClick={handleNewSketch}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono rounded bg-accent text-white hover:bg-accent/80 transition-colors cursor-pointer"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          New
+        </button>
       </div>
 
       {/* Content */}
@@ -79,10 +95,10 @@ export function SketchesGrid() {
           <div className="text-center py-16">
             <p className="text-text-muted/30 text-sm font-mono mb-4">No sketches yet</p>
             <button
-              onClick={goBack}
-              className="px-4 py-2 text-xs font-mono rounded bg-info/10 text-info hover:bg-info/20 transition-colors cursor-pointer"
+              onClick={handleNewSketch}
+              className="px-4 py-2 text-xs font-mono rounded bg-accent text-white hover:bg-accent/80 transition-colors cursor-pointer"
             >
-              Back to Editor
+              Create your first sketch
             </button>
           </div>
         )}
