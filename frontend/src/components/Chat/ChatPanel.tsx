@@ -128,30 +128,33 @@ export function ChatPanel() {
 
       if (backendOnline !== true) setBackendOnline(true);
 
-      // Restore full message content (with code block) and clear streaming
+      // Restore full message content, clear streaming, and auto-apply in one atomic update
+      // to avoid a flicker frame between streaming DiffEditor and pendingDiff DiffEditor
+      const jsCode = assistantContent ? extractFirstJsBlock(assistantContent) : null;
+
       useEditorStore.setState((state) => {
         const newMessages = [...state.messages];
         newMessages[newMessages.length - 1] = {
           ...newMessages[newMessages.length - 1],
           content: assistantContent,
         };
+
+        if (state.autoApply && jsCode) {
+          const lastMsg = newMessages[newMessages.length - 1];
+          const blockKey = `${lastMsg.id}:${simpleHash(jsCode)}`;
+          return {
+            messages: newMessages,
+            streamingCode: null,
+            pendingDiff: { code: jsCode, previousCode: state.code, messageId: lastMsg.id, blockKey, prompt: userMessage },
+            previewCode: null,
+            code: jsCode,
+            isRunning: true,
+            runTrigger: state.runTrigger + 1,
+          };
+        }
+
         return { messages: newMessages, streamingCode: null };
       });
-
-      const finalState = useEditorStore.getState();
-      if (finalState.autoApply && assistantContent) {
-        const jsCode = extractFirstJsBlock(assistantContent);
-        if (jsCode) {
-          const lastMsg = finalState.messages[finalState.messages.length - 1];
-          const blockKey = `${lastMsg.id}:${simpleHash(jsCode)}`;
-          useEditorStore.getState().setPendingDiff({
-            code: jsCode,
-            messageId: lastMsg.id,
-            blockKey,
-            prompt: userMessage,
-          });
-        }
-      }
     } catch (error) {
       setIsStreaming(false);
       const errorMsg = error instanceof Error ? error.message : 'Failed to get response';
