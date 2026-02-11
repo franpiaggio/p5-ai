@@ -1,6 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { fetchModels } from '../services/api';
+import { queryKeys } from './queryClient';
 import type { LLMConfig } from '../types';
+
+/** Models rarely change, cache for 5 minutes */
+const MODELS_STALE_TIME_MS = 5 * 60_000;
 
 export const FALLBACK_MODELS: Record<string, string[]> = {
   demo: ['llama-3.3-70b-versatile'],
@@ -17,30 +21,17 @@ export const PROVIDER_LABELS: Record<string, string> = {
 };
 
 export function useModelList(provider: LLMConfig['provider'], apiKey: string) {
-  const [models, setModels] = useState<string[]>(FALLBACK_MODELS[provider] ?? []);
-  const [loadingModels, setLoadingModels] = useState(false);
+  const enabled = provider === 'demo' || !!apiKey;
 
-  useEffect(() => {
-    if (provider !== 'demo' && !apiKey) {
-      setModels(FALLBACK_MODELS[provider] ?? []);
-      return;
-    }
+  const { data, isLoading } = useQuery({
+    queryKey: queryKeys.models(provider, apiKey),
+    queryFn: () => fetchModels(provider, apiKey),
+    enabled,
+    staleTime: MODELS_STALE_TIME_MS,
+    placeholderData: FALLBACK_MODELS[provider] ?? [],
+  });
 
-    let cancelled = false;
-    setLoadingModels(true);
+  const models = data && data.length > 0 ? data : FALLBACK_MODELS[provider] ?? [];
 
-    fetchModels(provider, apiKey).then((fetched) => {
-      if (cancelled) return;
-      setModels(fetched.length > 0 ? fetched : FALLBACK_MODELS[provider] ?? []);
-      setLoadingModels(false);
-    }).catch(() => {
-      if (cancelled) return;
-      setModels(FALLBACK_MODELS[provider] ?? []);
-      setLoadingModels(false);
-    });
-
-    return () => { cancelled = true; };
-  }, [provider, apiKey]);
-
-  return { models, loadingModels };
+  return { models, loadingModels: isLoading && enabled };
 }

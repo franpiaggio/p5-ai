@@ -2,12 +2,14 @@ import { useEffect } from 'react';
 import { Toolbar, CodeEditor, P5Preview, BottomPanel, SettingsModal, SplitPane, Panel } from './components';
 import { ProfileModal } from './components/Sketches/ProfileModal';
 import { SaveSketchModal } from './components/Sketches/SaveSketchModal';
+import { ExamplesGrid } from './components/Sketches/ExamplesGrid';
 import { SketchesGrid } from './components/Sketches/SketchesGrid';
 import { LoginModal } from './components/Auth/LoginModal';
 import { MobileLayout } from './components/Layout/MobileLayout';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useEditorStore } from './store/editorStore';
 import { useAuthStore } from './store/authStore';
+import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
 import { getPublicSketch } from './services/api';
 
 function App() {
@@ -16,10 +18,13 @@ function App() {
   const streamingCode = useEditorStore((s) => s.streamingCode);
   const user = useAuthStore((s) => s.user);
 
-  // Detect /sketches route on mount
+  // Detect /sketches or /examples route on mount
   useEffect(() => {
-    if (window.location.pathname === '/sketches') {
+    const path = window.location.pathname;
+    if (path === '/sketches') {
       useEditorStore.setState({ currentPage: 'sketches' });
+    } else if (path === '/examples') {
+      useEditorStore.setState({ currentPage: 'examples' });
     }
   }, []);
 
@@ -38,9 +43,12 @@ function App() {
     if (useEditorStore.getState().sketchId === id) return;
     getPublicSketch(id)
       .then((sketch) => {
+        // Re-check: zustand persist may have rehydrated this sketch while fetch was in-flight
+        if (useEditorStore.getState().sketchId === id) return;
         const { runTrigger } = useEditorStore.getState();
         useEditorStore.setState({
           code: sketch.code,
+          lastSavedCode: sketch.code,
           isRunning: true,
           runTrigger: runTrigger + 1,
           previewCode: null,
@@ -59,11 +67,21 @@ function App() {
       });
   }, []);
 
+  if (currentPage === 'examples') {
+    return (
+      <>
+        <ExamplesGrid />
+        <UnsavedChangesDialog />
+      </>
+    );
+  }
+
   if (currentPage === 'sketches' && user) {
     return (
       <>
         <SketchesGrid />
         <LoginModal />
+        <UnsavedChangesDialog />
       </>
     );
   }
@@ -103,6 +121,7 @@ function App() {
       <LoginModal />
       <ProfileModal />
       <SaveSketchModal />
+      <UnsavedChangesDialog />
     </div>
   );
 }

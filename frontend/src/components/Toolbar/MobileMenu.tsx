@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
-import { updateSketch, createSketch, logoutApi } from '../../services/api';
+import { logoutApi } from '../../services/api';
+import { useUpdateSketch, useCreateSketch } from '../../hooks/useSketches';
+import { guardUnsaved } from '../../utils/unsavedGuard';
 import { capturePreview } from '../Preview/P5Preview';
 import { EDITOR_THEMES } from '../Editor/editorConfig';
 import type { EditorLanguage } from '../../store/editorStore';
@@ -9,6 +11,8 @@ import type { EditorLanguage } from '../../store/editorStore';
 export function MobileMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const updateSketchMut = useUpdateSketch();
+  const createSketchMut = useCreateSketch();
 
   const sketchId = useEditorStore((s) => s.sketchId);
   const sketchTitle = useEditorStore((s) => s.sketchTitle);
@@ -41,7 +45,7 @@ export function MobileMenu() {
 
   const handleNewSketch = () => {
     close();
-    newSketch();
+    guardUnsaved(() => newSketch());
   };
 
   const handleSave = async () => {
@@ -53,7 +57,8 @@ export function MobileMenu() {
     if (sketchId) {
       try {
         const thumbnail = await capturePreview();
-        await updateSketch(sketchId, { title: sketchTitle, code, codeHistory, thumbnail });
+        updateSketchMut.mutate({ id: sketchId, title: sketchTitle, code, codeHistory, thumbnail },
+          { onSuccess: () => useEditorStore.getState().markCodeSaved() });
       } catch (err) {
         console.error('Failed to save:', err);
       }
@@ -75,7 +80,7 @@ export function MobileMenu() {
     close();
     if (!user || !sketchId) return;
     try {
-      const copy = await createSketch({
+      const copy = await createSketchMut.mutateAsync({
         title: sketchTitle + ' (copy)',
         code,
       });
@@ -124,6 +129,12 @@ export function MobileMenu() {
           {/* File actions */}
           <button onClick={handleNewSketch} className={menuItemClass}>
             New Sketch
+          </button>
+          <button
+            onClick={() => { close(); useEditorStore.getState().setCurrentPage('examples'); }}
+            className={menuItemClass}
+          >
+            Examples
           </button>
           <button onClick={handleSave} className={menuItemClass}>
             Save

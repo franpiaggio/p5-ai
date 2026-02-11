@@ -7,6 +7,9 @@ import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
 import { GeneratingCodeIndicator } from './GeneratingCodeIndicator';
 import { PendingDiffBanner } from './PendingDiffBanner';
+import { SketchSuggestion } from './SketchSuggestion';
+import type { SketchExample } from '../../data/sketchExamples';
+import { guardUnsaved } from '../../utils/unsavedGuard';
 import type { ImageAttachment } from '../../types';
 
 const JS_FENCE_OPEN = /```(?:javascript|js|jsx|typescript|ts|tsx)\s*\n/;
@@ -190,6 +193,28 @@ export function ChatPanel() {
     useEditorStore.setState({ streamingCode: null });
   }, []);
 
+  const applyExample = useCallback((example: SketchExample) => {
+    addMessage({ role: 'user', content: example.prompt });
+    const assistantContent = `Here's a **${example.label}** sketch:\n\n\`\`\`javascript\n${example.code}\n\`\`\``;
+    addMessage({ role: 'assistant', content: assistantContent });
+
+    useEditorStore.setState((state) => {
+      const lastMsg = state.messages[state.messages.length - 1];
+      const blockKey = `${lastMsg.id}:${simpleHash(example.code)}`;
+      return {
+        pendingDiff: { code: example.code, previousCode: state.code, messageId: lastMsg.id, blockKey, prompt: example.prompt },
+        previewCode: null,
+        code: example.code,
+        isRunning: true,
+        runTrigger: state.runTrigger + 1,
+      };
+    });
+  }, [addMessage]);
+
+  const handleExampleSelect = useCallback((example: SketchExample) => {
+    guardUnsaved(() => applyExample(example));
+  }, [applyExample]);
+
   useEffect(() => {
     if (fixRequest && !isLoading) {
       setFixRequest(null);
@@ -218,15 +243,10 @@ export function ChatPanel() {
       )}
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
         {messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-2 text-center px-4">
-            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-              <svg className="w-5 h-5 text-accent/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-              </svg>
+          <div className="flex flex-col items-center justify-end h-full gap-3 text-center px-4 pb-3">
+            <div className="w-full max-w-xs">
+              <SketchSuggestion onSelect={handleExampleSelect} />
             </div>
-            <p className="text-text-muted/30 text-xs font-mono">
-              Describe your idea to get started
-            </p>
           </div>
         ) : (
           messages.map((msg, idx) => {

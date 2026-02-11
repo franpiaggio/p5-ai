@@ -1,25 +1,20 @@
-import { useState, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { getSketches, getSketch, deleteSketch, createSketch } from '../../services/api';
-import type { SketchSummary } from '../../types';
+import { getSketch } from '../../services/api';
+import { useSketches, useCreateSketch, useDeleteSketch } from '../../hooks/useSketches';
+import { guardUnsaved } from '../../utils/unsavedGuard';
 
 export function SketchesGrid() {
-  const [sketches, setSketches] = useState<SketchSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: sketches = [], isLoading: loading } = useSketches();
+  const createSketchMut = useCreateSketch();
+  const deleteSketchMut = useDeleteSketch();
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
 
-  useEffect(() => {
-    getSketches()
-      .then(setSketches)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleLoad = async (id: string) => {
+  const loadSketch = async (id: string) => {
     try {
       const sketch = await getSketch(id);
       useEditorStore.setState({
         code: sketch.code,
+        lastSavedCode: sketch.code,
         isRunning: false,
         previewCode: null,
         pendingDiff: null,
@@ -36,20 +31,17 @@ export function SketchesGrid() {
     }
   };
 
+  const handleLoad = (id: string) => guardUnsaved(() => loadSketch(id));
+
   const handleDelete = async (id: string) => {
     if (!window.confirm('Delete this sketch?')) return;
-    try {
-      await deleteSketch(id);
-      setSketches((prev) => prev.filter((s) => s.id !== id));
-    } catch (error) {
-      console.error('Failed to delete sketch:', error);
-    }
+    deleteSketchMut.mutate(id);
   };
 
   const handleDuplicate = async (id: string) => {
     try {
       const sketch = await getSketch(id);
-      const saved = await createSketch({
+      const saved = await createSketchMut.mutateAsync({
         title: `Copy of ${sketch.title}`,
         code: sketch.code,
         description: sketch.description || undefined,
@@ -57,6 +49,7 @@ export function SketchesGrid() {
       });
       useEditorStore.setState({
         code: saved.code,
+        lastSavedCode: saved.code,
         isRunning: true,
         runTrigger: useEditorStore.getState().runTrigger + 1,
         previewCode: null,
@@ -76,10 +69,10 @@ export function SketchesGrid() {
 
   const goBack = () => useEditorStore.getState().setCurrentPage('editor');
 
-  const handleNewSketch = () => {
+  const handleNewSketch = () => guardUnsaved(() => {
     useEditorStore.getState().newSketch();
     useEditorStore.getState().setCurrentPage('editor');
-  };
+  });
 
   return (
     <div className="h-dvh bg-surface flex flex-col">

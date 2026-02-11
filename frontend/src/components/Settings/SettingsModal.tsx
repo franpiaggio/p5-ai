@@ -3,7 +3,7 @@ import { useEditorStore } from '../../store/editorStore';
 import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
 import { useModelList, FALLBACK_MODELS, PROVIDER_LABELS } from '../../hooks/useModelList';
-import { getProviderKeys, saveProviderKey, clearProviderKey as clearProviderKeyApi } from '../../services/api';
+import { useProviderKeysQuery, useSaveProviderKey, useClearProviderKey } from '../../hooks/useProviderKeys';
 import type { LLMConfig, ProviderKeys } from '../../types';
 
 interface Draft {
@@ -21,11 +21,16 @@ export function SettingsModal() {
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  const saveProviderKeyMut = useSaveProviderKey();
+  const clearProviderKeyMut = useClearProviderKey();
 
   const { models, loadingModels } = useModelList(
     draft?.provider ?? 'demo',
     draft?.keys[draft?.provider ?? 'demo'] ?? '',
   );
+
+  const shouldFetchKeys = isSettingsOpen && !!user && !!draft?.storeApiKeys;
+  const { data: remoteKeys } = useProviderKeysQuery(shouldFetchKeys);
 
   // Initialize draft from store when modal opens
   useEffect(() => {
@@ -43,15 +48,13 @@ export function SettingsModal() {
     });
   }, [isSettingsOpen]);
 
-  // Auto-fetch keys from backend on open
+  // Merge remote keys into draft when they arrive
   useEffect(() => {
-    if (!draft || !user || !draft.storeApiKeys) return;
+    if (!remoteKeys || !draft) return;
     const hasAnyKey = Object.values(draft.keys).some(Boolean);
     if (hasAnyKey) return;
-    getProviderKeys().then((keys) => {
-      setDraft((prev) => prev ? { ...prev, keys: { ...prev.keys, ...keys } } : prev);
-    });
-  }, [draft?.storeApiKeys, user, isSettingsOpen]);
+    setDraft((prev) => prev ? { ...prev, keys: { ...prev.keys, ...remoteKeys } } : prev);
+  }, [remoteKeys]);
 
   const handleSave = useCallback(async () => {
     if (!draft) return;
@@ -77,7 +80,7 @@ export function SettingsModal() {
       if (user && draft.storeApiKeys) {
         const key = draft.keys[draft.provider];
         if (key && draft.provider !== 'demo') {
-          await saveProviderKey(draft.provider, key).catch(() => {});
+          saveProviderKeyMut.mutate({ provider: draft.provider, apiKey: key });
         }
       }
     } finally {
@@ -120,7 +123,7 @@ export function SettingsModal() {
     });
     // Also clear from backend if stored
     if (user && draft.storeApiKeys) {
-      clearProviderKeyApi(draft.provider).catch(() => {});
+      clearProviderKeyMut.mutate(draft.provider);
     }
   };
 

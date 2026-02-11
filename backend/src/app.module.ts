@@ -16,13 +16,13 @@ import { SketchesModule } from './sketches/sketches.module';
     ThrottlerModule.forRoot([
       {
         name: 'short',
-        ttl: 60_000,   // 1 minute window
-        limit: 30,     // 30 requests per minute
+        ttl: 60_000,
+        limit: 30,
       },
       {
         name: 'long',
-        ttl: 600_000,  // 10 minute window
-        limit: 200,    // 200 requests per 10 minutes
+        ttl: 600_000,
+        limit: 200,
       },
     ]),
     TypeOrmModule.forRootAsync({
@@ -43,10 +43,9 @@ import { SketchesModule } from './sketches/sketches.module';
   controllers: [AppController],
   providers: [
     AppService,
-    {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
+    ...(process.env.NODE_ENV === 'production'
+      ? [{ provide: APP_GUARD, useClass: ThrottlerGuard }]
+      : []),
   ],
 })
 export class AppModule {}

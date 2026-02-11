@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
 import { useEditorStore } from '../../store/editorStore';
-import { createSketch } from '../../services/api';
+import { useCreateSketch } from '../../hooks/useSketches';
 import { capturePreview } from '../Preview/P5Preview';
 
 export function SaveSketchModal() {
@@ -11,6 +11,7 @@ export function SaveSketchModal() {
   const code = useEditorStore((s) => s.code);
   const sketchTitle = useEditorStore((s) => s.sketchTitle);
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
+  const createSketchMut = useCreateSketch();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
@@ -34,19 +35,21 @@ export function SaveSketchModal() {
 
   if (!isSaveSketchOpen) return null;
 
-  const handleSave = async () => {
-    if (!title.trim()) return;
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || saving) return;
     setSaving(true);
     setError('');
     try {
       const thumbnail = await capturePreview();
-      const saved = await createSketch({
+      const saved = await createSketchMut.mutateAsync({
         title: title.trim(),
         code,
         description: description.trim() || undefined,
         thumbnail,
       });
       setSketchMeta(saved.id, saved.title);
+      useEditorStore.getState().markCodeSaved();
       setIsSaveSketchOpen(false);
       setTitle('');
       setDescription('');
@@ -64,12 +67,13 @@ export function SaveSketchModal() {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="modal-panel max-w-md">
+      <form className="modal-panel max-w-md" onSubmit={handleSave}>
         <div className="flex justify-between items-center mb-5">
           <h2 className="modal-title">
             Save Sketch
           </h2>
           <button
+            type="button"
             onClick={handleClose}
             className="modal-close"
           >
@@ -124,20 +128,21 @@ export function SaveSketchModal() {
 
         <div className="mt-6 flex justify-end gap-3">
           <button
+            type="button"
             onClick={handleClose}
             className="px-4 py-1.5 text-xs font-mono text-text-muted hover:text-text-primary transition-colors"
           >
             Cancel
           </button>
           <button
-            onClick={handleSave}
+            type="submit"
             disabled={!title.trim() || saving}
             className="btn-primary px-5 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

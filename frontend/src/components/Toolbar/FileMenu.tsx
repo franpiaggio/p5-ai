@@ -1,13 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
-import { updateSketch, createSketch } from '../../services/api';
+import { useUpdateSketch, useCreateSketch } from '../../hooks/useSketches';
 import { capturePreview } from '../Preview/P5Preview';
+import { guardUnsaved } from '../../utils/unsavedGuard';
 
 
 export function FileMenu() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const updateSketchMut = useUpdateSketch();
+  const createSketchMut = useCreateSketch();
 
   const sketchId = useEditorStore((s) => s.sketchId);
   const sketchTitle = useEditorStore((s) => s.sketchTitle);
@@ -15,6 +18,8 @@ export function FileMenu() {
   const codeHistory = useEditorStore((s) => s.codeHistory);
   const newSketch = useEditorStore((s) => s.newSketch);
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
+  const autoSave = useEditorStore((s) => s.autoSave);
+  const setAutoSave = useEditorStore((s) => s.setAutoSave);
 
   const user = useAuthStore((s) => s.user);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
@@ -31,8 +36,8 @@ export function FileMenu() {
   }, []);
 
   const handleNewSketch = () => {
-    newSketch();
     setIsOpen(false);
+    guardUnsaved(() => newSketch());
   };
 
   const handleSave = async () => {
@@ -44,7 +49,8 @@ export function FileMenu() {
     if (sketchId) {
       try {
         const thumbnail = await capturePreview();
-        await updateSketch(sketchId, { title: sketchTitle, code, codeHistory, thumbnail });
+        updateSketchMut.mutate({ id: sketchId, title: sketchTitle, code, codeHistory, thumbnail },
+          { onSuccess: () => useEditorStore.getState().markCodeSaved() });
       } catch (err) {
         console.error('Failed to save:', err);
       }
@@ -66,7 +72,7 @@ export function FileMenu() {
     setIsOpen(false);
     if (!user || !sketchId) return;
     try {
-      const copy = await createSketch({
+      const copy = await createSketchMut.mutateAsync({
         title: sketchTitle + ' (copy)',
         code,
       });
@@ -97,6 +103,13 @@ export function FileMenu() {
             New Sketch
           </button>
 
+          <button
+            onClick={() => { setIsOpen(false); useEditorStore.getState().setCurrentPage('examples'); }}
+            className="dropdown-item"
+          >
+            Examples
+          </button>
+
           <div className="dropdown-separator" />
 
           <button
@@ -117,6 +130,22 @@ export function FileMenu() {
           >
             Save As...
           </button>
+          <label
+            className={`flex items-center gap-2 px-3 py-2 text-xs font-mono transition-colors ${
+              user && sketchId
+                ? 'text-text-muted hover:bg-border/30 cursor-pointer'
+                : 'text-text-muted/30 cursor-not-allowed'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={autoSave}
+              onChange={(e) => setAutoSave(e.target.checked)}
+              disabled={!user || !sketchId}
+              className="accent-info w-3 h-3"
+            />
+            Auto-save
+          </label>
 
           <div className="dropdown-separator" />
 

@@ -6,7 +6,7 @@ import { UserMenu } from './UserMenu';
 import { FileMenu } from './FileMenu';
 import { CodeMenu } from './CodeMenu';
 import { MobileMenu } from './MobileMenu';
-import { updateSketch } from '../../services/api';
+import { useUpdateSketch } from '../../hooks/useSketches';
 
 function SketchTitle() {
   const sketchTitle = useEditorStore((s) => s.sketchTitle);
@@ -125,6 +125,7 @@ export function Toolbar() {
   const user = useAuthStore((s) => s.user);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
   const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
+  const updateSketchMut = useUpdateSketch();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -136,9 +137,8 @@ export function Toolbar() {
           return;
         }
         if (sketchId) {
-          updateSketch(sketchId, { title: sketchTitle, code, codeHistory }).catch(
-            (err) => console.error('Failed to save:', err),
-          );
+          updateSketchMut.mutate({ id: sketchId, title: sketchTitle, code, codeHistory },
+            { onSuccess: () => useEditorStore.getState().markCodeSaved() });
         } else {
           setIsSaveSketchOpen(true);
         }
@@ -146,7 +146,7 @@ export function Toolbar() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [user, sketchId, sketchTitle, code, codeHistory, setIsSaveSketchOpen, setIsLoginOpen, setPreviewCode]);
+  }, [user, sketchId, sketchTitle, code, codeHistory, setIsSaveSketchOpen, setIsLoginOpen, setPreviewCode, updateSketchMut]);
 
   return (
     <div className="h-11 bg-surface-raised border-b border-border/60 flex items-center px-3 md:px-4 gap-2 md:gap-3 shrink-0">

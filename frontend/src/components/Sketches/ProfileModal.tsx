@@ -1,38 +1,31 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { useEditorStore } from '../../store/editorStore';
 import { useEscapeClose } from '../../hooks/useEscapeClose';
-import { getSketches, getSketch, deleteSketch } from '../../services/api';
-import type { SketchSummary } from '../../types';
+import { getSketch } from '../../services/api';
+import { useSketches, useDeleteSketch } from '../../hooks/useSketches';
+import { guardUnsaved } from '../../utils/unsavedGuard';
 
 export function ProfileModal() {
   const isProfileOpen = useAuthStore((s) => s.isProfileOpen);
   const setIsProfileOpen = useAuthStore((s) => s.setIsProfileOpen);
   const user = useAuthStore((s) => s.user);
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
-  const [sketches, setSketches] = useState<SketchSummary[]>([]);
-  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (isProfileOpen) {
-      setLoading(true);
-      getSketches()
-        .then(setSketches)
-        .catch(console.error)
-        .finally(() => setLoading(false));
-    }
-  }, [isProfileOpen]);
+  const { data: sketches = [], isLoading: loading } = useSketches(isProfileOpen);
+  const deleteSketchMut = useDeleteSketch();
 
   const handleClose = useCallback(() => setIsProfileOpen(false), [setIsProfileOpen]);
   useEscapeClose(isProfileOpen, handleClose);
 
   if (!isProfileOpen) return null;
 
-  const handleLoad = async (id: string) => {
+  const loadSketch = async (id: string) => {
     try {
       const sketch = await getSketch(id);
       useEditorStore.setState({
         code: sketch.code,
+        lastSavedCode: sketch.code,
         isRunning: false,
         previewCode: null,
         pendingDiff: null,
@@ -49,13 +42,10 @@ export function ProfileModal() {
     }
   };
 
+  const handleLoad = (id: string) => guardUnsaved(() => loadSketch(id));
+
   const handleDelete = async (id: string) => {
-    try {
-      await deleteSketch(id);
-      setSketches((prev) => prev.filter((s) => s.id !== id));
-    } catch (error) {
-      console.error('Failed to delete sketch:', error);
-    }
+    deleteSketchMut.mutate(id);
   };
 
   return (

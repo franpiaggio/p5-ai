@@ -14,25 +14,18 @@ export interface PendingDiff {
   isRestore?: boolean;
 }
 
-const DEFAULT_CODE = `let x, y, vx, vy, r = 20;
-
-function setup() {
+const DEFAULT_CODE = `function setup() {
   createCanvas(windowWidth, windowHeight);
-  x = width / 2;
-  y = height / 2;
-  vx = 3;
-  vy = 2;
+  rectMode(CENTER);
 }
 
 function draw() {
   background(30);
-  x += vx;
-  y += vy;
-  if (x < r || x > width - r) vx *= -1;
-  if (y < r || y > height - r) vy *= -1;
+  translate(width / 2, height / 2);
+  rotate(frameCount * 0.02);
   fill(255);
   noStroke();
-  circle(x, y, r * 2);
+  square(0, 0, 80);
 }
 
 function windowResized() {
@@ -56,16 +49,19 @@ interface EditorState {
   pendingDiff: PendingDiff | null;
   previewCode: { code: string; entryId: string } | null;
   autoApply: boolean;
+  autoSave: boolean;
   sketchId: string | null;
   sketchTitle: string;
   fixRequest: string | null;
   editorTheme: string;
   editorLanguage: EditorLanguage;
   transpiler: ((code: string) => Promise<string>) | null;
-  currentPage: 'editor' | 'sketches';
+  currentPage: 'editor' | 'sketches' | 'examples';
   providerKeys: ProviderKeys;
   storeApiKeys: boolean;
   streamingCode: string | null;
+  lastSavedCode: string;
+  pendingNavigation: (() => void) | null;
 
   setCode: (code: string) => void;
   setIsRunning: (running: boolean) => void;
@@ -81,6 +77,7 @@ interface EditorState {
   setIsLoading: (loading: boolean) => void;
   setIsStreaming: (streaming: boolean) => void;
   setAutoApply: (auto: boolean) => void;
+  setAutoSave: (auto: boolean) => void;
   clearMessages: () => void;
   setPendingDiff: (diff: Omit<PendingDiff, 'previousCode'> | null) => void;
   acceptPendingDiff: () => void;
@@ -95,11 +92,13 @@ interface EditorState {
   setEditorTheme: (theme: string) => void;
   setEditorLanguage: (language: EditorLanguage) => void;
   setTranspiler: (transpiler: ((code: string) => Promise<string>) | null) => void;
-  setCurrentPage: (page: 'editor' | 'sketches') => void;
+  setCurrentPage: (page: 'editor' | 'sketches' | 'examples') => void;
   setProviderKey: (provider: LLMConfig['provider'], key: string) => void;
   clearProviderKey: (provider: LLMConfig['provider']) => void;
   setStoreApiKeys: (store: boolean) => void;
   setStreamingCode: (code: string | null) => void;
+  markCodeSaved: () => void;
+  setPendingNavigation: (action: (() => void) | null) => void;
 }
 
 let logCounter = 0;
@@ -129,6 +128,7 @@ export const useEditorStore = create<EditorState>()(
       pendingDiff: null,
       previewCode: null,
       autoApply: true,
+      autoSave: false,
       sketchId: null,
       sketchTitle: 'Untitled Sketch',
       fixRequest: null,
@@ -139,6 +139,8 @@ export const useEditorStore = create<EditorState>()(
       providerKeys: {} as ProviderKeys,
       storeApiKeys: false,
       streamingCode: null,
+      lastSavedCode: DEFAULT_CODE,
+      pendingNavigation: null,
 
       setCode: (code) =>
         set((state) => ({
@@ -196,6 +198,7 @@ export const useEditorStore = create<EditorState>()(
       setIsLoading: (isLoading) => set({ isLoading }),
       setIsStreaming: (isStreaming) => set({ isStreaming }),
       setAutoApply: (autoApply) => set({ autoApply }),
+      setAutoSave: (autoSave) => set({ autoSave }),
       clearMessages: () => set({ messages: [], appliedBlocks: {} }),
 
       setPendingDiff: (pendingDiff) =>
@@ -293,9 +296,12 @@ export const useEditorStore = create<EditorState>()(
         }),
       setStoreApiKeys: (storeApiKeys) => set({ storeApiKeys }),
       setStreamingCode: (streamingCode) => set({ streamingCode }),
+      markCodeSaved: () => set((state) => ({ lastSavedCode: state.code })),
+      setPendingNavigation: (pendingNavigation) => set({ pendingNavigation }),
       newSketch: () =>
         set((state) => ({
           code: DEFAULT_CODE,
+          lastSavedCode: DEFAULT_CODE,
           sketchId: null,
           sketchTitle: 'Untitled Sketch',
           messages: [],
@@ -313,6 +319,7 @@ export const useEditorStore = create<EditorState>()(
       name: 'p5-ai-editor',
       partialize: (state) => ({
         code: state.code,
+        lastSavedCode: state.lastSavedCode,
         llmConfig: {
           provider: state.llmConfig.provider,
           model: state.llmConfig.model,
@@ -320,6 +327,7 @@ export const useEditorStore = create<EditorState>()(
         },
         codeHistory: state.codeHistory,
         autoApply: state.autoApply,
+        autoSave: state.autoSave,
         editorTheme: state.editorTheme,
         editorLanguage: state.editorLanguage,
         sketchId: state.sketchId,
@@ -341,57 +349,15 @@ export const useEditorStore = create<EditorState>()(
           sessionStorage.removeItem('p5-ai-editor-key');
         }
         state.providerKeys = keys;
-        state.llmConfig = { ...state.llmConfig, apiKey: keys[state.llmConfig.provider] ?? '' };
+        const provider = state.llmConfig.provider as keyof ProviderKeys;
+        state.llmConfig = { ...state.llmConfig, apiKey: keys[provider] ?? '' };
+        // Ensure lastSavedCode matches code on rehydrate so we don't
+        // false-positive the unsaved-changes guard after a reload.
+        state.lastSavedCode = state.code;
+        // Force canvas rebuild after async rehydration so P5Preview
+        // picks up the persisted code instead of DEFAULT_CODE.
+        state.runTrigger = state.runTrigger + 1;
       },
     }
   )
 );
-
-// Sync sketchId to URL (only when on editor page)
-let prevSketchId = useEditorStore.getState().sketchId;
-useEditorStore.subscribe((state) => {
-  if (state.currentPage !== 'editor') return;
-  const id = state.sketchId;
-  if (id === prevSketchId) return;
-  prevSketchId = id;
-  history.replaceState(null, '', id ? `/sketch/${id}` : '/');
-});
-
-// Sync currentPage to URL
-let prevPage = useEditorStore.getState().currentPage;
-useEditorStore.subscribe((state) => {
-  if (state.currentPage === prevPage) return;
-  prevPage = state.currentPage;
-  if (state.currentPage === 'sketches') {
-    history.pushState(null, '', '/sketches');
-  } else {
-    const id = state.sketchId;
-    history.pushState(null, '', id ? `/sketch/${id}` : '/');
-    prevSketchId = id;
-  }
-});
-
-// Handle browser back/forward button
-window.addEventListener('popstate', () => {
-  const path = window.location.pathname;
-  if (path === '/sketches') {
-    useEditorStore.setState({ currentPage: 'sketches' });
-    prevPage = 'sketches';
-  } else {
-    useEditorStore.setState({ currentPage: 'editor' });
-    prevPage = 'editor';
-  }
-});
-
-// Sync providerKeys to sessionStorage (backend save happens on Settings close)
-let prevProviderKeys = useEditorStore.getState().providerKeys;
-useEditorStore.subscribe((state) => {
-  if (state.providerKeys === prevProviderKeys) return;
-  prevProviderKeys = state.providerKeys;
-  const hasKeys = Object.values(state.providerKeys).some(Boolean);
-  if (hasKeys) {
-    sessionStorage.setItem('p5-ai-editor-keys', JSON.stringify(state.providerKeys));
-  } else {
-    sessionStorage.removeItem('p5-ai-editor-keys');
-  }
-});
