@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { simpleHash, extractFirstJsBlock } from '../../utils/codeUtils';
+import { simpleHash, extractFirstJsBlock, extractSearchReplaceBlocks, applySearchReplace, stripSearchReplaceBlocks } from '../../utils/codeUtils';
 import { streamChat, checkBackendHealth } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';
@@ -107,9 +107,11 @@ export function ChatPanel() {
       let assistantContent = '';
       let firstChunk = true;
       let hasCodeFence = false;
+      let hasSearchReplace = false;
       addMessage({ role: 'assistant', content: '' });
 
       const currentState = useEditorStore.getState();
+      const originalCode = currentState.code;
       for await (const chunk of streamChat({
         message: userMessage,
         code: currentState.code,
@@ -124,18 +126,46 @@ export function ChatPanel() {
         }
         assistantContent += chunk;
 
+        if (!hasSearchReplace && assistantContent.includes('<<<SEARCH')) {
+          hasSearchReplace = true;
+        }
+
         const { chatContent, codeContent } = parseStreamContent(assistantContent);
-        if (codeContent !== null) hasCodeFence = true;
+        if (!hasSearchReplace && codeContent !== null) hasCodeFence = true;
+
+        let displayContent: string;
+        let newStreamingCode: string | null = null;
+
+        if (hasSearchReplace) {
+          displayContent = stripSearchReplaceBlocks(assistantContent);
+          const srBlocks = extractSearchReplaceBlocks(assistantContent);
+          if (srBlocks) {
+            try {
+              newStreamingCode = applySearchReplace(originalCode, srBlocks);
+            } catch {
+              // block didn't match yet — show original so indicator appears
+              newStreamingCode = originalCode;
+            }
+          } else {
+            // block started but not complete yet — show indicator immediately
+            newStreamingCode = originalCode;
+          }
+        } else if (hasCodeFence) {
+          displayContent = chatContent;
+          newStreamingCode = codeContent;
+        } else {
+          displayContent = assistantContent;
+        }
 
         useEditorStore.setState((state) => {
           const newMessages = [...state.messages];
           newMessages[newMessages.length - 1] = {
             ...newMessages[newMessages.length - 1],
-            content: hasCodeFence ? chatContent : assistantContent,
+            content: displayContent,
           };
           return {
             messages: newMessages,
-            ...(codeContent !== null ? { streamingCode: codeContent } : {}),
+            ...(newStreamingCode !== null ? { streamingCode: newStreamingCode } : {}),
           };
         });
       }
@@ -144,13 +174,30 @@ export function ChatPanel() {
 
       // Restore full message content, clear streaming, and auto-apply in one atomic update
       // to avoid a flicker frame between streaming DiffEditor and pendingDiff DiffEditor
-      const jsCode = assistantContent ? extractFirstJsBlock(assistantContent) : null;
+      let jsCode: string | null = null;
+      if (assistantContent) {
+        const srBlocks = extractSearchReplaceBlocks(assistantContent);
+        if (srBlocks) {
+          try {
+            jsCode = applySearchReplace(originalCode, srBlocks);
+          } catch {
+            // search block didn't match — fall back to full code extraction
+            jsCode = extractFirstJsBlock(assistantContent);
+          }
+        } else {
+          jsCode = extractFirstJsBlock(assistantContent);
+        }
+      }
+
+      const finalChatContent = hasSearchReplace
+        ? stripSearchReplaceBlocks(assistantContent)
+        : assistantContent;
 
       useEditorStore.setState((state) => {
         const newMessages = [...state.messages];
         newMessages[newMessages.length - 1] = {
           ...newMessages[newMessages.length - 1],
-          content: assistantContent,
+          content: finalChatContent,
         };
 
         if (state.autoApply && jsCode) {

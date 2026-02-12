@@ -12,8 +12,14 @@ export function formatModelName(model: string): string {
     return `${name} ${claudeOld2[1]}`;
   }
 
-  // Anthropic new format: claude-sonnet-4-20250514 → Sonnet 4, claude-opus-4-20250514 → Opus 4
-  const claudeNew = model.match(/^claude-(\w+)-(\d+(?:\.\d+)?)/);
+  // Anthropic new format: claude-opus-4-6-20250514 → Opus 4.6, claude-sonnet-4-5-20250514 → Sonnet 4.5
+  const claudeNewSub = model.match(/^claude-(\w+)-(\d+)-(\d+)(?:-\d{6,})?/);
+  if (claudeNewSub) {
+    const name = claudeNewSub[1].charAt(0).toUpperCase() + claudeNewSub[1].slice(1);
+    return `${name} ${claudeNewSub[2]}.${claudeNewSub[3]}`;
+  }
+  // claude-sonnet-4-20250514 → Sonnet 4
+  const claudeNew = model.match(/^claude-(\w+)-(\d+)(?:-\d{6,})?$/);
   if (claudeNew) {
     const name = claudeNew[1].charAt(0).toUpperCase() + claudeNew[1].slice(1);
     return `${name} ${claudeNew[2]}`;
