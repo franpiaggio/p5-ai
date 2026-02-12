@@ -28,7 +28,7 @@ export function MobileLayout() {
 
   const { size, containerRef, handleMouseDown, handleTouchStart } = useResizable({
     direction: 'vertical',
-    initialSize: 75,
+    initialSize: 65,
     minSize: 15,
     maxSize: 85,
   });
