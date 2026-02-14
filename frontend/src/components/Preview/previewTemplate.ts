@@ -2,6 +2,7 @@
 const HTML_BEFORE_CODE = `<!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"><\/script>
   <style>
     body { margin: 0; padding: 0; overflow: hidden; background: #fff; }
