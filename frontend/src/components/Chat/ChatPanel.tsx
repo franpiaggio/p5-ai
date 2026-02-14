@@ -11,6 +11,7 @@ import { SketchSuggestion } from './SketchSuggestion';
 import type { SketchExample } from '../../data/sketchExamples';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useAuthStore } from '../../store/authStore';
 import type { ImageAttachment } from '../../types';
 
 const JS_FENCE_OPEN = /```(?:javascript|js|jsx|typescript|ts|tsx)\s*\n/;
@@ -86,7 +87,9 @@ export function ChatPanel() {
     const store = useEditorStore.getState();
     if (!userMessage.trim() || store.isLoading) return;
 
-    if (store.llmConfig.provider !== 'demo' && !store.llmConfig.apiKey) {
+    const authUser = useAuthStore.getState().user;
+    const hasStoredKeys = store.storeApiKeys && !!authUser;
+    if (store.llmConfig.provider !== 'demo' && !store.llmConfig.apiKey && !hasStoredKeys) {
       setIsSettingsOpen(true);
       return;
     }
@@ -112,12 +115,15 @@ export function ChatPanel() {
 
       const currentState = useEditorStore.getState();
       const originalCode = currentState.code;
+      const chatConfig = hasStoredKeys
+        ? { provider: currentState.llmConfig.provider, model: currentState.llmConfig.model }
+        : currentState.llmConfig;
       for await (const chunk of streamChat({
         message: userMessage,
         code: currentState.code,
         language: currentState.editorLanguage,
         history: currentState.messages.slice(0, -1),
-        config: currentState.llmConfig,
+        config: chatConfig,
         ...(images?.length ? { images } : {}),
       }, abortController.signal)) {
         if (firstChunk) {
@@ -276,9 +282,12 @@ export function ChatPanel() {
     }
   }, [fixRequest, isLoading, sendMessage, setFixRequest]);
 
+  const user = useAuthStore((s) => s.user);
+  const storeApiKeys = useEditorStore((s) => s.storeApiKeys);
   const lastMessage = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMessage?.role === 'assistant' && !lastMessage.content;
-  const missingApiKey = llmConfig.provider !== 'demo' && !llmConfig.apiKey;
+  const hasStoredServerKeys = storeApiKeys && !!user;
+  const missingApiKey = llmConfig.provider !== 'demo' && !llmConfig.apiKey && !hasStoredServerKeys;
   const chatDisabled = backendOnline === false || backendOnline === null || missingApiKey || !!pendingDiff;
 
   return (

@@ -94,6 +94,7 @@ export class AuthService implements OnModuleInit {
     email: string;
     name: string;
     picture?: string;
+    storeApiKeys?: boolean;
   }) {
     const jwtPayload = { sub: user.id, email: user.email };
     const accessToken = this.jwtService.sign(jwtPayload);
@@ -105,6 +106,7 @@ export class AuthService implements OnModuleInit {
         email: user.email,
         name: user.name,
         picture: user.picture,
+        storeApiKeys: user.storeApiKeys ?? false,
       },
     };
   }

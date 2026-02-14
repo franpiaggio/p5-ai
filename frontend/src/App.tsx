@@ -10,7 +10,8 @@ import { useIsMobile } from './hooks/useIsMobile';
 import { useEditorStore } from './store/editorStore';
 import { useAuthStore } from './store/authStore';
 import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
-import { getPublicSketch } from './services/api';
+import { getPublicSketch, getProfile, getProviderKeys } from './services/api';
+import type { LLMConfig } from './types';
 
 function App() {
   const isMobile = useIsMobile();
@@ -34,6 +35,31 @@ function App() {
       useEditorStore.getState().setCurrentPage('editor');
     }
   }, [currentPage, user]);
+
+  // Auto-restore API keys on new device: fetch server preference and keys
+  useEffect(() => {
+    if (!user) return;
+    const store = useEditorStore.getState();
+    // If local storeApiKeys is already true, keys were likely restored at login
+    if (store.storeApiKeys) return;
+    // Check if server has the preference enabled
+    getProfile()
+      .then(async (profile) => {
+        if (!profile.storeApiKeys) return;
+        // Server says opt-in — sync preference and fetch keys
+        useEditorStore.getState().setStoreApiKeys(true);
+        const hasAnyKey = Object.values(useEditorStore.getState().providerKeys).some(Boolean);
+        if (hasAnyKey) return; // Don't overwrite existing session keys
+        const keys = await getProviderKeys();
+        const s = useEditorStore.getState();
+        for (const [provider, key] of Object.entries(keys)) {
+          if (key) s.setProviderKey(provider as LLMConfig['provider'], key);
+        }
+      })
+      .catch(() => {
+        // Silently fail — user may not have valid session cookie
+      });
+  }, [user]);
 
   useEffect(() => {
     const match = window.location.pathname.match(/^\/sketch\/(.+)$/);

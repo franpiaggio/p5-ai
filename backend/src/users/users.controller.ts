@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -29,8 +30,21 @@ export class UsersController {
       email: user.email,
       name: user.name,
       picture: user.picture,
+      storeApiKeys: user.storeApiKeys,
       createdAt: user.createdAt,
     };
+  }
+
+  @Patch('me/preferences')
+  async updatePreferences(
+    @CurrentUser() currentUser: { sub: string },
+    @Body('storeApiKeys') storeApiKeys: boolean,
+  ) {
+    if (typeof storeApiKeys !== 'boolean') {
+      throw new BadRequestException('storeApiKeys must be a boolean');
+    }
+    await this.usersService.updateStoreApiKeys(currentUser.sub, storeApiKeys);
+    return { ok: true };
   }
 
   @Put('me/api-keys/:provider')
@@ -50,7 +64,7 @@ export class UsersController {
 
   @Get('me/api-keys')
   async getProviderKeys(@CurrentUser() currentUser: { sub: string }) {
-    const keys = await this.usersService.getProviderKeys(currentUser.sub);
+    const keys = await this.usersService.getMaskedProviderKeys(currentUser.sub);
     return { keys };
   }
 

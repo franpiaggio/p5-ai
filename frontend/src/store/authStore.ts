@@ -7,6 +7,7 @@ export interface AuthUser {
   email: string;
   name: string;
   picture?: string;
+  storeApiKeys?: boolean;
 }
 
 interface AuthState {

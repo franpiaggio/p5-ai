@@ -50,9 +50,10 @@ export class LLMConfigDto {
   @MaxLength(200)
   model: string;
 
+  @IsOptional()
   @IsString()
   @MaxLength(500)
-  apiKey: string;
+  apiKey?: string;
 }
 
 export class ChatRequestDto {

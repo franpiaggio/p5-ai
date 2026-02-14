@@ -26,7 +26,11 @@ export function LoginModal() {
 
   if (!isLoginOpen) return null;
 
-  const restoreApiKeys = async () => {
+  const restoreApiKeys = async (serverStoreApiKeys?: boolean) => {
+    // Use server preference if provided (login response), otherwise fall back to local
+    if (serverStoreApiKeys) {
+      useEditorStore.getState().setStoreApiKeys(true);
+    }
     if (!useEditorStore.getState().storeApiKeys) return;
     const keys = await getProviderKeys();
     const store = useEditorStore.getState();
@@ -44,7 +48,7 @@ export function LoginModal() {
       const result = await loginWithCredentials(username.trim(), password);
       setAuth(result.user);
       handleClose();
-      restoreApiKeys();
+      restoreApiKeys(result.user.storeApiKeys);
     } catch {
       setError('Invalid username or password');
     } finally {
@@ -59,7 +63,7 @@ export function LoginModal() {
       const result = await loginWithGoogle(credentialResponse.credential);
       setAuth(result.user);
       handleClose();
-      restoreApiKeys();
+      restoreApiKeys(result.user.storeApiKeys);
     } catch {
       setError('Google login failed');
     }

@@ -3,6 +3,7 @@ import { OpenAIProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { GroqProvider } from './providers/groq.provider';
 import { DeepSeekProvider } from './providers/deepseek.provider';
+import { UsersService } from '../users/users.service';
 import { ChatRequestDto, ImageAttachmentDto } from './dto/chat.dto';
 import type { LLMMessage, LLMProvider } from './providers/llm.interface';
 
@@ -117,7 +118,24 @@ export class ChatService {
     private anthropicProvider: AnthropicProvider,
     private groqProvider: GroqProvider,
     private deepseekProvider: DeepSeekProvider,
+    private usersService: UsersService,
   ) {}
+
+  async resolveApiKey(
+    provider: string,
+    bodyApiKey?: string,
+    userId?: string,
+  ): Promise<string> {
+    if (provider === 'demo') return '';
+    if (bodyApiKey) return bodyApiKey;
+    if (userId) {
+      const key = await this.usersService.getProviderKey(userId, provider);
+      if (key) return key;
+    }
+    throw new BadRequestException(
+      'API key is required. Provide it in the request body or store it in your account settings.',
+    );
+  }
 
   private estimateBase64Bytes(base64: string): number {
     const normalized = base64.replace(/\s/g, '');
@@ -266,7 +284,7 @@ export class ChatService {
     const provider = providers[request.config.provider];
     if (!provider) throw new Error(`Unknown provider: ${request.config.provider}`);
 
-    yield* provider.stream(messages, request.config.model, request.config.apiKey);
+    yield* provider.stream(messages, request.config.model, request.config.apiKey!);
   }
 
   async listModels(provider: string, apiKey: string): Promise<string[]> {

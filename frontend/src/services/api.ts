@@ -6,7 +6,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export async function loginWithGoogle(
   credential: string,
-): Promise<{ accessToken: string; user: { id: string; email: string; name: string; picture?: string } }> {
+): Promise<{ accessToken: string; user: { id: string; email: string; name: string; picture?: string; storeApiKeys?: boolean } }> {
   const response = await fetch(`${API_BASE}/auth/google`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -20,7 +20,7 @@ export async function loginWithGoogle(
 export async function loginWithCredentials(
   username: string,
   password: string,
-): Promise<{ accessToken: string; user: { id: string; email: string; name: string; picture?: string } }> {
+): Promise<{ accessToken: string; user: { id: string; email: string; name: string; picture?: string; storeApiKeys?: boolean } }> {
   const response = await fetch(`${API_BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -35,6 +35,31 @@ export async function logoutApi(): Promise<void> {
   await fetch(`${API_BASE}/auth/logout`, {
     method: 'POST',
     credentials: 'include',
+  });
+}
+
+// --- User Profile & Preferences ---
+
+export async function getProfile(): Promise<{
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  storeApiKeys: boolean;
+}> {
+  const response = await fetch(`${API_BASE}/users/me`, {
+    credentials: 'include',
+  });
+  if (!response.ok) throw new Error('Failed to fetch profile');
+  return response.json();
+}
+
+export async function updatePreferences(prefs: { storeApiKeys: boolean }): Promise<void> {
+  await fetch(`${API_BASE}/users/me/preferences`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(prefs),
   });
 }
 
@@ -144,7 +169,8 @@ export async function fetchModels(
   const response = await fetch(`${API_BASE}/chat/models`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ provider, apiKey }),
+    credentials: 'include',
+    body: JSON.stringify({ provider, ...(apiKey ? { apiKey } : {}) }),
   });
   if (!response.ok) return [];
   const data = await response.json();
@@ -171,7 +197,7 @@ export interface ChatRequest {
   code: string;
   language?: 'javascript' | 'typescript';
   history: Message[];
-  config: LLMConfig;
+  config: Omit<LLMConfig, 'apiKey'> & { apiKey?: string };
   images?: ImageAttachment[];
 }
 
@@ -184,6 +210,7 @@ export async function* streamChat(request: ChatRequest, signal?: AbortSignal): A
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify({
         ...request,
         history: request.history.slice(-10),

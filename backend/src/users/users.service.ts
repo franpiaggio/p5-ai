@@ -49,7 +49,7 @@ export class UsersService {
   async findByUsername(username: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { username },
-      select: ['id', 'username', 'password', 'email', 'name', 'picture', 'createdAt'],
+      select: ['id', 'username', 'password', 'email', 'name', 'picture', 'storeApiKeys', 'createdAt'],
     });
   }
 
@@ -111,9 +111,39 @@ export class UsersService {
     return this.loadKeyMap(userId);
   }
 
+  async getMaskedProviderKeys(
+    userId: string,
+  ): Promise<Record<string, string>> {
+    const map = await this.loadKeyMap(userId);
+    const masked: Record<string, string> = {};
+    for (const [provider, key] of Object.entries(map)) {
+      if (key.length > 4) {
+        masked[provider] = `...${key.slice(-4)}`;
+      } else {
+        masked[provider] = '****';
+      }
+    }
+    return masked;
+  }
+
+  async getProviderKey(
+    userId: string,
+    provider: string,
+  ): Promise<string | null> {
+    const map = await this.loadKeyMap(userId);
+    return map[provider] ?? null;
+  }
+
   async clearProviderKey(userId: string, provider: string): Promise<void> {
     const map = await this.loadKeyMap(userId);
     delete map[provider];
     await this.saveKeyMap(userId, map);
+  }
+
+  async updateStoreApiKeys(
+    userId: string,
+    storeApiKeys: boolean,
+  ): Promise<void> {
+    await this.usersRepository.update(userId, { storeApiKeys });
   }
 }

@@ -4,6 +4,7 @@ import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
 import { useModelList, FALLBACK_MODELS, PROVIDER_LABELS } from '../../hooks/useModelList';
 import { useProviderKeysQuery, useSaveProviderKey, useClearProviderKey } from '../../hooks/useProviderKeys';
+import { updatePreferences } from '../../services/api';
 import type { LLMConfig, ProviderKeys } from '../../types';
 
 interface Draft {
@@ -48,26 +49,16 @@ export function SettingsModal() {
     });
   }, [isSettingsOpen]);
 
-  // Merge remote keys into draft when they arrive
-  useEffect(() => {
-    if (!remoteKeys || !draft) return;
-    const hasAnyKey = Object.values(draft.keys).some(Boolean);
-    if (hasAnyKey) return;
-    setDraft((prev) => prev ? { ...prev, keys: { ...prev.keys, ...remoteKeys } } : prev);
-  }, [remoteKeys]);
-
   const handleSave = useCallback(async () => {
     if (!draft) return;
     setSaving(true);
     try {
       const store = useEditorStore.getState();
 
-      // Apply provider keys
+      // Apply only user-typed keys to local store (draft.keys never has masked values)
       for (const [provider, key] of Object.entries(draft.keys)) {
         if (key) {
           store.setProviderKey(provider as LLMConfig['provider'], key);
-        } else if (store.providerKeys[provider as LLMConfig['provider']]) {
-          store.clearProviderKey(provider as LLMConfig['provider']);
         }
       }
 
@@ -76,11 +67,17 @@ export function SettingsModal() {
       store.setStoreApiKeys(draft.storeApiKeys);
       store.setAutoApply(draft.autoApply);
 
-      // Save to backend if enabled
+      // Persist preference to server
+      if (user) {
+        updatePreferences({ storeApiKeys: draft.storeApiKeys }).catch(() => {});
+      }
+
+      // Save user-typed keys to backend
       if (user && draft.storeApiKeys) {
-        const key = draft.keys[draft.provider];
-        if (key && draft.provider !== 'demo') {
-          saveProviderKeyMut.mutate({ provider: draft.provider, apiKey: key });
+        for (const [provider, key] of Object.entries(draft.keys)) {
+          if (key && provider !== 'demo') {
+            saveProviderKeyMut.mutate({ provider, apiKey: key });
+          }
         }
       }
     } finally {
@@ -99,6 +96,7 @@ export function SettingsModal() {
 
   const isDemo = draft.provider === 'demo';
   const currentKey = draft.keys[draft.provider] ?? '';
+  const storedKeyMask = draft.storeApiKeys ? remoteKeys?.[draft.provider] : undefined;
   const disabled = saving || loadingModels;
 
   const updateDraft = (partial: Partial<Draft>) => setDraft((prev) => prev ? { ...prev, ...partial } : prev);
@@ -180,41 +178,69 @@ export function SettingsModal() {
               <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
                 API Key
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={currentKey}
-                  onChange={(e) => handleKeyChange(e.target.value)}
-                  placeholder={`Enter ${PROVIDER_LABELS[draft.provider]} key`}
-                  className="input-field flex-1"
-                />
-                {currentKey && (
-                  <button
-                    type="button"
-                    onClick={handleClearKey}
-                    className="px-2.5 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                    title="Delete key"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-              {user && draft.storeApiKeys ? (
-                <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
-                  Encrypted &amp; saved to your account.
-                </p>
+              {storedKeyMask ? (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={storedKeyMask}
+                      disabled
+                      className="input-field flex-1 opacity-60"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleClearKey}
+                      className="px-2.5 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                      title="Delete key"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                  <p className="mt-1.5 text-[10px] font-mono text-success/50">
+                    Stored on server. Delete to set a new key.
+                  </p>
+                </>
               ) : (
-                <div className="mt-2 flex items-start gap-2 px-2.5 py-2 rounded-md bg-warning/10 border border-warning/25">
-                  <svg className="w-3.5 h-3.5 text-warning shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86l-8.58 14.85A1 1 0 002.56 20h18.88a1 1 0 00.85-1.29L13.71 3.86a1 1 0 00-1.42 0z" />
-                  </svg>
-                  <span className="text-[10px] font-mono text-warning/80 leading-relaxed">
-                    Session only — your key will be lost when you close this tab.
-                    {user && ' Enable "Store my API keys" below to save it.'}
-                  </span>
-                </div>
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={currentKey}
+                      onChange={(e) => handleKeyChange(e.target.value)}
+                      placeholder={`Enter ${PROVIDER_LABELS[draft.provider]} key`}
+                      className="input-field flex-1"
+                    />
+                    {currentKey && (
+                      <button
+                        type="button"
+                        onClick={handleClearKey}
+                        className="px-2.5 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                        title="Delete key"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                  {user && draft.storeApiKeys ? (
+                    <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
+                      Will be encrypted &amp; saved to your account.
+                    </p>
+                  ) : (
+                    <div className="mt-2 flex items-start gap-2 px-2.5 py-2 rounded-md bg-warning/10 border border-warning/25">
+                      <svg className="w-3.5 h-3.5 text-warning shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86l-8.58 14.85A1 1 0 002.56 20h18.88a1 1 0 00.85-1.29L13.71 3.86a1 1 0 00-1.42 0z" />
+                      </svg>
+                      <span className="text-[10px] font-mono text-warning/80 leading-relaxed">
+                        Session only — your key will be lost when you close this tab.
+                        {user && ' Enable "Store my API keys" below to save it.'}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

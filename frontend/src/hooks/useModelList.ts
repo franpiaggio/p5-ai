@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchModels } from '../services/api';
 import { queryKeys } from './queryClient';
+import { useAuthStore } from '../store/authStore';
+import { useEditorStore } from '../store/editorStore';
 import type { LLMConfig } from '../types';
 
 /** Models rarely change, cache for 5 minutes */
@@ -21,11 +23,17 @@ export const PROVIDER_LABELS: Record<string, string> = {
 };
 
 export function useModelList(provider: LLMConfig['provider'], apiKey: string) {
-  const enabled = provider === 'demo' || !!apiKey;
+  const user = useAuthStore((s) => s.user);
+  const storeApiKeys = useEditorStore((s) => s.storeApiKeys);
+  const useServerKey = storeApiKeys && !!user && !apiKey;
+
+  const enabled = provider === 'demo' || !!apiKey || useServerKey;
 
   const { data, isLoading } = useQuery({
-    queryKey: queryKeys.models(provider, apiKey),
-    queryFn: () => fetchModels(provider, apiKey),
+    queryKey: useServerKey
+      ? queryKeys.models(provider, '__stored__')
+      : queryKeys.models(provider, apiKey),
+    queryFn: () => fetchModels(provider, useServerKey ? undefined : apiKey),
     enabled,
     staleTime: MODELS_STALE_TIME_MS,
     placeholderData: FALLBACK_MODELS[provider] ?? [],

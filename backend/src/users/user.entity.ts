@@ -30,6 +30,9 @@ export class User {
   @Column({ nullable: true })
   picture: string;
 
+  @Column({ default: false })
+  storeApiKeys: boolean;
+
   @Column({ nullable: true, select: false })
   encryptedApiKey: string;
 
