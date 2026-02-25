@@ -5,6 +5,8 @@ import { buildPreviewHtml } from './previewTemplate';
 // Module-level ref for thumbnail capture
 let _iframeEl: HTMLIFrameElement | null = null;
 
+const CONSOLE_TYPES = new Set(['log', 'error', 'warn', 'info']);
+
 /** Request a thumbnail data URL from the running preview iframe. */
 export function capturePreview(): Promise<string | null> {
   return new Promise((resolve) => {
@@ -19,6 +21,50 @@ export function capturePreview(): Promise<string | null> {
   });
 }
 
+/** Take a full-resolution screenshot of the preview canvas. */
+export function takeScreenshot(): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!_iframeEl?.contentWindow) { resolve(null); return; }
+    const timeout = setTimeout(() => { cleanup(); resolve(null); }, 3000);
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'screenshot-complete') { cleanup(); resolve(e.data.dataUrl ?? null); }
+    };
+    const cleanup = () => { clearTimeout(timeout); window.removeEventListener('message', handler); };
+    window.addEventListener('message', handler);
+    _iframeEl.contentWindow.postMessage({ type: 'screenshot' }, '*');
+  });
+}
+
+/** Start recording the preview canvas as WebM video. */
+export function startRecording(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (!_iframeEl?.contentWindow) { resolve(false); return; }
+    const timeout = setTimeout(() => { cleanup(); resolve(false); }, 3000);
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'recording-started') { cleanup(); resolve(true); }
+      if (e.data?.type === 'recording-error') { cleanup(); resolve(false); }
+    };
+    const cleanup = () => { clearTimeout(timeout); window.removeEventListener('message', handler); };
+    window.addEventListener('message', handler);
+    _iframeEl.contentWindow.postMessage({ type: 'start-recording' }, '*');
+  });
+}
+
+/** Stop recording and return the video as a data URL. */
+export function stopRecording(): Promise<string | null> {
+  return new Promise((resolve) => {
+    if (!_iframeEl?.contentWindow) { resolve(null); return; }
+    const timeout = setTimeout(() => { cleanup(); resolve(null); }, 10000);
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'recording-complete') { cleanup(); resolve(e.data.dataUrl ?? null); }
+      if (e.data?.type === 'recording-error') { cleanup(); resolve(null); }
+    };
+    const cleanup = () => { clearTimeout(timeout); window.removeEventListener('message', handler); };
+    window.addEventListener('message', handler);
+    _iframeEl.contentWindow.postMessage({ type: 'stop-recording' }, '*');
+  });
+}
+
 export function P5Preview() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -30,8 +76,9 @@ export function P5Preview() {
   const addEditorError = useEditorStore((s) => s.addEditorError);
 
   const handleMessage = useCallback((event: MessageEvent) => {
-    if (event.data?.type) {
-      const { type, message, line, column } = event.data;
+    const type = event.data?.type;
+    if (type && CONSOLE_TYPES.has(type)) {
+      const { message, line, column } = event.data;
       addConsoleLog({ type, message, line, column });
 
       // Add error marker in editor if it's an error with line info

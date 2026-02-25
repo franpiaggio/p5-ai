@@ -8,6 +8,7 @@ import { HistoryPanel } from '../History/HistoryPanel';
 import { CodeEditor } from '../Editor/CodeEditor';
 import { MobileDiffBar } from './MobileDiffBar';
 import { MobileTabBar } from './MobileTabBar';
+import { PreviewControls } from '../Preview/PreviewControls';
 
 export function MobileLayout() {
   const activeTab = useEditorStore((s) => s.activeTab);
@@ -39,6 +40,9 @@ export function MobileLayout() {
         <div className="flex-1 min-h-0">
           <P5Preview />
         </div>
+        <div className="absolute top-2 left-2 z-10 bg-surface/80 backdrop-blur border border-border/40 rounded-lg px-1 py-0.5">
+          <PreviewControls />
+        </div>
         <button
           onClick={() => { history.back(); }}
           className="absolute top-2 right-2 z-10 btn-icon bg-surface/80 backdrop-blur border border-border/40 text-text-muted/60 hover:text-text-primary"
@@ -56,6 +60,9 @@ export function MobileLayout() {
     <div ref={containerRef} className="flex-1 flex flex-col min-h-0">
       <div className="shrink-0 relative" style={{ height: `${size}%` }}>
         <P5Preview />
+        <div className="absolute top-2 left-2 z-10 bg-surface/80 backdrop-blur border border-border/40 rounded-lg px-1 py-0.5">
+          <PreviewControls />
+        </div>
         <button
           onClick={enterFullscreen}
           className="absolute top-2 right-2 z-10 btn-icon bg-surface/80 backdrop-blur border border-border/40 text-text-muted/60 hover:text-text-primary"
