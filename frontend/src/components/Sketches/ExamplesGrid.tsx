@@ -87,11 +87,11 @@ function ExamplePreview({ code }: { code: string }) {
   }, [visible, code, thumbnail]);
 
   return (
-    <div ref={containerRef} className="w-full aspect-[4/3] bg-surface-alt overflow-hidden">
+    <div ref={containerRef} className="w-full aspect-[4/3] bg-surface-alt relative overflow-hidden">
       {thumbnail ? (
-        <img src={thumbnail} alt="" className="w-full h-full object-cover" />
+        <img src={thumbnail} alt="" className="absolute inset-0 w-full h-full object-cover" />
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center">
           {visible ? (
             <div className="w-4 h-4 border-2 border-text-muted/20 border-t-info/40 rounded-full animate-spin" />
           ) : (
