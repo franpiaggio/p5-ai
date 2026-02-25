@@ -11,8 +11,10 @@ interface Draft {
   provider: LLMConfig['provider'];
   model: string;
   keys: ProviderKeys;
+  initialKeys: ProviderKeys;
   storeApiKeys: boolean;
   autoApply: boolean;
+  pendingDeletes: string[];
 }
 
 export function SettingsModal() {
@@ -44,8 +46,10 @@ export function SettingsModal() {
       provider: s.llmConfig.provider,
       model: s.llmConfig.model,
       keys: { ...s.providerKeys },
+      initialKeys: { ...s.providerKeys },
       storeApiKeys: s.storeApiKeys,
       autoApply: s.autoApply,
+      pendingDeletes: [],
     });
   }, [isSettingsOpen]);
 
@@ -55,11 +59,15 @@ export function SettingsModal() {
     try {
       const store = useEditorStore.getState();
 
-      // Apply only user-typed keys to local store (draft.keys never has masked values)
+      // Apply only new/changed keys to local store (skip masked values carried over)
       for (const [provider, key] of Object.entries(draft.keys)) {
-        if (key) {
+        if (key && key !== draft.initialKeys[provider as keyof ProviderKeys]) {
           store.setProviderKey(provider as LLMConfig['provider'], key);
         }
+      }
+      // Clear deleted provider keys from local store
+      for (const provider of draft.pendingDeletes) {
+        store.clearProviderKey(provider as LLMConfig['provider']);
       }
 
       // Apply config
@@ -72,12 +80,17 @@ export function SettingsModal() {
         updatePreferences({ storeApiKeys: draft.storeApiKeys }).catch(() => {});
       }
 
-      // Save user-typed keys to backend
+      // Save only user-changed keys to backend (never re-save masked indicators)
       if (user && draft.storeApiKeys) {
         for (const [provider, key] of Object.entries(draft.keys)) {
-          if (key && provider !== 'demo') {
+          if (key && provider !== 'demo' && key !== draft.initialKeys[provider as keyof ProviderKeys]) {
             saveProviderKeyMut.mutate({ provider, apiKey: key });
           }
+        }
+      }
+      if (user && draft.pendingDeletes.length > 0) {
+        for (const provider of draft.pendingDeletes) {
+          clearProviderKeyMut.mutate(provider);
         }
       }
     } finally {
@@ -96,7 +109,7 @@ export function SettingsModal() {
 
   const isDemo = draft.provider === 'demo';
   const currentKey = draft.keys[draft.provider] ?? '';
-  const storedKeyMask = draft.storeApiKeys ? remoteKeys?.[draft.provider] : undefined;
+  const storedKeyMask = draft.storeApiKeys && !draft.pendingDeletes.includes(draft.provider) ? remoteKeys?.[draft.provider] : undefined;
   const disabled = saving || loadingModels;
 
   const updateDraft = (partial: Partial<Draft>) => setDraft((prev) => prev ? { ...prev, ...partial } : prev);
@@ -109,7 +122,14 @@ export function SettingsModal() {
   };
 
   const handleKeyChange = (value: string) => {
-    setDraft((prev) => prev ? { ...prev, keys: { ...prev.keys, [prev.provider]: value } } : prev);
+    setDraft((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        keys: { ...prev.keys, [prev.provider]: value },
+        pendingDeletes: prev.pendingDeletes.filter(p => p !== prev.provider),
+      };
+    });
   };
 
   const handleClearKey = () => {
@@ -117,12 +137,11 @@ export function SettingsModal() {
       if (!prev) return prev;
       const keys = { ...prev.keys };
       delete keys[prev.provider];
-      return { ...prev, keys };
+      const pendingDeletes = prev.pendingDeletes.includes(prev.provider)
+        ? prev.pendingDeletes
+        : [...prev.pendingDeletes, prev.provider];
+      return { ...prev, keys, pendingDeletes };
     });
-    // Also clear from backend if stored
-    if (user && draft.storeApiKeys) {
-      clearProviderKeyMut.mutate(draft.provider);
-    }
   };
 
   return (

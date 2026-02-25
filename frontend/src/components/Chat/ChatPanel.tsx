@@ -88,7 +88,7 @@ export function ChatPanel() {
     if (!userMessage.trim() || store.isLoading) return;
 
     const authUser = useAuthStore.getState().user;
-    const hasStoredKeys = store.storeApiKeys && !!authUser;
+    const hasStoredKeys = store.storeApiKeys && !!authUser && !!store.providerKeys[store.llmConfig.provider];
     if (store.llmConfig.provider !== 'demo' && !store.llmConfig.apiKey && !hasStoredKeys) {
       setIsSettingsOpen(true);
       return;
@@ -115,9 +115,12 @@ export function ChatPanel() {
 
       const currentState = useEditorStore.getState();
       const originalCode = currentState.code;
-      const chatConfig = hasStoredKeys
-        ? { provider: currentState.llmConfig.provider, model: currentState.llmConfig.model }
-        : currentState.llmConfig;
+      // Send real key in body if available; omit masked/empty keys (backend resolves from DB)
+      const apiKey = currentState.llmConfig.apiKey;
+      const hasRealKey = !!apiKey && !apiKey.startsWith('...');
+      const chatConfig = hasRealKey
+        ? currentState.llmConfig
+        : { provider: currentState.llmConfig.provider, model: currentState.llmConfig.model };
       for await (const chunk of streamChat({
         message: userMessage,
         code: currentState.code,
@@ -284,9 +287,10 @@ export function ChatPanel() {
 
   const user = useAuthStore((s) => s.user);
   const storeApiKeys = useEditorStore((s) => s.storeApiKeys);
+  const currentProviderKey = useEditorStore((s) => s.providerKeys[s.llmConfig.provider]);
   const lastMessage = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMessage?.role === 'assistant' && !lastMessage.content;
-  const hasStoredServerKeys = storeApiKeys && !!user;
+  const hasStoredServerKeys = storeApiKeys && !!user && !!currentProviderKey;
   const missingApiKey = llmConfig.provider !== 'demo' && !llmConfig.apiKey && !hasStoredServerKeys;
   const chatDisabled = backendOnline === false || backendOnline === null || missingApiKey || !!pendingDiff;
 

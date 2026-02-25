@@ -36,29 +36,34 @@ function App() {
     }
   }, [currentPage, user]);
 
-  // Auto-restore API keys on new device: fetch server preference and keys
+  // Auto-restore API keys: fetch server preference and keys on mount/login
   useEffect(() => {
     if (!user) return;
     const store = useEditorStore.getState();
-    // If local storeApiKeys is already true, keys were likely restored at login
-    if (store.storeApiKeys) return;
-    // Check if server has the preference enabled
-    getProfile()
-      .then(async (profile) => {
-        if (!profile.storeApiKeys) return;
-        // Server says opt-in — sync preference and fetch keys
-        useEditorStore.getState().setStoreApiKeys(true);
-        const hasAnyKey = Object.values(useEditorStore.getState().providerKeys).some(Boolean);
-        if (hasAnyKey) return; // Don't overwrite existing session keys
-        const keys = await getProviderKeys();
-        const s = useEditorStore.getState();
-        for (const [provider, key] of Object.entries(keys)) {
-          if (key) s.setProviderKey(provider as LLMConfig['provider'], key);
-        }
-      })
-      .catch(() => {
-        // Silently fail — user may not have valid session cookie
-      });
+    const hasAnyKey = Object.values(store.providerKeys).some(Boolean);
+
+    const fetchAndRestoreKeys = async () => {
+      if (Object.values(useEditorStore.getState().providerKeys).some(Boolean)) return;
+      const keys = await getProviderKeys();
+      const s = useEditorStore.getState();
+      for (const [provider, key] of Object.entries(keys)) {
+        if (key) s.setProviderKey(provider as LLMConfig['provider'], key);
+      }
+    };
+
+    if (store.storeApiKeys) {
+      // storeApiKeys already true — fetch keys if none loaded (e.g. new tab/reload)
+      if (!hasAnyKey) fetchAndRestoreKeys().catch(() => {});
+    } else {
+      // Check if server has the preference enabled (new device scenario)
+      getProfile()
+        .then(async (profile) => {
+          if (!profile.storeApiKeys) return;
+          useEditorStore.getState().setStoreApiKeys(true);
+          await fetchAndRestoreKeys();
+        })
+        .catch(() => {});
+    }
   }, [user]);
 
   useEffect(() => {
