@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Toolbar, CodeEditor, P5Preview, BottomPanel, SettingsModal, SplitPane, Panel } from './components';
+import { PreviewControls } from './components/Preview/PreviewControls';
 import { ProfileModal } from './components/Sketches/ProfileModal';
 import { SaveSketchModal } from './components/Sketches/SaveSketchModal';
 import { ExamplesGrid } from './components/Sketches/ExamplesGrid';
@@ -143,7 +144,7 @@ function App() {
             <BottomPanel />
           </SplitPane>
 
-          <Panel label="Preview" indicatorColor="bg-info/80">
+          <Panel label="Preview" indicatorColor="bg-info/80" rightContent={<PreviewControls />}>
             <P5Preview />
           </Panel>
         </SplitPane>

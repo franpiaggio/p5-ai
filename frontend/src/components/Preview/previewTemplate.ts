@@ -75,6 +75,51 @@ const HTML_BEFORE_CODE = `<!DOCTYPE html>
         ctx.drawImage(c, 0, 0, t.width, t.height);
         parent.postMessage({ type: 'capture', dataUrl: t.toDataURL('image/webp', 0.7) }, '*');
       }
+
+      if (e.data?.type === 'screenshot') {
+        const c = document.querySelector('canvas');
+        if (!c) { parent.postMessage({ type: 'screenshot-complete', dataUrl: null }, '*'); return; }
+        parent.postMessage({ type: 'screenshot-complete', dataUrl: c.toDataURL('image/png') }, '*');
+      }
+
+      if (e.data?.type === 'start-recording') {
+        const c = document.querySelector('canvas');
+        if (!c) { parent.postMessage({ type: 'recording-error', error: 'No canvas found' }, '*'); return; }
+        try {
+          const stream = c.captureStream(30);
+          const mimeTypes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+          let mimeType = '';
+          for (const mt of mimeTypes) {
+            if (MediaRecorder.isTypeSupported(mt)) { mimeType = mt; break; }
+          }
+          if (!mimeType) { parent.postMessage({ type: 'recording-error', error: 'No supported video format' }, '*'); return; }
+          const chunks = [];
+          const recorder = new MediaRecorder(stream, { mimeType });
+          recorder.ondataavailable = (ev) => { if (ev.data.size > 0) chunks.push(ev.data); };
+          recorder.onstop = () => {
+            const blob = new Blob(chunks, { type: mimeType });
+            const reader = new FileReader();
+            reader.onload = () => { parent.postMessage({ type: 'recording-complete', dataUrl: reader.result }, '*'); };
+            reader.onerror = () => { parent.postMessage({ type: 'recording-error', error: 'Failed to encode recording' }, '*'); };
+            reader.readAsDataURL(blob);
+          };
+          recorder.start(100);
+          window.__p5Recorder = recorder;
+          parent.postMessage({ type: 'recording-started' }, '*');
+        } catch (err) {
+          parent.postMessage({ type: 'recording-error', error: String(err) }, '*');
+        }
+      }
+
+      if (e.data?.type === 'stop-recording') {
+        const recorder = window.__p5Recorder;
+        if (recorder && recorder.state !== 'inactive') {
+          recorder.stop();
+          window.__p5Recorder = null;
+        } else {
+          parent.postMessage({ type: 'recording-error', error: 'No active recorder' }, '*');
+        }
+      }
     });
   <\/script>
   <script>
