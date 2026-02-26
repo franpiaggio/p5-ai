@@ -7,7 +7,7 @@ import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
 
   const baseJsonLimit = process.env.JSON_LIMIT ?? '256kb';
   const chatJsonLimit = process.env.CHAT_JSON_LIMIT ?? '12mb';
