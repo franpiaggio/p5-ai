@@ -104,15 +104,6 @@ export function FileMenu() {
           </button>
 
           <button
-            onClick={() => { setIsOpen(false); useEditorStore.getState().setCurrentPage('examples'); }}
-            className="dropdown-item"
-          >
-            Examples
-          </button>
-
-          <div className="dropdown-separator" />
-
-          <button
             onClick={handleSave}
             className="dropdown-item flex justify-between"
           >

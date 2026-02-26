@@ -13,9 +13,11 @@ useEditorStore.subscribe((state) => {
 
 // Sync currentPage to URL
 let prevPage = useEditorStore.getState().currentPage;
+let fromPopState = false;
 useEditorStore.subscribe((state) => {
   if (state.currentPage === prevPage) return;
   prevPage = state.currentPage;
+  if (fromPopState) return;
   if (state.currentPage === 'sketches') {
     history.pushState(null, '', '/sketches');
   } else if (state.currentPage === 'examples') {
@@ -29,17 +31,16 @@ useEditorStore.subscribe((state) => {
 
 // Handle browser back/forward button
 window.addEventListener('popstate', () => {
+  fromPopState = true;
   const path = window.location.pathname;
   if (path === '/sketches') {
     useEditorStore.setState({ currentPage: 'sketches' });
-    prevPage = 'sketches';
   } else if (path === '/examples') {
     useEditorStore.setState({ currentPage: 'examples' });
-    prevPage = 'examples';
   } else {
     useEditorStore.setState({ currentPage: 'editor' });
-    prevPage = 'editor';
   }
+  fromPopState = false;
 });
 
 // Sync providerKeys to sessionStorage (backend save happens on Settings close)

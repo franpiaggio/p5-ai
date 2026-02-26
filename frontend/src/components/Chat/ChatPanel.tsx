@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { simpleHash, extractFirstJsBlock, extractSearchReplaceBlocks, applySearchReplace, stripSearchReplaceBlocks } from '../../utils/codeUtils';
+import { simpleHash, extractFirstJsBlock, extractSearchReplaceBlocks, applySearchReplace, stripSearchReplaceBlocks, diffSummary } from '../../utils/codeUtils';
 import { streamChat, checkBackendHealth } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';
@@ -198,9 +198,14 @@ export function ChatPanel() {
         }
       }
 
-      const finalChatContent = hasSearchReplace
+      let finalChatContent = hasSearchReplace
         ? stripSearchReplaceBlocks(assistantContent)
         : assistantContent;
+
+      // If stripping code left the message empty, show a brief note
+      if (!finalChatContent.trim() && jsCode) {
+        finalChatContent = diffSummary(originalCode, jsCode) || 'Code updated.';
+      }
 
       useEditorStore.setState((state) => {
         const newMessages = [...state.messages];

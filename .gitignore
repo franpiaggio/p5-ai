@@ -22,3 +22,6 @@ docs/
 
 # Claude Code
 .claude/
+
+# Prompt templates
+generate_new_art.md

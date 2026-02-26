@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
-import { useModelList, FALLBACK_MODELS, PROVIDER_LABELS } from '../../hooks/useModelList';
+import { useModelList, MODELS, PROVIDER_LABELS } from '../../hooks/useModelList';
 import { useProviderKeysQuery, useSaveProviderKey, useClearProviderKey } from '../../hooks/useProviderKeys';
 import { updatePreferences } from '../../services/api';
 import type { LLMConfig, ProviderKeys } from '../../types';
@@ -27,10 +27,7 @@ export function SettingsModal() {
   const saveProviderKeyMut = useSaveProviderKey();
   const clearProviderKeyMut = useClearProviderKey();
 
-  const { models, loadingModels } = useModelList(
-    draft?.provider ?? 'demo',
-    draft?.keys[draft?.provider ?? 'demo'] ?? '',
-  );
+  const { models, loadingModels } = useModelList(draft?.provider ?? 'demo');
 
   const shouldFetchKeys = isSettingsOpen && !!user && !!draft?.storeApiKeys;
   const { data: remoteKeys } = useProviderKeysQuery(shouldFetchKeys);
@@ -117,7 +114,7 @@ export function SettingsModal() {
   const handleProviderChange = (provider: LLMConfig['provider']) => {
     updateDraft({
       provider,
-      model: FALLBACK_MODELS[provider][0],
+      model: MODELS[provider]?.[0] ?? '',
     });
   };
 
@@ -133,14 +130,25 @@ export function SettingsModal() {
   };
 
   const handleClearKey = () => {
+    if (!draft) return;
+    const provider = draft.provider;
+
+    // Immediately clear from local store
+    useEditorStore.getState().clearProviderKey(provider as LLMConfig['provider']);
+
+    // Immediately clear from server
+    if (user) {
+      clearProviderKeyMut.mutate(provider);
+    }
+
+    // Update draft to reflect the deletion
     setDraft((prev) => {
       if (!prev) return prev;
       const keys = { ...prev.keys };
       delete keys[prev.provider];
-      const pendingDeletes = prev.pendingDeletes.includes(prev.provider)
-        ? prev.pendingDeletes
-        : [...prev.pendingDeletes, prev.provider];
-      return { ...prev, keys, pendingDeletes };
+      const initialKeys = { ...prev.initialKeys };
+      delete initialKeys[prev.provider];
+      return { ...prev, keys, initialKeys, pendingDeletes: prev.pendingDeletes.filter(p => p !== prev.provider) };
     });
   };
 

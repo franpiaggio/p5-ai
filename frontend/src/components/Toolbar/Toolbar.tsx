@@ -167,11 +167,21 @@ export function Toolbar() {
         <SketchTitle />
       </div>
 
-      {/* Desktop: hint + settings + user */}
+      {/* Desktop: hint + examples + settings + user */}
       <div className="hidden md:flex items-center gap-2">
         <span className="text-text-muted/40 text-[10px] font-mono">
           Alt+Enter to run
         </span>
+        <button
+          onClick={() => useEditorStore.getState().setCurrentPage('examples')}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono text-text-muted hover:text-info hover:bg-border/40 rounded transition-colors cursor-pointer"
+          title="Browse examples"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+          Examples
+        </button>
         <button
           onClick={() => setIsSettingsOpen(true)}
           className="btn-icon text-text-muted/60 hover:text-info hover:bg-border/40"

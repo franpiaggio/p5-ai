@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useEditorStore } from '../../store/editorStore';
+import { useAuthStore } from '../../store/authStore';
 import { SKETCH_EXAMPLES } from '../../data/sketchExamples';
 import { buildPreviewHtml } from '../Preview/previewTemplate';
 import { guardUnsaved } from '../../utils/unsavedGuard';
@@ -108,6 +109,7 @@ function ExamplePreview({ code }: { code: string }) {
 
 export function ExamplesGrid() {
   const shuffled = useMemo(() => shuffle(SKETCH_EXAMPLES), []);
+  const user = useAuthStore((s) => s.user);
 
   const loadExample = (idx: number) => {
     const example = shuffled[idx];
@@ -154,6 +156,14 @@ export function ExamplesGrid() {
             <h1 className="text-sm font-mono text-text-primary">Examples</h1>
           </div>
         </div>
+        {user && (
+          <button
+            onClick={() => useEditorStore.getState().setCurrentPage('sketches')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono rounded bg-border/30 text-text-muted hover:text-text-primary hover:bg-border/50 transition-colors cursor-pointer"
+          >
+            My Sketches
+          </button>
+        )}
       </div>
 
       {/* Content */}

@@ -60,15 +60,6 @@ export function UserMenu() {
           >
             My Sketches
           </button>
-          <button
-            onClick={() => {
-              useEditorStore.getState().setCurrentPage('examples');
-              setIsOpen(false);
-            }}
-            className="dropdown-item"
-          >
-            Examples
-          </button>
           <div className="dropdown-separator" />
           <button
             onClick={() => {

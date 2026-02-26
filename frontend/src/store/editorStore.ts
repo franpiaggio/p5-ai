@@ -152,7 +152,7 @@ export const useEditorStore = create<EditorState>()(
           ...(state.previewCode ? { previewCode: null, isRunning: true, runTrigger: state.runTrigger + 1 } : {}),
         })),
       setIsRunning: (isRunning) => set({ isRunning }),
-      runSketch: () => set((state) => ({ isRunning: true, runTrigger: state.runTrigger + 1, previewCode: null })),
+      runSketch: () => set((state) => ({ isRunning: true, runTrigger: state.runTrigger + 1, previewCode: null, consoleLogs: [], editorErrors: [] })),
       setActiveTab: (activeTab) => set({ activeTab }),
 
       addMessage: (message) =>
@@ -366,6 +366,12 @@ export const useEditorStore = create<EditorState>()(
           state.showSuggestion = true;
         } else {
           state.showSuggestion = false;
+          // When auto-save is off, discard unsaved edits on reload
+          // so the editor resets to the last backend-saved version.
+          if (!state.autoSave && state.lastSavedCode) {
+            state.code = state.lastSavedCode;
+            state.codeHistory = [];
+          }
         }
         // Ensure lastSavedCode matches code on rehydrate so we don't
         // false-positive the unsaved-changes guard after a reload.

@@ -102,13 +102,18 @@ export async function createSketch(data: {
   description?: string;
   thumbnail?: string | null;
 }): Promise<SketchFull> {
+  const { thumbnail, ...rest } = data;
+  const body = thumbnail ? { ...rest, thumbnail } : rest;
   const response = await fetch(`${API_BASE}/sketches`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify(data),
+    body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error('Failed to save sketch');
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text || `Failed to save sketch (${response.status})`);
+  }
   return response.json();
 }
 
@@ -142,13 +147,18 @@ export async function updateSketch(
   id: string,
   data: { title?: string; code?: string; description?: string; thumbnail?: string | null; codeHistory?: unknown[] },
 ): Promise<SketchFull> {
+  const { thumbnail, ...rest } = data;
+  const body = thumbnail ? { ...rest, thumbnail } : rest;
   const response = await fetch(`${API_BASE}/sketches/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify(data),
+    body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error('Failed to update sketch');
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text || `Failed to update sketch (${response.status})`);
+  }
   return response.json();
 }
 
