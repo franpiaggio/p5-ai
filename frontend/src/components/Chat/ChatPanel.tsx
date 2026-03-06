@@ -303,7 +303,7 @@ export function ChatPanel() {
       onSend={sendMessage}
       isLoading={isLoading}
       disabled={chatDisabled}
-      showAttach={llmConfig.provider !== 'demo'}
+      showAttach={llmConfig.provider === 'anthropic'}
     >
       {backendOnline === null && (
         <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-border/10 border border-border/20 flex items-center gap-2">

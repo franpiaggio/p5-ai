@@ -4,20 +4,6 @@ import type { LLMProvider, LLMMessage } from './llm.interface';
 
 @Injectable()
 export class GroqProvider implements LLMProvider {
-  private buildContent(msg: LLMMessage): string | OpenAI.ChatCompletionContentPart[] {
-    if (!msg.images?.length) return msg.content;
-    const parts: OpenAI.ChatCompletionContentPart[] = [
-      { type: 'text', text: msg.content },
-    ];
-    for (const img of msg.images) {
-      parts.push({
-        type: 'image_url',
-        image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
-      });
-    }
-    return parts;
-  }
-
   async *stream(
     messages: LLMMessage[],
     model: string,
@@ -29,11 +15,12 @@ export class GroqProvider implements LLMProvider {
     });
 
     try {
+      // Groq doesn't support vision — always send content as plain string
       const stream = await client.chat.completions.create({
         model,
         messages: messages.map((m) => ({
           role: m.role,
-          content: this.buildContent(m),
+          content: m.content,
         })) as OpenAI.ChatCompletionMessageParam[],
         stream: true,
       });

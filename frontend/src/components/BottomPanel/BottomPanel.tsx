@@ -37,15 +37,13 @@ export function BottomPanel() {
           History
           {activeTab === 'history' && <div className="tab-indicator bg-warning" />}
         </button>
-        {!isDemo && (
-          <button
-            onClick={() => setIsSettingsOpen(true)}
-            className="ml-auto mr-2 px-2 py-0.5 text-[10px] font-mono text-text-muted/40 hover:text-text-muted/70 transition-colors cursor-pointer truncate max-w-[140px]"
-            title={`Model: ${model} — Click to change`}
-          >
-            {formatModelName(model)}
-          </button>
-        )}
+        <button
+          onClick={() => setIsSettingsOpen(true)}
+          className="ml-auto mr-2 px-2 py-0.5 text-[10px] font-mono text-text-muted/40 hover:text-text-muted/70 transition-colors cursor-pointer truncate max-w-[140px]"
+          title={`Model: ${isDemo ? 'Demo' : model} — Click to change`}
+        >
+          {isDemo ? 'Demo' : formatModelName(model)}
+        </button>
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
         {activeTab === 'console' && <ConsolePanel />}

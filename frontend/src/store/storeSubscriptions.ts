@@ -56,6 +56,14 @@ useEditorStore.subscribe((state) => {
   }
 });
 
+// Warn on tab close / refresh when there are unsaved changes
+window.addEventListener('beforeunload', (e) => {
+  const { code, lastSavedCode } = useEditorStore.getState();
+  if (code !== lastSavedCode) {
+    e.preventDefault();
+  }
+});
+
 // Auto-save: debounced save to backend when code changes
 const AUTO_SAVE_DEBOUNCE_MS = 2000;
 let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;

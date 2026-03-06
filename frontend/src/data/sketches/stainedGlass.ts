@@ -77,19 +77,6 @@ function draw() {
     }
   }
 
-  // subtle arch frame
-  stroke(0, 0, 8);
-  strokeWeight(12);
-  noFill();
-  let margin = 30;
-  beginShape();
-  vertex(margin, height - margin);
-  vertex(margin, height * 0.3);
-  // arch top
-  bezierVertex(margin, margin, width - margin, margin, width - margin, height * 0.3);
-  vertex(width - margin, height - margin);
-  endShape();
-
   noLoop();
 }
 
