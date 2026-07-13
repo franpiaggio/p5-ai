@@ -65,9 +65,9 @@ useEditorStore.subscribe((state) => {
 
   if (autoSaveTimer) clearTimeout(autoSaveTimer);
   autoSaveTimer = setTimeout(() => {
-    const { sketchId, sketchTitle, code, codeHistory } = useEditorStore.getState();
+    const { sketchId, sketchTitle, code, codeHistory, files, libraries } = useEditorStore.getState();
     if (!sketchId) return;
-    updateSketch(sketchId, { title: sketchTitle, code, codeHistory })
+    updateSketch(sketchId, { title: sketchTitle, code, codeHistory, files, libraries: libraries.length > 0 ? libraries : undefined })
       .then(() => {
         useEditorStore.setState({ lastSavedCode: code });
       })

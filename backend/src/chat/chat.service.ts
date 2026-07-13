@@ -97,6 +97,18 @@ You have TWO response formats. Choose based on how much code changes:
 - Explain concepts, describe what specific parts of the code do, or answer questions in plain text
 - Only include a \`\`\`javascript or \`\`\`typescript code block when the user is requesting new code, modifications, or a fix
 
+## MULTI-FILE SKETCHES
+The user may have multiple JS/TS files. When provided, all files are shown with headers like \`// filename: utils.js\`.
+
+### Targeting files in responses
+- To modify a specific file, start the code block or search/replace block with a comment: \`// filename: utils.js\`
+- To create a new file, use: \`// filename: particle.js [NEW FILE]\`
+- If no filename comment is present, changes target \`sketch.js\` by default
+- Search/replace blocks can target different files by prefixing each block with \`// filename: ...\`
+
+### CDN Libraries
+The user may have CDN libraries loaded (e.g. p5.sound, ml5.js). These are listed when provided. You can reference their APIs in your code. If the user needs a library that isn't loaded, mention they should add it via the Libraries panel.
+
 The user's current code is provided for context.`;
 
 const DEMO_MODEL = 'llama-3.3-70b-versatile';
@@ -142,7 +154,10 @@ export class ChatService {
     return Math.floor((normalized.length * 3) / 4);
   }
 
-  private validateAndCountImages(images: ImageAttachmentDto[] | undefined, context: string): number {
+  private validateAndCountImages(
+    images: ImageAttachmentDto[] | undefined,
+    context: string,
+  ): number {
     if (!images?.length) return 0;
 
     let totalBytes = 0;
@@ -194,7 +209,10 @@ export class ChatService {
     let totalBytes = 0;
     let totalCount = request.images?.length ?? 0;
 
-    totalBytes += this.validateAndCountImages(request.images, 'current message');
+    totalBytes += this.validateAndCountImages(
+      request.images,
+      'current message',
+    );
 
     for (const msg of request.history) {
       totalBytes += this.validateAndCountImages(msg.images, 'history');
@@ -202,7 +220,9 @@ export class ChatService {
     }
 
     if (totalCount > MAX_TOTAL_IMAGES) {
-      throw new BadRequestException(`Too many images provided (${totalCount}). Max ${MAX_TOTAL_IMAGES} per request including history.`);
+      throw new BadRequestException(
+        `Too many images provided (${totalCount}). Max ${MAX_TOTAL_IMAGES} per request including history.`,
+      );
     }
 
     if (totalBytes > MAX_TOTAL_IMAGE_BYTES) {
@@ -212,7 +232,9 @@ export class ChatService {
     }
   }
 
-  private clampHistory(history: ChatRequestDto['history']): ChatRequestDto['history'] {
+  private clampHistory(
+    history: ChatRequestDto['history'],
+  ): ChatRequestDto['history'] {
     if (!history?.length) return [];
 
     const capped = history.slice(-MAX_HISTORY_MESSAGES);
@@ -243,13 +265,30 @@ export class ChatService {
     const history = this.clampHistory(request.history);
     this.enforceImageBudgets({ ...request, history });
 
-    const codeFence = request.language === 'javascript' ? 'javascript' : 'typescript';
+    const codeFence =
+      request.language === 'javascript' ? 'javascript' : 'typescript';
+
+    // Build code context: multi-file or single file
+    let codeContext: string;
+    if (request.files && request.files.length > 0) {
+      const fileBlocks = request.files
+        .map((f) => `// filename: ${f.name}\n${f.content}`)
+        .join('\n\n');
+      codeContext = `Current p5.js sketch files:\n\`\`\`${codeFence}\n${fileBlocks}\n\`\`\``;
+    } else {
+      codeContext = `Current p5.js code:\n\`\`\`${codeFence}\n${request.code}\n\`\`\``;
+    }
+
+    if (request.libraries && request.libraries.length > 0) {
+      const libList = request.libraries
+        .map((l) => `- ${l.name} (${l.url})`)
+        .join('\n');
+      codeContext += `\n\nLoaded CDN libraries:\n${libList}`;
+    }
+
     const messages: LLMMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },
-      {
-        role: 'user',
-        content: `Current p5.js code:\n\`\`\`${codeFence}\n${request.code}\n\`\`\``,
-      },
+      { role: 'user', content: codeContext },
     ];
 
     for (const msg of history) {
@@ -269,7 +308,9 @@ export class ChatService {
     if (request.config.provider === 'demo') {
       const groqKey = process.env.GROQ_API_KEY;
       if (!groqKey) {
-        throw new Error('Demo mode is not configured. Please use your own API key in Settings.');
+        throw new Error(
+          'Demo mode is not configured. Please use your own API key in Settings.',
+        );
       }
       yield* this.groqProvider.stream(messages, DEMO_MODEL, groqKey);
       return;
@@ -282,9 +323,14 @@ export class ChatService {
     };
 
     const provider = providers[request.config.provider];
-    if (!provider) throw new Error(`Unknown provider: ${request.config.provider}`);
+    if (!provider)
+      throw new Error(`Unknown provider: ${request.config.provider}`);
 
-    yield* provider.stream(messages, request.config.model, request.config.apiKey!);
+    yield* provider.stream(
+      messages,
+      request.config.model,
+      request.config.apiKey!,
+    );
   }
 
   async listModels(provider: string, apiKey: string): Promise<string[]> {

@@ -11,6 +11,12 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [UsersModule, AuthModule],
   controllers: [ChatController],
-  providers: [ChatService, OpenAIProvider, AnthropicProvider, GroqProvider, DeepSeekProvider],
+  providers: [
+    ChatService,
+    OpenAIProvider,
+    AnthropicProvider,
+    GroqProvider,
+    DeepSeekProvider,
+  ],
 })
 export class ChatModule {}

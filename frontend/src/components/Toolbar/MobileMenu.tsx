@@ -20,6 +20,8 @@ export function MobileMenu() {
   const sketchTitle = useEditorStore((s) => s.sketchTitle);
   const code = useEditorStore((s) => s.code);
   const codeHistory = useEditorStore((s) => s.codeHistory);
+  const files = useEditorStore((s) => s.files);
+  const libraries = useEditorStore((s) => s.libraries);
   const newSketch = useEditorStore((s) => s.newSketch);
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
   const setIsSettingsOpen = useEditorStore((s) => s.setIsSettingsOpen);
@@ -61,7 +63,7 @@ export function MobileMenu() {
     if (sketchId) {
       try {
         const thumbnail = await capturePreview();
-        updateSketchMut.mutate({ id: sketchId, title: sketchTitle, code, codeHistory, thumbnail },
+        updateSketchMut.mutate({ id: sketchId, title: sketchTitle, code, codeHistory, thumbnail, files, libraries: libraries.length > 0 ? libraries : undefined },
           { onSuccess: () => useEditorStore.getState().markCodeSaved() });
       } catch (err) {
         console.error('Failed to save:', err);
@@ -87,6 +89,8 @@ export function MobileMenu() {
       const copy = await createSketchMut.mutateAsync({
         title: sketchTitle + ' (copy)',
         code,
+        files,
+        libraries: libraries.length > 0 ? libraries : undefined,
       });
       setSketchMeta(copy.id, copy.title);
     } catch (err) {

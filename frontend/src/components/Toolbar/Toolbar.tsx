@@ -136,7 +136,15 @@ export function Toolbar() {
       try {
         const thumbnail = await capturePreview();
         updateSketchMut.mutate(
-          { id: s.sketchId, title: s.sketchTitle, code: s.code, codeHistory: s.codeHistory, thumbnail },
+          {
+            id: s.sketchId,
+            title: s.sketchTitle,
+            code: s.code,
+            codeHistory: s.codeHistory,
+            thumbnail,
+            files: s.files,
+            libraries: s.libraries.length > 0 ? s.libraries : undefined,
+          },
           { onSuccess: () => useEditorStore.getState().markCodeSaved() },
         );
       } catch (err) {

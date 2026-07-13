@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Message, ConsoleLog, LLMConfig, TabType, EditorError, CodeChange, ProviderKeys } from '../types';
+import type { Message, ConsoleLog, LLMConfig, TabType, EditorError, CodeChange, ProviderKeys, SketchFile, Library } from '../types';
 import type { AppThemeId } from '../components/Editor/editorConfig';
 import { diffSummary } from '../utils/codeUtils';
+import { createDefaultFiles, createFileId, isAllowedFileName, languageFromExtension } from '../constants/defaultFiles';
 
 export type EditorLanguage = 'javascript' | 'typescript';
 
@@ -13,6 +14,7 @@ export interface PendingDiff {
   blockKey: string;
   prompt?: string;
   isRestore?: boolean;
+  fileName?: string;
 }
 
 const DEFAULT_CODE = `function setup() {
@@ -70,6 +72,12 @@ interface EditorState {
   // it survives ChatPanel unmount/remount when switching bottom tabs.
   exampleApplied: boolean;
   exampleAppliedLabel: string | null;
+  files: SketchFile[];
+  activeFileName: string;
+  lastSavedFiles: SketchFile[];
+  isFileSidebarOpen: boolean;
+  libraries: Library[];
+  lastSavedLibraries: Library[];
 
   setCode: (code: string) => void;
   setIsRunning: (running: boolean) => void;
@@ -106,11 +114,29 @@ interface EditorState {
   setStreamingCode: (code: string | null) => void;
   markCodeSaved: () => void;
   setPendingNavigation: (action: (() => void) | null) => void;
+  setActiveFile: (name: string) => void;
+  addFile: (name: string) => void;
+  deleteFile: (name: string) => void;
+  renameFile: (oldName: string, newName: string) => void;
+  setFileContent: (name: string, content: string) => void;
+  setFiles: (files: SketchFile[]) => void;
+  addLibrary: (lib: Library) => void;
+  removeLibrary: (url: string) => void;
+  setLibraries: (libs: Library[]) => void;
+  setFileSidebarOpen: (open: boolean) => void;
 }
 
 let logCounter = 0;
 let msgCounter = 0;
 let changeCounter = 0;
+
+/** Keep the active file's content in sync with the live `code` buffer. */
+const syncActiveFile = (
+  files: SketchFile[],
+  activeFileName: string,
+  content: string,
+): SketchFile[] =>
+  files.map((f) => (f.name === activeFileName ? { ...f, content } : f));
 
 export const useEditorStore = create<EditorState>()(
   persist(
@@ -151,12 +177,24 @@ export const useEditorStore = create<EditorState>()(
       showSuggestion: true,
       exampleApplied: false,
       exampleAppliedLabel: null,
+      files: createDefaultFiles(DEFAULT_CODE),
+      activeFileName: 'sketch.js',
+      lastSavedFiles: createDefaultFiles(DEFAULT_CODE),
+      isFileSidebarOpen: false,
+      libraries: [] as Library[],
+      lastSavedLibraries: [] as Library[],
 
       setCode: (code) =>
-        set((state) => ({
-          code,
-          ...(state.previewCode ? { previewCode: null, isRunning: true, runTrigger: state.runTrigger + 1 } : {}),
-        })),
+        set((state) => {
+          const files = state.files.map((f) =>
+            f.name === state.activeFileName ? { ...f, content: code } : f,
+          );
+          return {
+            code,
+            files,
+            ...(state.previewCode ? { previewCode: null, isRunning: true, runTrigger: state.runTrigger + 1 } : {}),
+          };
+        }),
       setIsRunning: (isRunning) => set({ isRunning }),
       runSketch: () => set((state) => ({ isRunning: true, runTrigger: state.runTrigger + 1, previewCode: null, consoleLogs: [], editorErrors: [] })),
       setActiveTab: (activeTab) => set({ activeTab }),
@@ -218,7 +256,12 @@ export const useEditorStore = create<EditorState>()(
             : null,
           previewCode: null,
           ...(pendingDiff
-            ? { code: pendingDiff.code, isRunning: true, runTrigger: state.runTrigger + 1 }
+            ? {
+                code: pendingDiff.code,
+                files: syncActiveFile(state.files, state.activeFileName, pendingDiff.code),
+                isRunning: true,
+                runTrigger: state.runTrigger + 1,
+              }
             : {}),
         })),
       rejectPendingDiff: () =>
@@ -227,6 +270,7 @@ export const useEditorStore = create<EditorState>()(
           const { blockKey } = state.pendingDiff;
           return {
             code: state.pendingDiff.previousCode,
+            files: syncActiveFile(state.files, state.activeFileName, state.pendingDiff.previousCode),
             pendingDiff: null,
             isRunning: true,
             runTrigger: state.runTrigger + 1,
@@ -238,6 +282,7 @@ export const useEditorStore = create<EditorState>()(
           if (!state.pendingDiff) return state;
           const { previousCode, messageId, blockKey, isRestore, prompt } = state.pendingDiff;
           return {
+            files: syncActiveFile(state.files, state.activeFileName, state.code),
             codeHistory: [
               ...state.codeHistory,
               {
@@ -308,28 +353,118 @@ export const useEditorStore = create<EditorState>()(
         }),
       setStoreApiKeys: (storeApiKeys) => set({ storeApiKeys }),
       setStreamingCode: (streamingCode) => set({ streamingCode }),
-      markCodeSaved: () => set((state) => ({ lastSavedCode: state.code })),
+      markCodeSaved: () => set((state) => ({
+        lastSavedCode: state.code,
+        lastSavedFiles: state.files.map((f) => ({ ...f })),
+        lastSavedLibraries: [...state.libraries],
+      })),
       setPendingNavigation: (pendingNavigation) => set({ pendingNavigation }),
-      newSketch: () =>
+      setActiveFile: (name) =>
+        set((state) => {
+          const file = state.files.find((f) => f.name === name);
+          if (!file) return state;
+          return { activeFileName: name, code: file.content };
+        }),
+      addFile: (name) =>
+        set((state) => {
+          if (!isAllowedFileName(name)) return state;
+          if (state.files.some((f) => f.name === name)) return state;
+          const newFile: SketchFile = {
+            id: createFileId(),
+            name,
+            content: '',
+            language: languageFromExtension(name),
+          };
+          return {
+            files: [...state.files, newFile],
+            activeFileName: name,
+            code: '',
+          };
+        }),
+      deleteFile: (name) =>
+        set((state) => {
+          if (name === 'sketch.js') return state;
+          const files = state.files.filter((f) => f.name !== name);
+          if (files.length === state.files.length) return state;
+          const switchTo = state.activeFileName === name ? 'sketch.js' : state.activeFileName;
+          const switchFile = files.find((f) => f.name === switchTo) ?? files[0];
+          return {
+            files,
+            activeFileName: switchFile.name,
+            code: switchFile.content,
+          };
+        }),
+      renameFile: (oldName, newName) =>
+        set((state) => {
+          if (oldName === 'sketch.js') return state;
+          if (!isAllowedFileName(newName)) return state;
+          if (state.files.some((f) => f.name === newName)) return state;
+          const files = state.files.map((f) =>
+            f.name === oldName ? { ...f, name: newName, language: languageFromExtension(newName) } : f,
+          );
+          return {
+            files,
+            activeFileName: state.activeFileName === oldName ? newName : state.activeFileName,
+          };
+        }),
+      setFileContent: (name, content) =>
+        set((state) => {
+          const files = state.files.map((f) =>
+            f.name === name ? { ...f, content } : f,
+          );
+          return {
+            files,
+            ...(state.activeFileName === name ? { code: content } : {}),
+          };
+        }),
+      setFiles: (files) =>
+        set((state) => {
+          const active = files.find((f) => f.name === state.activeFileName) ?? files[0];
+          return {
+            files,
+            activeFileName: active?.name ?? 'sketch.js',
+            code: active?.content ?? '',
+          };
+        }),
+      addLibrary: (lib) =>
+        set((state) => {
+          if (state.libraries.some((l) => l.url === lib.url)) return state;
+          return { libraries: [...state.libraries, lib] };
+        }),
+      removeLibrary: (url) =>
         set((state) => ({
-          code: DEFAULT_CODE,
-          lastSavedCode: DEFAULT_CODE,
-          sketchId: null,
-          sketchTitle: 'Untitled Sketch',
-          messages: [],
-          codeHistory: [],
-          appliedBlocks: {},
-          rejectedBlocks: {},
-          pendingDiff: null,
-          previewCode: null,
-          consoleLogs: [],
-          editorErrors: [],
-          isRunning: true,
-          runTrigger: state.runTrigger + 1,
-          showSuggestion: true,
-          exampleApplied: false,
-          exampleAppliedLabel: null,
+          libraries: state.libraries.filter((l) => l.url !== url),
         })),
+      setLibraries: (libraries) => set({ libraries }),
+      setFileSidebarOpen: (isFileSidebarOpen) => set({ isFileSidebarOpen }),
+      newSketch: () =>
+        set((state) => {
+          const newFiles = createDefaultFiles(DEFAULT_CODE);
+          return {
+            code: DEFAULT_CODE,
+            lastSavedCode: DEFAULT_CODE,
+            sketchId: null,
+            sketchTitle: 'Untitled Sketch',
+            messages: [],
+            codeHistory: [],
+            appliedBlocks: {},
+            rejectedBlocks: {},
+            pendingDiff: null,
+            previewCode: null,
+            consoleLogs: [],
+            editorErrors: [],
+            isRunning: true,
+            runTrigger: state.runTrigger + 1,
+            showSuggestion: true,
+            exampleApplied: false,
+            exampleAppliedLabel: null,
+            files: newFiles,
+            activeFileName: 'sketch.js',
+            lastSavedFiles: newFiles.map((f) => ({ ...f })),
+            libraries: [],
+            lastSavedLibraries: [],
+          };
+        }),
     }),
     {
       name: 'p5-ai-editor',
@@ -353,6 +488,12 @@ export const useEditorStore = create<EditorState>()(
         sketchId: state.sketchId,
         sketchTitle: state.sketchTitle,
         storeApiKeys: state.storeApiKeys,
+        files: state.files,
+        lastSavedFiles: state.lastSavedFiles,
+        activeFileName: state.activeFileName,
+        isFileSidebarOpen: state.isFileSidebarOpen,
+        libraries: state.libraries,
+        lastSavedLibraries: state.lastSavedLibraries,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
@@ -389,6 +530,20 @@ export const useEditorStore = create<EditorState>()(
             state.code = state.lastSavedCode;
             state.codeHistory = [];
           }
+        }
+        // Migrate: construct files from code if absent
+        if (!state.files || !Array.isArray(state.files) || state.files.length === 0) {
+          state.files = createDefaultFiles(state.code);
+          state.activeFileName = 'sketch.js';
+        }
+        if (!state.lastSavedFiles || !Array.isArray(state.lastSavedFiles)) {
+          state.lastSavedFiles = state.files.map((f) => ({ ...f }));
+        }
+        if (!state.libraries || !Array.isArray(state.libraries)) {
+          state.libraries = [];
+        }
+        if (!state.lastSavedLibraries || !Array.isArray(state.lastSavedLibraries)) {
+          state.lastSavedLibraries = [];
         }
         // Ensure lastSavedCode matches code on rehydrate so we don't
         // false-positive the unsaved-changes guard after a reload.

@@ -35,10 +35,14 @@ export class GroqProvider implements LLMProvider {
       if (error instanceof OpenAI.APIError) {
         const msg = error.message.toLowerCase();
         if (msg.includes('rate limit')) {
-          throw new Error('Demo mode rate limit reached. Please wait a moment or configure your own API key in Settings.');
+          throw new Error(
+            'Demo mode rate limit reached. Please wait a moment or configure your own API key in Settings.',
+          );
         }
         if (msg.includes('invalid api key') || msg.includes('authentication')) {
-          throw new Error('Groq API: Invalid API key. Please check server configuration.');
+          throw new Error(
+            'Groq API: Invalid API key. Please check server configuration.',
+          );
         }
         throw new Error(`Groq API: ${error.message}`);
       }
@@ -62,7 +66,9 @@ export class GroqProvider implements LLMProvider {
       if (error instanceof OpenAI.APIError) {
         const msg = error.message.toLowerCase();
         if (msg.includes('invalid api key') || msg.includes('authentication')) {
-          throw new Error('Groq API: Invalid API key. Please check server configuration.');
+          throw new Error(
+            'Groq API: Invalid API key. Please check server configuration.',
+          );
         }
         throw new Error(`Groq API: ${error.message}`);
       }

@@ -64,10 +64,18 @@ export class DeepSeekProvider implements LLMProvider {
   private formatError(error: InstanceType<typeof OpenAI.APIError>): string {
     const msg = error.message.toLowerCase();
 
-    if (msg.includes('insufficient') || msg.includes('billing') || msg.includes('balance')) {
+    if (
+      msg.includes('insufficient') ||
+      msg.includes('billing') ||
+      msg.includes('balance')
+    ) {
       return 'DeepSeek API: Insufficient credits. Please check your balance at platform.deepseek.com';
     }
-    if (msg.includes('invalid api key') || msg.includes('authentication') || msg.includes('auth')) {
+    if (
+      msg.includes('invalid api key') ||
+      msg.includes('authentication') ||
+      msg.includes('auth')
+    ) {
       return 'DeepSeek API: Invalid API key. Please check your key in Settings.';
     }
     if (msg.includes('rate limit')) {

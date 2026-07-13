@@ -28,14 +28,32 @@ export class SketchesService {
     return this.sketchesRepository.find({
       where: { userId },
       order: { updatedAt: 'DESC' },
-      select: ['id', 'title', 'description', 'thumbnail', 'createdAt', 'updatedAt'],
+      select: [
+        'id',
+        'title',
+        'description',
+        'thumbnail',
+        'createdAt',
+        'updatedAt',
+      ],
     });
   }
 
   async findOnePublic(id: string): Promise<Partial<Sketch>> {
     const sketch = await this.sketchesRepository.findOne({
       where: { id },
-      select: ['id', 'title', 'code', 'description', 'thumbnail', 'codeHistory', 'createdAt', 'updatedAt'],
+      select: [
+        'id',
+        'title',
+        'code',
+        'description',
+        'thumbnail',
+        'codeHistory',
+        'files',
+        'libraries',
+        'createdAt',
+        'updatedAt',
+      ],
     });
     if (!sketch) throw new NotFoundException('Sketch not found');
     return sketch;

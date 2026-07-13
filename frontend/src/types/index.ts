@@ -3,6 +3,18 @@ export interface ImageAttachment {
   mimeType: 'image/png' | 'image/jpeg';
 }
 
+export interface SketchFile {
+  id: string;
+  name: string;
+  content: string;
+  language: 'javascript' | 'typescript';
+}
+
+export interface Library {
+  name: string;
+  url: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -41,6 +53,7 @@ export interface CodeChange {
   summary?: string;
   prompt?: string;
   isRestore?: boolean;
+  fileName?: string;
 }
 
 export type ProviderKeys = Partial<Record<LLMConfig['provider'], string>>;
@@ -59,4 +72,6 @@ export interface SketchSummary {
 export interface SketchFull extends SketchSummary {
   code: string;
   codeHistory?: CodeChange[] | null;
+  files?: SketchFile[] | null;
+  libraries?: Library[] | null;
 }

@@ -56,6 +56,26 @@ export class LLMConfigDto {
   apiKey?: string;
 }
 
+export class ChatFileDto {
+  @IsString()
+  @MaxLength(200)
+  name: string;
+
+  @IsString()
+  @MaxLength(500_000)
+  content: string;
+}
+
+export class ChatLibraryDto {
+  @IsString()
+  @MaxLength(200)
+  name: string;
+
+  @IsString()
+  @MaxLength(2000)
+  url: string;
+}
+
 export class ChatRequestDto {
   @IsString()
   @MaxLength(100_000)
@@ -85,6 +105,20 @@ export class ChatRequestDto {
   @Type(() => ImageAttachmentDto)
   @ArrayMaxSize(4)
   images?: ImageAttachmentDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ChatFileDto)
+  @ArrayMaxSize(20)
+  files?: ChatFileDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ChatLibraryDto)
+  @ArrayMaxSize(20)
+  libraries?: ChatLibraryDto[];
 }
 
 export class ListModelsDto {

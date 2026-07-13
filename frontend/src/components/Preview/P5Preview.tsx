@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { buildPreviewHtml } from './previewTemplate';
+import { buildPreviewHtml, buildMultiFilePreviewHtml } from './previewTemplate';
 
 // Module-level ref for thumbnail capture
 let _iframeEl: HTMLIFrameElement | null = null;
@@ -112,19 +112,44 @@ export function P5Preview() {
         URL.revokeObjectURL(blobUrlRef.current);
       }
 
-      // Read code fresh from the store at run time rather than from the render
-      // closure: a route mount (/example/:slug, /sketch/:id) sets code + bumps
-      // runTrigger in one update, and the closure's `code` can lag a tick behind
-      // the runTrigger change, which would run stale code (e.g. the default sketch).
-      const { code: currentCode, transpiler, editorLanguage } = useEditorStore.getState();
-      const activeCode = previewCode?.code ?? currentCode;
-      const jsCode = editorLanguage === 'typescript' && transpiler
-        ? await transpiler(activeCode)
-        : activeCode;
+      // Read state fresh from the store at run time rather than from the render
+      // closure: a route mount (/example/:slug, /sketch/:id) sets code + files +
+      // bumps runTrigger in one update, and the closure can lag a tick behind the
+      // runTrigger change, which would run stale content (e.g. the default sketch).
+      const { code: currentCode, transpiler, files, libraries } = useEditorStore.getState();
+
+      // History preview uses legacy single-code builder
+      if (previewCode) {
+        const jsCode = transpiler && previewCode.code !== currentCode
+          ? await transpiler(previewCode.code)
+          : previewCode.code;
+        if (cancelled || !iframeRef.current) return;
+        const html = buildPreviewHtml(jsCode);
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        blobUrlRef.current = url;
+        iframeRef.current.src = url;
+        return;
+      }
+
+      // Multi-file preview: transpile TS files if needed
+      const processedFiles = await Promise.all(
+        files.map(async (f) => {
+          if (f.language === 'typescript' && transpiler) {
+            try {
+              const jsContent = await transpiler(f.content);
+              return { ...f, content: jsContent, language: 'javascript' as const };
+            } catch {
+              return f;
+            }
+          }
+          return f;
+        }),
+      );
 
       if (cancelled || !iframeRef.current) return;
 
-      const html = buildPreviewHtml(jsCode);
+      const html = buildMultiFilePreviewHtml(processedFiles, libraries);
       const blob = new Blob([html], { type: 'text/html' });
       const url = URL.createObjectURL(blob);
       blobUrlRef.current = url;

@@ -44,6 +44,20 @@ export class Sketch {
     summary?: string;
   }> | null;
 
+  @Column({ type: 'simple-json', nullable: true, default: null })
+  files: Array<{
+    id: string;
+    name: string;
+    content: string;
+    language: string;
+  }> | null;
+
+  @Column({ type: 'simple-json', nullable: true, default: null })
+  libraries: Array<{
+    name: string;
+    url: string;
+  }> | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

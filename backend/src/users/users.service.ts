@@ -49,7 +49,16 @@ export class UsersService {
   async findByUsername(username: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { username },
-      select: ['id', 'username', 'password', 'email', 'name', 'picture', 'storeApiKeys', 'createdAt'],
+      select: [
+        'id',
+        'username',
+        'password',
+        'email',
+        'name',
+        'picture',
+        'storeApiKeys',
+        'createdAt',
+      ],
     });
   }
 
@@ -111,9 +120,7 @@ export class UsersService {
     return this.loadKeyMap(userId);
   }
 
-  async getMaskedProviderKeys(
-    userId: string,
-  ): Promise<Record<string, string>> {
+  async getMaskedProviderKeys(userId: string): Promise<Record<string, string>> {
     const map = await this.loadKeyMap(userId);
     const masked: Record<string, string> = {};
     for (const [provider, key] of Object.entries(map)) {

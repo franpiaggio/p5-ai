@@ -1,4 +1,13 @@
-import { Controller, Post, Body, Res, Req, UseGuards, HttpException, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Res,
+  Req,
+  UseGuards,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ChatService } from './chat.service';
 import { ChatRequestDto, ListModelsDto } from './dto/chat.dto';
@@ -24,13 +33,18 @@ export class ChatController {
       const models = await this.chatService.listModels(body.provider, apiKey);
       return { models };
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to list models';
+      const message =
+        error instanceof Error ? error.message : 'Failed to list models';
       throw new HttpException({ error: message }, HttpStatus.BAD_REQUEST);
     }
   }
 
   @Post()
-  async chat(@Body() request: ChatRequestDto, @Req() req: Request, @Res() res: Response) {
+  async chat(
+    @Body() request: ChatRequestDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -39,7 +53,9 @@ export class ChatController {
 
     // Stream timeout: 2 minutes max
     res.setTimeout(300_000, () => {
-      res.write(`data: ${JSON.stringify({ error: 'Stream timeout exceeded' })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ error: 'Stream timeout exceeded' })}\n\n`,
+      );
       res.end();
     });
 
@@ -58,7 +74,8 @@ export class ChatController {
       }
       if (!res.writableEnded) res.write('data: [DONE]\n\n');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'An error occurred';
+      const message =
+        error instanceof Error ? error.message : 'An error occurred';
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
       }

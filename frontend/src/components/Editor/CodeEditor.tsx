@@ -6,6 +6,7 @@ import { DiffToolbar } from './DiffToolbar';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles, registerFunctionCallTokenProvider, resolveMonacoTheme } from './editorConfig';
 import { P5_TYPE_DEFS } from './p5Types';
+import { languageFromExtension } from '../../constants/defaultFiles';
 
 export function CodeEditor() {
   const code = useEditorStore((s) => s.code);
@@ -19,6 +20,13 @@ export function CodeEditor() {
   const isLoading = useEditorStore((s) => s.isLoading);
   const appTheme = useEditorStore((s) => s.appTheme);
   const isMobile = useIsMobile();
+  const files = useEditorStore((s) => s.files);
+  const activeFileName = useEditorStore((s) => s.activeFileName);
+  const setActiveFile = useEditorStore((s) => s.setActiveFile);
+  const isFileSidebarOpen = useEditorStore((s) => s.isFileSidebarOpen);
+  const setFileSidebarOpen = useEditorStore((s) => s.setFileSidebarOpen);
+
+  const activeLanguage = languageFromExtension(activeFileName);
 
   // When the theme is 'auto' it tracks the OS preference; re-render on change
   // so the Monaco theme follows the app's light/dark default live. (When the
@@ -252,18 +260,50 @@ export function CodeEditor() {
   }
 
   return (
-    <div className="h-full w-full">
-      <Editor
-        height="100%"
-        language={editorLanguage}
-        path={editorLanguage === 'typescript' ? 'sketch.ts' : 'sketch.js'}
-        value={code}
-        onChange={(value) => setCode(value || '')}
-        beforeMount={handleBeforeMount}
-        onMount={handleMount}
-        theme={resolvedTheme}
-        options={{ ...EDITOR_OPTIONS, readOnly: isLoading }}
-      />
+    <div className="h-full w-full flex flex-col">
+      {!isMobile && (
+        <div className="flex items-center bg-surface-raised border-b border-border/30 shrink-0">
+          <button
+            onClick={() => setFileSidebarOpen(!isFileSidebarOpen)}
+            className={`p-1.5 mx-1 rounded hover:bg-border/30 transition-colors cursor-pointer shrink-0 ${
+              isFileSidebarOpen ? 'text-info' : 'text-text-muted/50 hover:text-info'
+            }`}
+            title="Toggle file sidebar"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+          </button>
+          <div className="flex-1 flex items-center overflow-x-auto scrollbar-none">
+            {files.map((file) => (
+              <button
+                key={file.id}
+                onClick={() => setActiveFile(file.name)}
+                className={`px-3 py-1.5 text-[11px] font-mono whitespace-nowrap transition-colors border-b-2 cursor-pointer ${
+                  activeFileName === file.name
+                    ? 'text-info border-info bg-info/5'
+                    : 'text-text-muted/60 border-transparent hover:text-text-primary hover:bg-border/20'
+                }`}
+              >
+                {file.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="flex-1 min-h-0">
+        <Editor
+          height="100%"
+          language={activeLanguage}
+          path={activeFileName}
+          value={code}
+          onChange={(value) => setCode(value || '')}
+          beforeMount={handleBeforeMount}
+          onMount={handleMount}
+          theme={resolvedTheme}
+          options={{ ...EDITOR_OPTIONS, readOnly: isLoading }}
+        />
+      </div>
     </div>
   );
 }

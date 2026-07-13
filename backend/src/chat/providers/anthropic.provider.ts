@@ -4,7 +4,9 @@ import type { LLMProvider, LLMMessage } from './llm.interface';
 
 @Injectable()
 export class AnthropicProvider implements LLMProvider {
-  private buildContent(msg: LLMMessage): string | Anthropic.ContentBlockParam[] {
+  private buildContent(
+    msg: LLMMessage,
+  ): string | Anthropic.ContentBlockParam[] {
     if (!msg.images?.length) return msg.content;
     const parts: Anthropic.ContentBlockParam[] = [];
     for (const img of msg.images) {
@@ -65,9 +67,7 @@ export class AnthropicProvider implements LLMProvider {
     const client = new Anthropic({ apiKey });
     try {
       const list = await client.models.list({ limit: 100 });
-      return list.data
-        .map((m) => m.id)
-        .sort();
+      return list.data.map((m) => m.id).sort();
     } catch (error) {
       if (error instanceof Anthropic.APIError) {
         const message = this.formatError(error);

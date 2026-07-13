@@ -48,6 +48,30 @@ export function stripSearchReplaceBlocks(text: string): string {
   return result.trimEnd();
 }
 
+/**
+ * Extract filename header from a code block.
+ * Patterns: `// filename: utils.js` or `// filename: particle.js [NEW FILE]`
+ * Returns { fileName, isNew, cleanCode } — cleanCode has the header line removed.
+ */
+export function extractFileName(code: string): { fileName: string | null; isNew: boolean; cleanCode: string } {
+  const match = /^\/\/\s*filename:\s*(\S+?)(\s+\[NEW FILE\])?\s*\n/.exec(code);
+  if (!match) return { fileName: null, isNew: false, cleanCode: code };
+  return {
+    fileName: match[1],
+    isNew: !!match[2],
+    cleanCode: code.slice(match[0].length),
+  };
+}
+
+/**
+ * Extract filename from a search/replace block text that starts with `// filename: ...`.
+ * Returns fileName or null if no filename header.
+ */
+export function extractSearchReplaceFileName(blockText: string): string | null {
+  const match = /^\/\/\s*filename:\s*(\S+)\s*\n/.exec(blockText);
+  return match ? match[1] : null;
+}
+
 /** Generate a short human summary of what changed between two code strings. */
 export function diffSummary(oldCode: string, newCode: string): string {
   const oldLines = oldCode.split('\n');

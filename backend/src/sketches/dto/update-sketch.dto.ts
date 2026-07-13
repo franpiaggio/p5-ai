@@ -32,6 +32,33 @@ class CodeHistoryEntryDto {
   summary?: string;
 }
 
+class SketchFileDto {
+  @IsString()
+  id: string;
+
+  @IsString()
+  @MaxLength(200)
+  name: string;
+
+  @IsString()
+  @MaxLength(500_000)
+  content: string;
+
+  @IsString()
+  @MaxLength(20)
+  language: string;
+}
+
+class LibraryDto {
+  @IsString()
+  @MaxLength(200)
+  name: string;
+
+  @IsString()
+  @MaxLength(2000)
+  url: string;
+}
+
 export class UpdateSketchDto {
   @IsOptional()
   @IsString()
@@ -58,4 +85,16 @@ export class UpdateSketchDto {
   @ValidateNested({ each: true })
   @Type(() => CodeHistoryEntryDto)
   codeHistory?: CodeHistoryEntryDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SketchFileDto)
+  files?: SketchFileDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LibraryDto)
+  libraries?: LibraryDto[];
 }

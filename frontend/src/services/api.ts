@@ -1,4 +1,4 @@
-import type { LLMConfig, Message, ImageAttachment, SketchSummary, SketchFull } from '../types';
+import type { LLMConfig, Message, ImageAttachment, SketchSummary, SketchFull, SketchFile, Library } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -130,6 +130,8 @@ export async function createSketch(data: {
   code: string;
   description?: string;
   thumbnail?: string | null;
+  files?: SketchFile[];
+  libraries?: Library[];
 }): Promise<SketchFull> {
   const { thumbnail, ...rest } = data;
   const body = thumbnail ? { ...rest, thumbnail } : rest;
@@ -171,7 +173,7 @@ export async function getSketch(id: string): Promise<SketchFull> {
 
 export async function updateSketch(
   id: string,
-  data: { title?: string; code?: string; description?: string; thumbnail?: string | null; codeHistory?: unknown[] },
+  data: { title?: string; code?: string; description?: string; thumbnail?: string | null; codeHistory?: unknown[]; files?: SketchFile[]; libraries?: Library[] },
 ): Promise<SketchFull> {
   const { thumbnail, ...rest } = data;
   const body = thumbnail ? { ...rest, thumbnail } : rest;
@@ -233,6 +235,8 @@ export interface ChatRequest {
   history: Message[];
   config: Omit<LLMConfig, 'apiKey'> & { apiKey?: string };
   images?: ImageAttachment[];
+  files?: { name: string; content: string }[];
+  libraries?: { name: string; url: string }[];
 }
 
 export async function* streamChat(request: ChatRequest, signal?: AbortSignal): AsyncGenerator<string> {

@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import { getSketch } from '../../services/api';
 import { useSketches, useCreateSketch, useDeleteSketch } from '../../hooks/useSketches';
 import { guardUnsaved } from '../../utils/unsavedGuard';
+import { createDefaultFiles } from '../../constants/defaultFiles';
 
 export function SketchesGrid() {
   const user = useAuthStore((s) => s.user);
@@ -25,6 +26,10 @@ export function SketchesGrid() {
     try {
       const sketch = await getSketch(id);
       const { runTrigger } = useEditorStore.getState();
+      const sketchFiles = sketch.files && sketch.files.length > 0
+        ? sketch.files
+        : createDefaultFiles(sketch.code);
+      const sketchLibraries = sketch.libraries ?? [];
       useEditorStore.setState({
         code: sketch.code,
         lastSavedCode: sketch.code,
@@ -37,6 +42,11 @@ export function SketchesGrid() {
         messages: [],
         appliedBlocks: {},
         showSuggestion: false,
+        files: sketchFiles,
+        lastSavedFiles: sketchFiles.map((f) => ({ ...f })),
+        activeFileName: 'sketch.js',
+        libraries: sketchLibraries,
+        lastSavedLibraries: [...sketchLibraries],
         ...(sketch.codeHistory ? { codeHistory: sketch.codeHistory } : {}),
       });
       setSketchMeta(sketch.id, sketch.title);
@@ -56,11 +66,17 @@ export function SketchesGrid() {
   const handleDuplicate = async (id: string) => {
     try {
       const sketch = await getSketch(id);
+      const sketchFiles = sketch.files && sketch.files.length > 0
+        ? sketch.files
+        : createDefaultFiles(sketch.code);
+      const sketchLibraries = sketch.libraries ?? [];
       const saved = await createSketchMut.mutateAsync({
         title: `Copy of ${sketch.title}`,
         code: sketch.code,
         description: sketch.description || undefined,
         thumbnail: sketch.thumbnail || undefined,
+        files: sketchFiles,
+        libraries: sketchLibraries.length > 0 ? sketchLibraries : undefined,
       });
       useEditorStore.setState({
         code: saved.code,
@@ -75,6 +91,11 @@ export function SketchesGrid() {
         appliedBlocks: {},
         codeHistory: [],
         showSuggestion: false,
+        files: sketchFiles,
+        lastSavedFiles: sketchFiles.map((f) => ({ ...f })),
+        activeFileName: 'sketch.js',
+        libraries: sketchLibraries,
+        lastSavedLibraries: [...sketchLibraries],
       });
       setSketchMeta(saved.id, saved.title);
       navigate(`/sketch/${saved.id}`);

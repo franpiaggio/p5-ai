@@ -1,20 +1,13 @@
-// Template parts split to calculate line offset
-const HTML_BEFORE_CODE = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"><\/script>
-  <style>
-    body { margin: 0; padding: 0; overflow: hidden; background: #fff; }
-    canvas { display: block; }
-  </style>
-</head>
-<body>
-  <script>
+/* eslint-disable no-useless-escape */
+import type { SketchFile, Library } from '../../types';
+
+const P5_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js';
+
+/** Infrastructure script: error handling, console proxy, capture support. */
+const INFRA_SCRIPT = `
     const LINE_OFFSET = {{LINE_OFFSET}};
 
     window.onerror = (msg, url, line, col) => {
-      // Adjust line number by subtracting the template offset
       const adjustedLine = typeof line === 'number' ? line - LINE_OFFSET : null;
       parent.postMessage({
         type: 'error',
@@ -30,7 +23,6 @@ const HTML_BEFORE_CODE = `<!DOCTYPE html>
       let errorCol = null;
       const reason = event.reason;
 
-      // Try to extract line from stack trace
       if (reason && reason.stack) {
         const lines = reason.stack.split('\\n');
         for (const stackLine of lines) {
@@ -121,7 +113,74 @@ const HTML_BEFORE_CODE = `<!DOCTYPE html>
         }
       }
     });
+`;
+
+function escapeScript(code: string): string {
+  return code.replace(/<\/script/gi, '<\x2fscript');
+}
+
+/**
+ * Build preview HTML for multiple files + CDN libraries.
+ * sketch.js is always loaded last (entry point with setup()/draw()).
+ * Other files are loaded in array order before sketch.js.
+ */
+export function buildMultiFilePreviewHtml(files: SketchFile[], libraries: Library[]): string {
+  const libTags = libraries
+    .map((lib) => `  <script src="${lib.url}"><\/script>`)
+    .join('\n');
+
+  // Separate sketch.js from other files; sketch.js goes last
+  const sketchFile = files.find((f) => f.name === 'sketch.js');
+  const otherFiles = files.filter((f) => f.name !== 'sketch.js');
+
+  // Calculate line offset for sketch.js error mapping
+  // Count lines in everything before sketch.js's <script> tag
+  const headSection = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="${P5_CDN}"><\/script>
+${libTags ? libTags + '\n' : ''}  <style>
+    body { margin: 0; padding: 0; overflow: hidden; background: #fff; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script>
+${INFRA_SCRIPT}  <\/script>`;
+
+  const otherScripts = otherFiles
+    .map((f) => `  <script>/* ${f.name} */\n${escapeScript(f.content)}\n  <\/script>`)
+    .join('\n');
+
+  // Calculate line offset: lines before the sketch.js script content
+  const beforeSketch = headSection + '\n' + (otherScripts ? otherScripts + '\n' : '');
+  const lineOffset = beforeSketch.split('\n').length; // the <script> opening line for sketch.js
+
+  const sketchContent = sketchFile?.content ?? '';
+
+  return `${beforeSketch}  <script>/* sketch.js */
+${escapeScript(sketchContent)}
   <\/script>
+</body>
+</html>`.replace('{{LINE_OFFSET}}', String(lineOffset));
+}
+
+// --- Legacy single-code builder (used for history preview) ---
+
+const HTML_BEFORE_CODE = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="${P5_CDN}"><\/script>
+  <style>
+    body { margin: 0; padding: 0; overflow: hidden; background: #fff; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script>
+${INFRA_SCRIPT}  <\/script>
   <script>
 `;
 
@@ -131,8 +190,7 @@ const HTML_AFTER_CODE = `
 </html>
 `;
 
-// Calculate line offset: count newlines in HTML_BEFORE_CODE
-const LINE_OFFSET = HTML_BEFORE_CODE.split('\n').length - 1;
+const LEGACY_LINE_OFFSET = HTML_BEFORE_CODE.split('\n').length - 1;
 
 export const buildPreviewHtml = (code: string) =>
-  HTML_BEFORE_CODE.replace('{{LINE_OFFSET}}', String(LINE_OFFSET)) + code + HTML_AFTER_CODE;
+  HTML_BEFORE_CODE.replace('{{LINE_OFFSET}}', String(LEGACY_LINE_OFFSET)) + code + HTML_AFTER_CODE;

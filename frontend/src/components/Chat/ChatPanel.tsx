@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { simpleHash, extractFirstJsBlock, extractSearchReplaceBlocks, applySearchReplace, stripSearchReplaceBlocks, diffSummary } from '../../utils/codeUtils';
+import { simpleHash, extractFirstJsBlock, extractSearchReplaceBlocks, applySearchReplace, stripSearchReplaceBlocks, diffSummary, extractFileName } from '../../utils/codeUtils';
 import { streamChat, checkBackendHealth } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';
@@ -122,6 +122,10 @@ export function ChatPanel() {
       const chatConfig = hasRealKey
         ? currentState.llmConfig
         : { provider: currentState.llmConfig.provider, model: currentState.llmConfig.model };
+      const chatFiles = currentState.files.map((f) => ({ name: f.name, content: f.content }));
+      const chatLibraries = currentState.libraries.length > 0
+        ? currentState.libraries.map((l) => ({ name: l.name, url: l.url }))
+        : undefined;
       for await (const chunk of streamChat({
         message: userMessage,
         code: currentState.code,
@@ -129,6 +133,8 @@ export function ChatPanel() {
         history: currentState.messages.slice(0, -1),
         config: chatConfig,
         ...(images?.length ? { images } : {}),
+        files: chatFiles,
+        libraries: chatLibraries,
       }, abortController.signal)) {
         if (firstChunk) {
           firstChunk = false;
@@ -185,6 +191,8 @@ export function ChatPanel() {
       // Restore full message content, clear streaming, and auto-apply in one atomic update
       // to avoid a flicker frame between streaming DiffEditor and pendingDiff DiffEditor
       let jsCode: string | null = null;
+      let targetFileName: string | null = null;
+      let isNewFile = false;
       if (assistantContent) {
         const srBlocks = extractSearchReplaceBlocks(assistantContent);
         if (srBlocks) {
@@ -195,7 +203,13 @@ export function ChatPanel() {
             jsCode = extractFirstJsBlock(assistantContent);
           }
         } else {
-          jsCode = extractFirstJsBlock(assistantContent);
+          const rawBlock = extractFirstJsBlock(assistantContent);
+          if (rawBlock) {
+            const { fileName, isNew, cleanCode } = extractFileName(rawBlock);
+            targetFileName = fileName;
+            isNewFile = isNew;
+            jsCode = cleanCode;
+          }
         }
       }
 
@@ -218,12 +232,41 @@ export function ChatPanel() {
         if (state.autoApply && jsCode) {
           const lastMsg = newMessages[newMessages.length - 1];
           const blockKey = `${lastMsg.id}:${simpleHash(jsCode)}`;
+
+          // Handle new file creation from AI
+          if (isNewFile && targetFileName) {
+            const { addFile, setFileContent } = useEditorStore.getState();
+            addFile(targetFileName);
+            setFileContent(targetFileName, jsCode);
+            return { messages: newMessages, streamingCode: null };
+          }
+
+          // Handle targeting a specific existing file
+          if (targetFileName && targetFileName !== state.activeFileName) {
+            const targetFile = state.files.find((f) => f.name === targetFileName);
+            if (targetFile) {
+              const files = state.files.map((f) =>
+                f.name === targetFileName ? { ...f, content: jsCode! } : f,
+              );
+              return {
+                messages: newMessages,
+                streamingCode: null,
+                files,
+                isRunning: true,
+                runTrigger: state.runTrigger + 1,
+              };
+            }
+          }
+
           return {
             messages: newMessages,
             streamingCode: null,
-            pendingDiff: { code: jsCode, previousCode: state.code, messageId: lastMsg.id, blockKey, prompt: userMessage },
+            pendingDiff: { code: jsCode, previousCode: state.code, messageId: lastMsg.id, blockKey, prompt: userMessage, fileName: targetFileName ?? undefined },
             previewCode: null,
             code: jsCode,
+            files: state.files.map((f) =>
+              f.name === state.activeFileName ? { ...f, content: jsCode! } : f,
+            ),
             isRunning: true,
             runTrigger: state.runTrigger + 1,
           };

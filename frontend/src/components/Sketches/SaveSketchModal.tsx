@@ -9,6 +9,8 @@ export function SaveSketchModal() {
   const isSaveSketchOpen = useAuthStore((s) => s.isSaveSketchOpen);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
   const code = useEditorStore((s) => s.code);
+  const files = useEditorStore((s) => s.files);
+  const libraries = useEditorStore((s) => s.libraries);
   const sketchTitle = useEditorStore((s) => s.sketchTitle);
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
   const createSketchMut = useCreateSketch();
@@ -47,6 +49,8 @@ export function SaveSketchModal() {
         code,
         description: description.trim() || undefined,
         thumbnail,
+        files,
+        libraries: libraries.length > 0 ? libraries : undefined,
       });
       setSketchMeta(saved.id, saved.title);
       useEditorStore.getState().markCodeSaved();

@@ -25,10 +25,7 @@ export class SketchesController {
 
   @Post()
   @UseGuards(AuthGuard)
-  create(
-    @CurrentUser() user: { sub: string },
-    @Body() dto: CreateSketchDto,
-  ) {
+  create(@CurrentUser() user: { sub: string }, @Body() dto: CreateSketchDto) {
     return this.sketchesService.create(user.sub, dto);
   }
 
@@ -40,10 +37,7 @@ export class SketchesController {
 
   @Get(':id')
   @UseGuards(AuthGuard)
-  findOne(
-    @Param('id') id: string,
-    @CurrentUser() user: { sub: string },
-  ) {
+  findOne(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
     return this.sketchesService.findOne(id, user.sub);
   }
 
@@ -59,10 +53,7 @@ export class SketchesController {
 
   @Delete(':id')
   @UseGuards(AuthGuard)
-  remove(
-    @Param('id') id: string,
-    @CurrentUser() user: { sub: string },
-  ) {
+  remove(@Param('id') id: string, @CurrentUser() user: { sub: string }) {
     return this.sketchesService.remove(id, user.sub);
   }
 }

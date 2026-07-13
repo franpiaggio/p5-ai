@@ -4,7 +4,9 @@ import type { LLMProvider, LLMMessage } from './llm.interface';
 
 @Injectable()
 export class OpenAIProvider implements LLMProvider {
-  private buildContent(msg: LLMMessage): string | OpenAI.ChatCompletionContentPart[] {
+  private buildContent(
+    msg: LLMMessage,
+  ): string | OpenAI.ChatCompletionContentPart[] {
     if (!msg.images?.length) return msg.content;
     const parts: OpenAI.ChatCompletionContentPart[] = [
       { type: 'text', text: msg.content },
@@ -76,7 +78,11 @@ export class OpenAIProvider implements LLMProvider {
     if (msg.includes('insufficient_quota') || msg.includes('billing')) {
       return 'OpenAI API: Insufficient credits. Please check your billing at platform.openai.com';
     }
-    if (msg.includes('invalid api key') || msg.includes('authentication') || msg.includes('incorrect api key')) {
+    if (
+      msg.includes('invalid api key') ||
+      msg.includes('authentication') ||
+      msg.includes('incorrect api key')
+    ) {
       return 'OpenAI API: Invalid API key. Please check your key in Settings.';
     }
     if (msg.includes('rate limit')) {
