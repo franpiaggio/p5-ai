@@ -360,6 +360,33 @@ export function ChatPanel() {
       )}
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 flex flex-col">
         <div className="flex-1 flex flex-col space-y-2">
+          {messages.length === 0 && !chatDisabled && (
+            <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 px-4 py-6">
+              <div className="w-9 h-9 grid place-items-center rounded-xl bg-accent/10 text-accent">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2l2.4 6.9L21 11l-6.6 2.1L12 20l-2.4-6.9L3 11l6.6-2.1z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-text-primary">Describe a change, watch it happen</h4>
+                <p className="text-[11px] text-text-muted/70 mt-1 max-w-[34ch] mx-auto">
+                  Ask for a new behaviour or a tweak. Edits arrive as a diff you approve.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                {['make it a spiral galaxy', 'slow the motion down', 'shift the palette to teal'].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => sendMessage(p)}
+                    className="text-[11px] font-mono text-text-muted border border-border/50 bg-raised px-2.5 py-1 rounded-full hover:border-accent hover:text-text-primary transition-colors cursor-pointer"
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {messages.map((msg, idx) => {
             if (showTypingIndicator && idx === messages.length - 1 && msg.role === 'assistant' && !msg.content) {
               return <TypingIndicator key={msg.id} />;

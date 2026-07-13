@@ -107,16 +107,10 @@ export function SketchesGrid() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate('/examples')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded bg-border/30 text-text-muted hover:text-text-primary hover:bg-border/50 transition-colors cursor-pointer"
-          >
+          <button onClick={() => navigate('/examples')} className="btn-secondary btn-sm">
             Explore Examples
           </button>
-          <button
-            onClick={handleNewSketch}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded bg-accent text-white hover:bg-accent/80 transition-colors cursor-pointer"
-          >
+          <button onClick={handleNewSketch} className="btn-primary btn-sm">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
@@ -128,18 +122,24 @@ export function SketchesGrid() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         {loading && (
-          <p className="text-text-muted/50 text-xs text-center py-16">
-            Loading...
-          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-panel rounded-lg border border-border/30 overflow-hidden">
+                <div className="skeleton w-full aspect-[4/3] rounded-none" />
+                <div className="p-3 flex flex-col gap-2">
+                  <div className="skeleton h-3.5 w-2/3" />
+                  <div className="skeleton h-2.5 w-full" />
+                  <div className="skeleton h-2.5 w-1/3 mt-1" />
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
         {!loading && sketches.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-text-muted/30 text-sm mb-4">No sketches yet</p>
-            <button
-              onClick={handleNewSketch}
-              className="px-4 py-2 text-xs rounded bg-accent text-white hover:bg-accent/80 transition-colors cursor-pointer"
-            >
+            <p className="text-text-muted/60 text-sm mb-4">No sketches yet</p>
+            <button onClick={handleNewSketch} className="btn-primary btn-sm mx-auto">
               Create your first sketch
             </button>
           </div>
@@ -188,21 +188,18 @@ export function SketchesGrid() {
                     {new Date(sketch.updatedAt).toLocaleDateString()}
                   </p>
                   <div className="flex gap-2 mt-3 pt-3 border-t border-border/20">
-                    <button
-                      onClick={() => handleLoad(sketch.id)}
-                      className="px-3 py-1.5 text-[11px] rounded bg-info/10 text-info hover:bg-info/20 transition-colors cursor-pointer"
-                    >
+                    <button onClick={() => handleLoad(sketch.id)} className="btn-secondary btn-sm">
                       Load
                     </button>
                     <button
                       onClick={() => handleDuplicate(sketch.id)}
-                      className="px-3 py-1.5 text-[11px] rounded bg-info/10 text-info hover:bg-info/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                      className="btn-ghost btn-sm opacity-0 group-hover:opacity-100"
                     >
                       Duplicate
                     </button>
                     <button
                       onClick={() => handleDelete(sketch.id)}
-                      className="px-3 py-1.5 text-[11px] rounded bg-error/10 text-error hover:bg-error/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                      className="btn-danger btn-sm opacity-0 group-hover:opacity-100"
                     >
                       Delete
                     </button>

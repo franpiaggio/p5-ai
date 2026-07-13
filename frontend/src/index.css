@@ -230,13 +230,58 @@ select option {
          placeholder:text-text-muted/50;
 }
 
+/* Button system — one vocabulary. Compose a variant with the optional `btn-sm`
+   size. Grids/dialogs should use these instead of inline bg/text combinations. */
 .btn-primary {
-  @apply bg-accent hover:bg-accent/85 text-on-accent px-4 py-2 rounded-lg text-sm
-         font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed;
+  @apply inline-flex items-center justify-center gap-1.5 bg-accent hover:bg-accent/85 text-on-accent
+         px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer
+         disabled:opacity-30 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-1.5 bg-raised text-text-primary border border-border/60
+         hover:border-accent px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer
+         disabled:opacity-30 disabled:cursor-not-allowed;
+}
+
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-1.5 text-text-muted hover:text-text-primary hover:bg-raised
+         px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer
+         disabled:opacity-30 disabled:cursor-not-allowed;
+}
+
+.btn-danger {
+  @apply inline-flex items-center justify-center gap-1.5 bg-error/10 text-error border border-error/25
+         hover:bg-error/20 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer
+         disabled:opacity-30 disabled:cursor-not-allowed;
+}
+
+/* Compact size modifier (place after a variant class). */
+.btn-sm {
+  @apply px-3 py-1.5 text-xs gap-1 rounded-md;
 }
 
 .btn-icon {
   @apply w-8 h-8 rounded-md flex items-center justify-center transition-all duration-150;
+}
+
+/* Skeleton shimmer for loading placeholders. */
+.skeleton {
+  @apply rounded-md bg-raised relative overflow-hidden;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-text-muted) 8%, transparent), transparent);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer {
+  100% { transform: translateX(100%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; }
 }
 
 .dropdown-menu {
