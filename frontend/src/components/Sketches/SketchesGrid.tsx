@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
@@ -12,6 +13,8 @@ export function SketchesGrid() {
   const createSketchMut = useCreateSketch();
   const deleteSketchMut = useDeleteSketch();
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
+  // Id of the sketch pending an inline delete confirmation (replaces window.confirm).
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // All hooks must run before any early return (Rules of Hooks): if `user` flips
   // to null while this route is mounted (e.g. a 401 triggers logout), an early
@@ -45,9 +48,9 @@ export function SketchesGrid() {
 
   const handleLoad = (id: string) => guardUnsaved(() => loadSketch(id));
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Delete this sketch?')) return;
+  const confirmDelete = (id: string) => {
     deleteSketchMut.mutate(id);
+    setConfirmDeleteId(null);
   };
 
   const handleDuplicate = async (id: string) => {
@@ -188,21 +191,35 @@ export function SketchesGrid() {
                     {new Date(sketch.updatedAt).toLocaleDateString()}
                   </p>
                   <div className="flex gap-2 mt-3 pt-3 border-t border-border/20">
-                    <button onClick={() => handleLoad(sketch.id)} className="btn-secondary btn-sm">
-                      Load
-                    </button>
-                    <button
-                      onClick={() => handleDuplicate(sketch.id)}
-                      className="btn-ghost btn-sm opacity-0 group-hover:opacity-100"
-                    >
-                      Duplicate
-                    </button>
-                    <button
-                      onClick={() => handleDelete(sketch.id)}
-                      className="btn-danger btn-sm opacity-0 group-hover:opacity-100"
-                    >
-                      Delete
-                    </button>
+                    {confirmDeleteId === sketch.id ? (
+                      <>
+                        <span className="text-[11px] text-text-muted self-center mr-auto">Delete this sketch?</span>
+                        <button onClick={() => setConfirmDeleteId(null)} className="btn-ghost btn-sm">
+                          Cancel
+                        </button>
+                        <button onClick={() => confirmDelete(sketch.id)} className="btn-danger btn-sm">
+                          Delete
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => handleLoad(sketch.id)} className="btn-secondary btn-sm">
+                          Load
+                        </button>
+                        <button
+                          onClick={() => handleDuplicate(sketch.id)}
+                          className="btn-ghost btn-sm opacity-0 group-hover:opacity-100"
+                        >
+                          Duplicate
+                        </button>
+                        <button
+                          onClick={() => setConfirmDeleteId(sketch.id)}
+                          className="btn-danger btn-sm opacity-0 group-hover:opacity-100"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

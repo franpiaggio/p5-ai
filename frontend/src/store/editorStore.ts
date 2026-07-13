@@ -377,10 +377,10 @@ export const useEditorStore = create<EditorState>()(
         const provider = state.llmConfig.provider as keyof ProviderKeys;
         state.llmConfig = { ...state.llmConfig, apiKey: keys[provider] ?? '' };
         if (!state.sketchId) {
-          state.code = DEFAULT_CODE;
-          state.codeHistory = [];
-          state.sketchTitle = 'Untitled Sketch';
-          state.showSuggestion = true;
+          // Unsaved scratchpad: keep the persisted code, history and title so
+          // work survives a reload instead of resetting to the default sketch.
+          // Only offer the example suggestion when nothing has been written yet.
+          state.showSuggestion = state.code === DEFAULT_CODE;
         } else {
           state.showSuggestion = false;
           // When auto-save is off, discard unsaved edits on reload

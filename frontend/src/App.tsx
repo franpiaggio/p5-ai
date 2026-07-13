@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Toolbar, SettingsModal } from './components';
-import { ProfileModal } from './components/Sketches/ProfileModal';
 import { SaveSketchModal } from './components/Sketches/SaveSketchModal';
 import { LoginModal } from './components/Auth/LoginModal';
 import { useEditorStore } from './store/editorStore';
@@ -84,7 +83,6 @@ function App() {
       <Outlet />
       <SettingsModal />
       <LoginModal />
-      <ProfileModal />
       <SaveSketchModal />
       <UnsavedChangesDialog />
     </div>
