@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { LoginButton } from './GoogleLoginButton';
@@ -116,6 +117,7 @@ function PlayStopButtons() {
 }
 
 export function Toolbar() {
+  const navigate = useNavigate();
   const sketchId = useEditorStore((s) => s.sketchId);
   const sketchTitle = useEditorStore((s) => s.sketchTitle);
   const code = useEditorStore((s) => s.code);
@@ -173,7 +175,7 @@ export function Toolbar() {
           Alt+Enter to run
         </span>
         <button
-          onClick={() => useEditorStore.getState().setCurrentPage('examples')}
+          onClick={() => navigate('/examples')}
           className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono text-text-muted hover:text-info hover:bg-border/40 rounded transition-colors cursor-pointer"
           title="Browse examples"
         >

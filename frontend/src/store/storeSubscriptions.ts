@@ -4,43 +4,13 @@ import { updateSketch } from '../services/api';
 // Sync sketchId to URL (only when on editor page)
 let prevSketchId = useEditorStore.getState().sketchId;
 useEditorStore.subscribe((state) => {
-  if (state.currentPage !== 'editor') return;
+  const path = window.location.pathname;
+  const isEditorPage = path === '/' || path.startsWith('/sketch/');
+  if (!isEditorPage) return;
   const id = state.sketchId;
   if (id === prevSketchId) return;
   prevSketchId = id;
   history.replaceState(null, '', id ? `/sketch/${id}` : '/');
-});
-
-// Sync currentPage to URL
-let prevPage = useEditorStore.getState().currentPage;
-let fromPopState = false;
-useEditorStore.subscribe((state) => {
-  if (state.currentPage === prevPage) return;
-  prevPage = state.currentPage;
-  if (fromPopState) return;
-  if (state.currentPage === 'sketches') {
-    history.pushState(null, '', '/sketches');
-  } else if (state.currentPage === 'examples') {
-    history.pushState(null, '', '/examples');
-  } else {
-    const id = state.sketchId;
-    history.pushState(null, '', id ? `/sketch/${id}` : '/');
-    prevSketchId = id;
-  }
-});
-
-// Handle browser back/forward button
-window.addEventListener('popstate', () => {
-  fromPopState = true;
-  const path = window.location.pathname;
-  if (path === '/sketches') {
-    useEditorStore.setState({ currentPage: 'sketches' });
-  } else if (path === '/examples') {
-    useEditorStore.setState({ currentPage: 'examples' });
-  } else {
-    useEditorStore.setState({ currentPage: 'editor' });
-  }
-  fromPopState = false;
 });
 
 // Sync providerKeys to sessionStorage (backend save happens on Settings close)

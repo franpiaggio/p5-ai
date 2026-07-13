@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { useUpdateSketch, useCreateSketch } from '../../hooks/useSketches';
@@ -7,6 +8,7 @@ import { guardUnsaved } from '../../utils/unsavedGuard';
 
 
 export function FileMenu() {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const updateSketchMut = useUpdateSketch();
@@ -156,7 +158,7 @@ export function FileMenu() {
             <>
               <div className="dropdown-separator" />
               <button
-                onClick={() => { setIsOpen(false); useEditorStore.getState().setCurrentPage('sketches'); }}
+                onClick={() => { setIsOpen(false); navigate('/sketches'); }}
                 className="dropdown-item"
               >
                 My Sketches

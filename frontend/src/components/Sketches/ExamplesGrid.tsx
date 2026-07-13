@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { SKETCH_EXAMPLES } from '../../data/sketchExamples';
@@ -108,6 +109,7 @@ function ExamplePreview({ code }: { code: string }) {
 }
 
 export function ExamplesGrid() {
+  const navigate = useNavigate();
   const shuffled = useMemo(() => shuffle(SKETCH_EXAMPLES), []);
   const user = useAuthStore((s) => s.user);
 
@@ -129,13 +131,13 @@ export function ExamplesGrid() {
         messages: [],
         appliedBlocks: {},
         codeHistory: [],
-        currentPage: 'editor',
         showSuggestion: false,
       });
+      navigate('/');
     });
   };
 
-  const goBack = () => useEditorStore.getState().setCurrentPage('editor');
+  const goBack = () => navigate('/');
 
   return (
     <div className="h-dvh bg-surface flex flex-col">
@@ -158,7 +160,7 @@ export function ExamplesGrid() {
         </div>
         {user && (
           <button
-            onClick={() => useEditorStore.getState().setCurrentPage('sketches')}
+            onClick={() => navigate('/sketches')}
             className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono rounded bg-border/30 text-text-muted hover:text-text-primary hover:bg-border/50 transition-colors cursor-pointer"
           >
             My Sketches
@@ -170,10 +172,12 @@ export function ExamplesGrid() {
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
           {shuffled.map((example, idx) => (
-            <div
+            <button
               key={idx}
+              type="button"
               onClick={() => loadExample(idx)}
-              className="bg-panel rounded-lg border border-border/30 hover:border-info/30 transition-colors group flex flex-col overflow-hidden cursor-pointer"
+              aria-label={`Load ${example.label}`}
+              className="bg-panel rounded-lg border border-border/30 hover:border-info/30 transition-colors group flex flex-col overflow-hidden cursor-pointer text-left"
             >
               <ExamplePreview code={example.code} />
               <div className="p-3">
@@ -184,7 +188,7 @@ export function ExamplesGrid() {
                   {example.prompt}
                 </p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>

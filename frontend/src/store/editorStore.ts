@@ -57,7 +57,6 @@ interface EditorState {
   editorTheme: string;
   editorLanguage: EditorLanguage;
   transpiler: ((code: string) => Promise<string>) | null;
-  currentPage: 'editor' | 'sketches' | 'examples';
   providerKeys: ProviderKeys;
   storeApiKeys: boolean;
   streamingCode: string | null;
@@ -94,7 +93,6 @@ interface EditorState {
   setEditorTheme: (theme: string) => void;
   setEditorLanguage: (language: EditorLanguage) => void;
   setTranspiler: (transpiler: ((code: string) => Promise<string>) | null) => void;
-  setCurrentPage: (page: 'editor' | 'sketches' | 'examples') => void;
   setProviderKey: (provider: LLMConfig['provider'], key: string) => void;
   clearProviderKey: (provider: LLMConfig['provider']) => void;
   setStoreApiKeys: (store: boolean) => void;
@@ -138,7 +136,6 @@ export const useEditorStore = create<EditorState>()(
       editorTheme: 'p5-dark',
       editorLanguage: 'javascript' as EditorLanguage,
       transpiler: null,
-      currentPage: 'editor' as const,
       providerKeys: {} as ProviderKeys,
       storeApiKeys: false,
       streamingCode: null,
@@ -286,7 +283,6 @@ export const useEditorStore = create<EditorState>()(
       setEditorTheme: (editorTheme) => set({ editorTheme }),
       setEditorLanguage: (editorLanguage) => set({ editorLanguage }),
       setTranspiler: (transpiler) => set({ transpiler }),
-      setCurrentPage: (currentPage) => set({ currentPage }),
       setProviderKey: (provider, key) =>
         set((state) => {
           const providerKeys = { ...state.providerKeys, [provider]: key };

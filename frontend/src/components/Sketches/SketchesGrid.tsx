@@ -1,13 +1,22 @@
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useEditorStore } from '../../store/editorStore';
+import { useAuthStore } from '../../store/authStore';
 import { getSketch } from '../../services/api';
 import { useSketches, useCreateSketch, useDeleteSketch } from '../../hooks/useSketches';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 
 export function SketchesGrid() {
+  const user = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
   const { data: sketches = [], isLoading: loading } = useSketches();
   const createSketchMut = useCreateSketch();
   const deleteSketchMut = useDeleteSketch();
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
+
+  // All hooks must run before any early return (Rules of Hooks): if `user` flips
+  // to null while this route is mounted (e.g. a 401 triggers logout), an early
+  // return placed above these hooks would change the hook count and crash React.
+  if (!user) return <Navigate to="/" replace />;
 
   const loadSketch = async (id: string) => {
     try {
@@ -28,7 +37,7 @@ export function SketchesGrid() {
         ...(sketch.codeHistory ? { codeHistory: sketch.codeHistory } : {}),
       });
       setSketchMeta(sketch.id, sketch.title);
-      useEditorStore.getState().setCurrentPage('editor');
+      navigate(`/sketch/${sketch.id}`);
     } catch (error) {
       console.error('Failed to load sketch:', error);
     }
@@ -65,17 +74,17 @@ export function SketchesGrid() {
         showSuggestion: false,
       });
       setSketchMeta(saved.id, saved.title);
-      useEditorStore.getState().setCurrentPage('editor');
+      navigate(`/sketch/${saved.id}`);
     } catch (error) {
       console.error('Failed to duplicate sketch:', error);
     }
   };
 
-  const goBack = () => useEditorStore.getState().setCurrentPage('editor');
+  const goBack = () => navigate('/');
 
   const handleNewSketch = () => guardUnsaved(() => {
     useEditorStore.getState().newSketch();
-    useEditorStore.getState().setCurrentPage('editor');
+    navigate('/');
   });
 
   return (
@@ -99,7 +108,7 @@ export function SketchesGrid() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => useEditorStore.getState().setCurrentPage('examples')}
+            onClick={() => navigate('/examples')}
             className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono rounded bg-border/30 text-text-muted hover:text-text-primary hover:bg-border/50 transition-colors cursor-pointer"
           >
             Explore Examples
@@ -144,9 +153,11 @@ export function SketchesGrid() {
                 className="bg-panel rounded-lg border border-border/30 hover:border-info/30 transition-colors group flex flex-col overflow-hidden"
               >
                 {/* Thumbnail */}
-                <div
-                  className="w-full aspect-[4/3] bg-surface-alt relative overflow-hidden cursor-pointer"
+                <button
+                  type="button"
+                  className="w-full aspect-[4/3] bg-surface-alt relative overflow-hidden cursor-pointer block"
                   onClick={() => handleLoad(sketch.id)}
+                  aria-label={`Open ${sketch.title}`}
                 >
                   {sketch.thumbnail ? (
                     <img
@@ -161,7 +172,7 @@ export function SketchesGrid() {
                       </svg>
                     </div>
                   )}
-                </div>
+                </button>
 
                 {/* Info */}
                 <div className="p-3 flex flex-col flex-1">
@@ -169,11 +180,11 @@ export function SketchesGrid() {
                     {sketch.title}
                   </h3>
                   {sketch.description && (
-                    <p className="text-[11px] font-mono text-text-muted/40 mt-1 line-clamp-2">
+                    <p className="text-[11px] font-mono text-text-muted/60 mt-1 line-clamp-2">
                       {sketch.description}
                     </p>
                   )}
-                  <p className="text-[10px] font-mono text-text-muted/30 mt-2">
+                  <p className="text-[10px] font-mono text-text-muted/50 mt-2">
                     {new Date(sketch.updatedAt).toLocaleDateString()}
                   </p>
                   <div className="flex gap-2 mt-3 pt-3 border-t border-border/20">

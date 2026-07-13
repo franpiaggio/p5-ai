@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { useEditorStore } from '../../store/editorStore';
 import { logoutApi } from '../../services/api';
 
 export function UserMenu() {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -25,6 +26,7 @@ export function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
+        aria-label="Account menu"
         className="w-8 h-8 rounded-full overflow-hidden border-2 border-transparent hover:border-info/50 transition-colors cursor-pointer"
       >
         {user.picture ? (
@@ -53,7 +55,7 @@ export function UserMenu() {
           </div>
           <button
             onClick={() => {
-              useEditorStore.getState().setCurrentPage('sketches');
+              navigate('/sketches');
               setIsOpen(false);
             }}
             className="dropdown-item"

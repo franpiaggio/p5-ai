@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { logoutApi } from '../../services/api';
@@ -9,6 +10,7 @@ import { EDITOR_THEMES } from '../Editor/editorConfig';
 import type { EditorLanguage } from '../../store/editorStore';
 
 export function MobileMenu() {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const updateSketchMut = useUpdateSketch();
@@ -97,7 +99,7 @@ export function MobileMenu() {
 
   const handleSketches = () => {
     close();
-    useEditorStore.getState().setCurrentPage('sketches');
+    navigate('/sketches');
   };
 
   const handleSignIn = () => {
@@ -132,7 +134,7 @@ export function MobileMenu() {
             New Sketch
           </button>
           <button
-            onClick={() => { close(); useEditorStore.getState().setCurrentPage('examples'); }}
+            onClick={() => { close(); navigate('/examples'); }}
             className={menuItemClass}
           >
             Examples
@@ -187,6 +189,7 @@ export function MobileMenu() {
                   const prev = (idx - 1 + EDITOR_THEMES.length) % EDITOR_THEMES.length;
                   setEditorTheme(EDITOR_THEMES[prev].id);
                 }}
+                aria-label="Previous theme"
                 className="p-1 text-text-muted/50 hover:text-text-primary transition-colors"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -202,6 +205,7 @@ export function MobileMenu() {
                   const next = (idx + 1) % EDITOR_THEMES.length;
                   setEditorTheme(EDITOR_THEMES[next].id);
                 }}
+                aria-label="Next theme"
                 className="p-1 text-text-muted/50 hover:text-text-primary transition-colors"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
