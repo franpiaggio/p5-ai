@@ -86,6 +86,7 @@ export function ChatPanel() {
   const sendMessage = useCallback(async (userMessage: string, images?: ImageAttachment[]) => {
     const store = useEditorStore.getState();
     if (!userMessage.trim() || store.isLoading) return;
+    useEditorStore.setState({ showSuggestion: false });
 
     const authUser = useAuthStore.getState().user;
     const serverCanResolve = store.storeApiKeys && !!authUser;
@@ -268,13 +269,32 @@ export function ChatPanel() {
     useEditorStore.setState((state) => {
       const lastMsg = state.messages[state.messages.length - 1];
       const blockKey = `${lastMsg.id}:${simpleHash(example.code)}`;
+      // Auto-apply the example directly: push to history and mark the block as
+      // applied instead of leaving a blocking pendingDiff, so the user can keep
+      // iterating on the sketch via chat right away.
       return {
-        pendingDiff: { code: example.code, previousCode: state.code, messageId: lastMsg.id, blockKey, prompt: example.prompt },
+        codeHistory: [
+          ...state.codeHistory,
+          {
+            id: `change-example-${lastMsg.id}`,
+            messageId: lastMsg.id,
+            timestamp: Date.now(),
+            previousCode: state.code,
+            newCode: example.code,
+            summary: diffSummary(state.code, example.code),
+            prompt: example.prompt,
+          },
+        ],
+        appliedBlocks: { ...state.appliedBlocks, [blockKey]: true as const },
+        pendingDiff: null,
         previewCode: null,
         code: example.code,
         lastSavedCode: example.code,
         isRunning: true,
         runTrigger: state.runTrigger + 1,
+        // Move the suggestion card into its "applied" phase (Keep it / New one).
+        exampleApplied: true,
+        exampleAppliedLabel: example.label,
       };
     });
   }, [addMessage]);
@@ -317,7 +337,7 @@ export function ChatPanel() {
         <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-error/10 border border-error/20 flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-error shrink-0" />
           <p className="text-error text-[11px] font-mono">
-            Backend unavailable &mdash; chat is disabled. The editor still works normally.
+            Backend unavailable. Chat is disabled, but the editor still works normally.
           </p>
         </div>
       )}
@@ -338,15 +358,9 @@ export function ChatPanel() {
           </p>
         </div>
       )}
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 space-y-2">
-        {messages.length === 0 && showSuggestion ? (
-          <div className="flex flex-col items-center justify-end h-full gap-3 text-center px-4 pb-3">
-            <div className="w-full max-w-xs">
-              <SketchSuggestion onSelect={handleExampleSelect} />
-            </div>
-          </div>
-        ) : (
-          messages.map((msg, idx) => {
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 flex flex-col">
+        <div className="flex-1 flex flex-col space-y-2">
+          {messages.map((msg, idx) => {
             if (showTypingIndicator && idx === messages.length - 1 && msg.role === 'assistant' && !msg.content) {
               return <TypingIndicator key={msg.id} />;
             }
@@ -354,14 +368,21 @@ export function ChatPanel() {
               <MessageBubble
                 key={msg.id}
                 msg={msg}
-                isLastMessage={idx === messages.length - 1}
-                isLoading={isLoading}
+                isGenerating={isLoading && idx === messages.length - 1}
               />
             );
-          })
+          })}
+          {streamingCode !== null && <GeneratingCodeIndicator onCancel={cancelStreaming} />}
+          {pendingDiff && !isMobile && <PendingDiffBanner />}
+        </div>
+        {showSuggestion && (
+          <div className="w-full max-w-xs mx-auto mt-3 pt-1">
+            <SketchSuggestion
+              onSelect={handleExampleSelect}
+              onKeep={() => useEditorStore.setState({ showSuggestion: false, exampleApplied: false, exampleAppliedLabel: null })}
+            />
+          </div>
         )}
-        {streamingCode !== null && <GeneratingCodeIndicator onCancel={cancelStreaming} />}
-        {pendingDiff && !isMobile && <PendingDiffBanner />}
         <div ref={messagesEndRef} />
       </div>
     </ChatInput>

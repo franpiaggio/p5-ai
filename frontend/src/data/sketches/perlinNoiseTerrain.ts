@@ -8,7 +8,7 @@ const SCL = 20;
 let flying = 0;
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+  createCanvas(windowWidth, windowHeight, WEBGL);
   cols = ceil(width / SCL) + 1;
   rows = 30;
 }
@@ -20,7 +20,7 @@ function draw() {
   stroke(80, 160, 200, 120);
   strokeWeight(0.8);
 
-  translate(0, height * 0.6);
+  translate(0, height * 0.15);
   rotateX(PI / 3);
 
   let terrain = [];

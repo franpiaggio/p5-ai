@@ -63,6 +63,11 @@ interface EditorState {
   lastSavedCode: string;
   pendingNavigation: (() => void) | null;
   showSuggestion: boolean;
+  // Example-suggestion flow: false = offer phase (single "Generate"),
+  // true = applied phase (offer "Keep it" / "New one"). Kept in the store so
+  // it survives ChatPanel unmount/remount when switching bottom tabs.
+  exampleApplied: boolean;
+  exampleAppliedLabel: string | null;
 
   setCode: (code: string) => void;
   setIsRunning: (running: boolean) => void;
@@ -142,6 +147,8 @@ export const useEditorStore = create<EditorState>()(
       lastSavedCode: DEFAULT_CODE,
       pendingNavigation: null,
       showSuggestion: true,
+      exampleApplied: false,
+      exampleAppliedLabel: null,
 
       setCode: (code) =>
         set((state) => ({
@@ -272,7 +279,8 @@ export const useEditorStore = create<EditorState>()(
       setPreviewCode: (previewCode) =>
         set((state) => ({
           previewCode,
-          ...(previewCode ? { isRunning: true, runTrigger: state.runTrigger + 1 } : { isRunning: true, runTrigger: state.runTrigger + 1 }),
+          isRunning: true,
+          runTrigger: state.runTrigger + 1,
         })),
 
       clearCodeHistory: () => set({ codeHistory: [] }),
@@ -317,6 +325,8 @@ export const useEditorStore = create<EditorState>()(
           isRunning: true,
           runTrigger: state.runTrigger + 1,
           showSuggestion: true,
+          exampleApplied: false,
+          exampleAppliedLabel: null,
         })),
     }),
     {
@@ -329,7 +339,11 @@ export const useEditorStore = create<EditorState>()(
           model: state.llmConfig.model,
           apiKey: '',
         },
-        codeHistory: state.codeHistory,
+        // Cap persisted history: each entry holds full previous+new code, so an
+        // unbounded array can blow localStorage's ~5MB quota — and a thrown
+        // QuotaExceededError from zustand's persist write silently drops the
+        // whole persisted state (code, config, key prefs). Keep the most recent.
+        codeHistory: state.codeHistory.slice(-20),
         autoApply: state.autoApply,
         autoSave: state.autoSave,
         editorTheme: state.editorTheme,
