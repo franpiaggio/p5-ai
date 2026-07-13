@@ -1,6 +1,6 @@
 FROM node:20-alpine AS builder
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
 
 # better-sqlite3 and bcrypt need native compilation
 RUN apk add --no-cache python3 make g++
