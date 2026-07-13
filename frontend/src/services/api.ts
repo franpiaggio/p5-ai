@@ -2,6 +2,42 @@ import type { LLMConfig, Message, ImageAttachment, SketchSummary, SketchFull } f
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
+// --- Error handling / session ---
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message?: string) {
+    super(message || `HTTP ${status}`);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+type UnauthorizedHandler = () => void;
+let onUnauthorized: UnauthorizedHandler | null = null;
+
+/** Register a global handler invoked whenever an authenticated request returns 401. */
+export function setUnauthorizedHandler(fn: UnauthorizedHandler | null): void {
+  onUnauthorized = fn;
+}
+
+/**
+ * fetch() wrapper for authenticated endpoints. Always sends the auth cookie and,
+ * on a 401 (expired/invalid session), fires the global unauthorized handler and
+ * throws an ApiError so callers can react to session expiry.
+ */
+async function authFetch(path: string, init?: RequestInit): Promise<Response> {
+  const response = await fetch(`${API_BASE}${path}`, {
+    credentials: 'include',
+    ...init,
+  });
+  if (response.status === 401) {
+    onUnauthorized?.();
+    throw new ApiError(401, 'Session expired');
+  }
+  return response;
+}
+
 // --- Auth ---
 
 export async function loginWithGoogle(
@@ -47,18 +83,15 @@ export async function getProfile(): Promise<{
   picture?: string;
   storeApiKeys: boolean;
 }> {
-  const response = await fetch(`${API_BASE}/users/me`, {
-    credentials: 'include',
-  });
+  const response = await authFetch(`/users/me`);
   if (!response.ok) throw new Error('Failed to fetch profile');
   return response.json();
 }
 
 export async function updatePreferences(prefs: { storeApiKeys: boolean }): Promise<void> {
-  await fetch(`${API_BASE}/users/me/preferences`, {
+  await authFetch(`/users/me/preferences`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(prefs),
   });
 }
@@ -66,19 +99,16 @@ export async function updatePreferences(prefs: { storeApiKeys: boolean }): Promi
 // --- API Keys (per-provider) ---
 
 export async function saveProviderKey(provider: string, apiKey: string): Promise<void> {
-  await fetch(`${API_BASE}/users/me/api-keys/${provider}`, {
+  await authFetch(`/users/me/api-keys/${provider}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify({ apiKey }),
   });
 }
 
 export async function getProviderKeys(): Promise<Record<string, string>> {
   try {
-    const response = await fetch(`${API_BASE}/users/me/api-keys`, {
-      credentials: 'include',
-    });
+    const response = await authFetch(`/users/me/api-keys`);
     if (!response.ok) return {};
     const data = await response.json();
     return data.keys ?? {};
@@ -88,9 +118,8 @@ export async function getProviderKeys(): Promise<Record<string, string>> {
 }
 
 export async function clearProviderKey(provider: string): Promise<void> {
-  await fetch(`${API_BASE}/users/me/api-keys/${provider}`, {
+  await authFetch(`/users/me/api-keys/${provider}`, {
     method: 'DELETE',
-    credentials: 'include',
   });
 }
 
@@ -104,10 +133,9 @@ export async function createSketch(data: {
 }): Promise<SketchFull> {
   const { thumbnail, ...rest } = data;
   const body = thumbnail ? { ...rest, thumbnail } : rest;
-  const response = await fetch(`${API_BASE}/sketches`, {
+  const response = await authFetch(`/sketches`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -118,9 +146,8 @@ export async function createSketch(data: {
 }
 
 export async function getSketches(): Promise<SketchSummary[]> {
-  const response = await fetch(`${API_BASE}/sketches`, {
+  const response = await authFetch(`/sketches`, {
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
   });
   if (!response.ok) throw new Error('Failed to fetch sketches');
   return response.json();
@@ -135,9 +162,8 @@ export async function getPublicSketch(id: string): Promise<SketchFull> {
 }
 
 export async function getSketch(id: string): Promise<SketchFull> {
-  const response = await fetch(`${API_BASE}/sketches/${id}`, {
+  const response = await authFetch(`/sketches/${id}`, {
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
   });
   if (!response.ok) throw new Error('Failed to fetch sketch');
   return response.json();
@@ -149,10 +175,9 @@ export async function updateSketch(
 ): Promise<SketchFull> {
   const { thumbnail, ...rest } = data;
   const body = thumbnail ? { ...rest, thumbnail } : rest;
-  const response = await fetch(`${API_BASE}/sketches/${id}`, {
+  const response = await authFetch(`/sketches/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
     body: JSON.stringify(body),
   });
   if (!response.ok) {
@@ -163,9 +188,8 @@ export async function updateSketch(
 }
 
 export async function deleteSketch(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/sketches/${id}`, {
+  const response = await authFetch(`/sketches/${id}`, {
     method: 'DELETE',
-    credentials: 'include',
   });
   if (!response.ok) throw new Error('Failed to delete sketch');
 }
@@ -274,6 +298,10 @@ export async function* streamChat(request: ChatRequest, signal?: AbortSignal): A
       }
     }
   } catch (error) {
+    // A user-initiated cancel aborts the fetch reader with a DOMException named
+    // 'AbortError'. Swallow it (like the initial-fetch catch does) so cancelling
+    // a generation doesn't surface a spurious "signal is aborted" error bubble.
+    if (error instanceof DOMException && error.name === 'AbortError') return;
     if (error instanceof TypeError && /network|abort|terminated/i.test(error.message)) return;
     throw error;
   }

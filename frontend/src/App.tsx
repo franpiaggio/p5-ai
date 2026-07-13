@@ -11,7 +11,7 @@ import { useIsMobile } from './hooks/useIsMobile';
 import { useEditorStore } from './store/editorStore';
 import { useAuthStore } from './store/authStore';
 import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
-import { getPublicSketch, getProfile, getProviderKeys } from './services/api';
+import { getPublicSketch, getProfile, getProviderKeys, setUnauthorizedHandler } from './services/api';
 import type { LLMConfig } from './types';
 
 function App() {
@@ -36,6 +36,38 @@ function App() {
       useEditorStore.getState().setCurrentPage('editor');
     }
   }, [currentPage, user]);
+
+  // Register a global 401 handler: if any authenticated request finds the session
+  // expired/invalid, clear the stale local auth state and prompt re-login so the UI
+  // never claims to be logged in while the backend rejects every request.
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      const { user: current, logout, setIsLoginOpen } = useAuthStore.getState();
+      if (!current) return; // nothing persisted to reconcile
+      logout();
+      setIsLoginOpen(true);
+    });
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  // Validate the persisted session against the backend on startup. The auth cookie
+  // (JWT) expires after 7 days while the persisted `user` never does, so on load we
+  // confirm the session is still valid and refresh the user; a 401 is handled by the
+  // global unauthorized handler above (logs out + opens login).
+  useEffect(() => {
+    if (!useAuthStore.getState().user) return;
+    getProfile()
+      .then((profile) => {
+        useAuthStore.getState().setAuth({
+          id: profile.id,
+          email: profile.email,
+          name: profile.name,
+          picture: profile.picture,
+          storeApiKeys: profile.storeApiKeys,
+        });
+      })
+      .catch(() => {}); // 401 already handled globally; ignore transient errors
+  }, []);
 
   // Auto-restore API keys: fetch server preference and keys on mount/login
   useEffect(() => {
