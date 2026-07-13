@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useModelList, MODELS, PROVIDER_LABELS } from '../../hooks/useModelList';
 import { useProviderKeysQuery, useSaveProviderKey, useClearProviderKey } from '../../hooks/useProviderKeys';
 import { updatePreferences } from '../../services/api';
+import { APP_THEMES } from '../Editor/editorConfig';
 import type { LLMConfig, ProviderKeys } from '../../types';
 
 interface Draft {
@@ -313,32 +314,21 @@ export function SettingsModal() {
 
         <div className="mt-5 pt-4 border-t border-border/30 space-y-4">
           <div>
-            <span className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
-              Appearance
-            </span>
-            <div className="flex gap-1 p-0.5 rounded-lg bg-surface border border-border/40" role="group" aria-label="Theme">
-              {([
-                { id: 'auto', label: 'Auto' },
-                { id: 'dark', label: 'Dark' },
-                { id: 'light', label: 'Light' },
-              ] as const).map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setAppTheme(opt.id)}
-                  aria-pressed={appTheme === opt.id}
-                  className={`flex-1 py-1.5 rounded-md text-[11px] transition-colors cursor-pointer ${
-                    appTheme === opt.id
-                      ? 'bg-accent text-on-accent'
-                      : 'text-text-muted hover:text-text-primary'
-                  }`}
-                >
-                  {opt.label}
-                </button>
+            <label htmlFor="settings-theme" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
+              Theme
+            </label>
+            <select
+              id="settings-theme"
+              value={appTheme}
+              onChange={(e) => setAppTheme(e.target.value as typeof appTheme)}
+              className="input-field"
+            >
+              {APP_THEMES.map((theme) => (
+                <option key={theme.id} value={theme.id}>{theme.label}</option>
               ))}
-            </div>
+            </select>
             <p className="mt-1.5 text-[10px] text-text-muted/40">
-              Auto follows your system. Applies to the editor too.
+              Paints the whole app, including the editor. Auto follows your system.
             </p>
           </div>
 

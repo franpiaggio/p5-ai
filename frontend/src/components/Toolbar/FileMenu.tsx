@@ -26,6 +26,7 @@ export function FileMenu() {
   const user = useAuthStore((s) => s.user);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
   const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
+  const setPendingSaveAfterLogin = useAuthStore((s) => s.setPendingSaveAfterLogin);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -45,6 +46,7 @@ export function FileMenu() {
   const handleSave = async () => {
     setIsOpen(false);
     if (!user) {
+      setPendingSaveAfterLogin(true);
       setIsLoginOpen(true);
       return;
     }

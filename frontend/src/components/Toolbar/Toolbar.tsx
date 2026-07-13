@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
@@ -8,6 +8,7 @@ import { FileMenu } from './FileMenu';
 import { CodeMenu } from './CodeMenu';
 import { MobileMenu } from './MobileMenu';
 import { useUpdateSketch } from '../../hooks/useSketches';
+import { capturePreview } from '../Preview/P5Preview';
 
 function SketchTitle() {
   const sketchTitle = useEditorStore((s) => s.sketchTitle);
@@ -118,16 +119,34 @@ function PlayStopButtons() {
 
 export function Toolbar() {
   const navigate = useNavigate();
-  const sketchId = useEditorStore((s) => s.sketchId);
-  const sketchTitle = useEditorStore((s) => s.sketchTitle);
-  const code = useEditorStore((s) => s.code);
-  const codeHistory = useEditorStore((s) => s.codeHistory);
   const setPreviewCode = useEditorStore((s) => s.setPreviewCode);
   const setIsSettingsOpen = useEditorStore((s) => s.setIsSettingsOpen);
   const user = useAuthStore((s) => s.user);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
   const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
+  const pendingSaveAfterLogin = useAuthStore((s) => s.pendingSaveAfterLogin);
+  const setPendingSaveAfterLogin = useAuthStore((s) => s.setPendingSaveAfterLogin);
   const updateSketchMut = useUpdateSketch();
+
+  // Persist the current sketch. Reads the editor store directly so it stays
+  // correct whether invoked from Cmd+S or replayed after a deferred login.
+  const runSave = useCallback(async () => {
+    const s = useEditorStore.getState();
+    if (s.sketchId) {
+      try {
+        const thumbnail = await capturePreview();
+        updateSketchMut.mutate(
+          { id: s.sketchId, title: s.sketchTitle, code: s.code, codeHistory: s.codeHistory, thumbnail },
+          { onSuccess: () => useEditorStore.getState().markCodeSaved() },
+        );
+      } catch (err) {
+        console.error('Failed to save:', err);
+      }
+    } else {
+      // New sketch: needs a name — open the save modal.
+      setIsSaveSketchOpen(true);
+    }
+  }, [updateSketchMut, setIsSaveSketchOpen]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -135,20 +154,25 @@ export function Toolbar() {
         e.preventDefault();
         setPreviewCode(null);
         if (!user) {
+          // Defer the save; it resumes automatically once the user logs in.
+          setPendingSaveAfterLogin(true);
           setIsLoginOpen(true);
           return;
         }
-        if (sketchId) {
-          updateSketchMut.mutate({ id: sketchId, title: sketchTitle, code, codeHistory },
-            { onSuccess: () => useEditorStore.getState().markCodeSaved() });
-        } else {
-          setIsSaveSketchOpen(true);
-        }
+        runSave();
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [user, sketchId, sketchTitle, code, codeHistory, setIsSaveSketchOpen, setIsLoginOpen, setPreviewCode, updateSketchMut]);
+  }, [user, setIsLoginOpen, setPreviewCode, setPendingSaveAfterLogin, runSave]);
+
+  // Resume a save that was blocked by the login gate — only in that exact case.
+  useEffect(() => {
+    if (user && pendingSaveAfterLogin) {
+      setPendingSaveAfterLogin(false); // consume once
+      runSave();
+    }
+  }, [user, pendingSaveAfterLogin, setPendingSaveAfterLogin, runSave]);
 
   return (
     <div className="h-11 bg-surface-raised border-b border-border/60 flex items-center px-3 md:px-4 gap-2 md:gap-3 shrink-0">

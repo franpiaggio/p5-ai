@@ -15,12 +15,16 @@ interface AuthState {
   isProfileOpen: boolean;
   isSaveSketchOpen: boolean;
   isLoginOpen: boolean;
+  // Set when the user hits Save while logged out; consumed once after a
+  // successful login to auto-resume that save. Transient (not persisted).
+  pendingSaveAfterLogin: boolean;
 
   setAuth: (user: AuthUser) => void;
   logout: () => void;
   setIsProfileOpen: (open: boolean) => void;
   setIsSaveSketchOpen: (open: boolean) => void;
   setIsLoginOpen: (open: boolean) => void;
+  setPendingSaveAfterLogin: (pending: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -30,6 +34,7 @@ export const useAuthStore = create<AuthState>()(
       isProfileOpen: false,
       isSaveSketchOpen: false,
       isLoginOpen: false,
+      pendingSaveAfterLogin: false,
 
       setAuth: (user) => set({ user }),
       logout: () => {
@@ -45,6 +50,7 @@ export const useAuthStore = create<AuthState>()(
       setIsProfileOpen: (isProfileOpen) => set({ isProfileOpen }),
       setIsSaveSketchOpen: (isSaveSketchOpen) => set({ isSaveSketchOpen }),
       setIsLoginOpen: (isLoginOpen) => set({ isLoginOpen }),
+      setPendingSaveAfterLogin: (pendingSaveAfterLogin) => set({ pendingSaveAfterLogin }),
     }),
     {
       name: 'p5-ai-auth',

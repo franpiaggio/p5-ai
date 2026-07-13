@@ -4,7 +4,7 @@ import type * as Monaco from 'monaco-editor';
 import { useEditorStore } from '../../store/editorStore';
 import { DiffToolbar } from './DiffToolbar';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles, registerFunctionCallTokenProvider, resolveEditorTheme } from './editorConfig';
+import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles, registerFunctionCallTokenProvider, resolveMonacoTheme } from './editorConfig';
 import { P5_TYPE_DEFS } from './p5Types';
 
 export function CodeEditor() {
@@ -14,7 +14,6 @@ export function CodeEditor() {
   const clearConsoleLogs = useEditorStore((s) => s.clearConsoleLogs);
   const editorErrors = useEditorStore((s) => s.editorErrors);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
-  const editorTheme = useEditorStore((s) => s.editorTheme);
   const editorLanguage = useEditorStore((s) => s.editorLanguage);
   const streamingCode = useEditorStore((s) => s.streamingCode);
   const isLoading = useEditorStore((s) => s.isLoading);
@@ -31,7 +30,7 @@ export function CodeEditor() {
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
-  const resolvedTheme = resolveEditorTheme(editorTheme, appTheme);
+  const resolvedTheme = resolveMonacoTheme(appTheme);
 
   // Apply the theme imperatively. @monaco-editor/react's `theme` prop is
   // unreliable when the value settles right around mount (store rehydration
@@ -262,7 +261,7 @@ export function CodeEditor() {
         onChange={(value) => setCode(value || '')}
         beforeMount={handleBeforeMount}
         onMount={handleMount}
-        theme={editorTheme}
+        theme={resolvedTheme}
         options={{ ...EDITOR_OPTIONS, readOnly: isLoading }}
       />
     </div>

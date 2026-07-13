@@ -6,7 +6,7 @@ import { logoutApi } from '../../services/api';
 import { useUpdateSketch, useCreateSketch } from '../../hooks/useSketches';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 import { capturePreview } from '../Preview/P5Preview';
-import { EDITOR_THEMES } from '../Editor/editorConfig';
+import { APP_THEMES } from '../Editor/editorConfig';
 import type { EditorLanguage } from '../../store/editorStore';
 
 export function MobileMenu() {
@@ -25,13 +25,14 @@ export function MobileMenu() {
   const setIsSettingsOpen = useEditorStore((s) => s.setIsSettingsOpen);
   const editorLanguage = useEditorStore((s) => s.editorLanguage);
   const setEditorLanguage = useEditorStore((s) => s.setEditorLanguage);
-  const editorTheme = useEditorStore((s) => s.editorTheme);
-  const setEditorTheme = useEditorStore((s) => s.setEditorTheme);
+  const appTheme = useEditorStore((s) => s.appTheme);
+  const setAppTheme = useEditorStore((s) => s.setAppTheme);
 
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const setIsSaveSketchOpen = useAuthStore((s) => s.setIsSaveSketchOpen);
   const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
+  const setPendingSaveAfterLogin = useAuthStore((s) => s.setPendingSaveAfterLogin);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -53,6 +54,7 @@ export function MobileMenu() {
   const handleSave = async () => {
     close();
     if (!user) {
+      setPendingSaveAfterLogin(true);
       setIsLoginOpen(true);
       return;
     }
@@ -185,9 +187,9 @@ export function MobileMenu() {
             <div className="flex items-center gap-1">
               <button
                 onClick={() => {
-                  const idx = EDITOR_THEMES.findIndex((t) => t.id === editorTheme);
-                  const prev = (idx - 1 + EDITOR_THEMES.length) % EDITOR_THEMES.length;
-                  setEditorTheme(EDITOR_THEMES[prev].id);
+                  const idx = APP_THEMES.findIndex((t) => t.id === appTheme);
+                  const prev = (idx - 1 + APP_THEMES.length) % APP_THEMES.length;
+                  setAppTheme(APP_THEMES[prev].id);
                 }}
                 aria-label="Previous theme"
                 className="p-1 text-text-muted/50 hover:text-text-primary transition-colors"
@@ -197,13 +199,13 @@ export function MobileMenu() {
                 </svg>
               </button>
               <span className="text-[11px] text-text-primary min-w-[80px] text-center">
-                {EDITOR_THEMES.find((t) => t.id === editorTheme)?.label ?? editorTheme}
+                {APP_THEMES.find((t) => t.id === appTheme)?.label ?? appTheme}
               </span>
               <button
                 onClick={() => {
-                  const idx = EDITOR_THEMES.findIndex((t) => t.id === editorTheme);
-                  const next = (idx + 1) % EDITOR_THEMES.length;
-                  setEditorTheme(EDITOR_THEMES[next].id);
+                  const idx = APP_THEMES.findIndex((t) => t.id === appTheme);
+                  const next = (idx + 1) % APP_THEMES.length;
+                  setAppTheme(APP_THEMES[next].id);
                 }}
                 aria-label="Next theme"
                 className="p-1 text-text-muted/50 hover:text-text-primary transition-colors"

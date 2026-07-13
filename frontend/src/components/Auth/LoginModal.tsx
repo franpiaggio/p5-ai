@@ -10,17 +10,27 @@ export function LoginModal() {
   const isLoginOpen = useAuthStore((s) => s.isLoginOpen);
   const setIsLoginOpen = useAuthStore((s) => s.setIsLoginOpen);
   const setAuth = useAuthStore((s) => s.setAuth);
+  const setPendingSaveAfterLogin = useAuthStore((s) => s.setPendingSaveAfterLogin);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleClose = useCallback(() => {
+  // Close + reset without touching the deferred-save flag (used on success so
+  // the pending save can still resume).
+  const closeModal = useCallback(() => {
     setIsLoginOpen(false);
     setUsername('');
     setPassword('');
     setError('');
   }, [setIsLoginOpen]);
+
+  // Dismiss (X / backdrop / Escape): the user gave up on logging in, so drop
+  // any deferred save instead of firing it on some later unrelated login.
+  const handleClose = useCallback(() => {
+    setPendingSaveAfterLogin(false);
+    closeModal();
+  }, [setPendingSaveAfterLogin, closeModal]);
 
   useEscapeClose(isLoginOpen, handleClose);
 
@@ -47,7 +57,7 @@ export function LoginModal() {
     try {
       const result = await loginWithCredentials(username.trim(), password);
       setAuth(result.user);
-      handleClose();
+      closeModal();
       restoreApiKeys(result.user.storeApiKeys);
     } catch {
       setError('Invalid username or password');
@@ -62,7 +72,7 @@ export function LoginModal() {
     try {
       const result = await loginWithGoogle(credentialResponse.credential);
       setAuth(result.user);
-      handleClose();
+      closeModal();
       restoreApiKeys(result.user.storeApiKeys);
     } catch {
       setError('Google login failed');

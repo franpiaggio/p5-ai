@@ -82,37 +82,47 @@ export const EDITOR_OPTIONS = {
   'semanticHighlighting.enabled': true,
 };
 
-export type EditorThemeId =
+export type AppThemeId =
   | 'auto'
-  | 'p5-darkroom'
-  | 'p5-gallery'
-  | 'vs-dark'
-  | 'p5-dark'
+  | 'darkroom'
+  | 'gallery'
   | 'monokai'
-  | 'github-dark';
+  | 'github-dark'
+  | 'vs-dark'
+  | 'p5-dark';
 
-export const EDITOR_THEMES: { id: EditorThemeId; label: string }[] = [
-  { id: 'auto', label: 'Auto (match app)' },
-  { id: 'p5-darkroom', label: 'Darkroom' },
-  { id: 'p5-gallery', label: 'Gallery (light)' },
-  { id: 'vs-dark', label: 'VS Dark' },
-  { id: 'p5-dark', label: 'p5 Dark (classic)' },
-  { id: 'monokai', label: 'Monokai' },
-  { id: 'github-dark', label: 'GitHub Dark' },
+/**
+ * The single theme list. Each theme paints the whole app: the chrome tokens
+ * (index.css `[data-theme]` blocks) and the matching Monaco editor theme, so a
+ * theme is one coordinated palette, not a light/dark switch. `swatch` powers the
+ * picker preview (surface + accent).
+ */
+export const APP_THEMES: {
+  id: AppThemeId;
+  label: string;
+  scheme: 'dark' | 'light';
+  monaco: string;
+  swatch: { bg: string; accent: string };
+}[] = [
+  { id: 'auto', label: 'Auto', scheme: 'dark', monaco: 'p5-dark', swatch: { bg: '#16213e', accent: '#e94560' } },
+  { id: 'darkroom', label: 'Darkroom', scheme: 'dark', monaco: 'p5-darkroom', swatch: { bg: '#1a1714', accent: '#f2a541' } },
+  { id: 'gallery', label: 'Gallery', scheme: 'light', monaco: 'p5-gallery', swatch: { bg: '#f4f0e8', accent: '#b9770f' } },
+  { id: 'monokai', label: 'Monokai', scheme: 'dark', monaco: 'monokai', swatch: { bg: '#272822', accent: '#fd971f' } },
+  { id: 'github-dark', label: 'GitHub Dark', scheme: 'dark', monaco: 'github-dark', swatch: { bg: '#0d1117', accent: '#58a6ff' } },
+  { id: 'vs-dark', label: 'VS Dark', scheme: 'dark', monaco: 'vs-dark', swatch: { bg: '#1e1e1e', accent: '#3794ff' } },
+  { id: 'p5-dark', label: 'p5 Dark', scheme: 'dark', monaco: 'p5-dark', swatch: { bg: '#16213e', accent: '#e94560' } },
 ];
 
 /**
- * Resolve the 'auto' editor theme to a concrete Monaco theme that tracks the
- * app appearance, so the editor stays in sync with the chrome. An explicit
- * editor-theme choice (monokai, github-dark, …) is always honored as-is.
+ * Resolve a theme id to its concrete Monaco theme. 'auto' tracks the OS so the
+ * editor matches the chrome's system-driven default.
  */
-export function resolveEditorTheme(theme: string, appTheme: 'auto' | 'dark' | 'light' = 'auto'): string {
-  if (theme !== 'auto') return theme;
-  let dark: boolean;
-  if (appTheme === 'dark') dark = true;
-  else if (appTheme === 'light') dark = false;
-  else dark = typeof window === 'undefined' || window.matchMedia('(prefers-color-scheme: dark)').matches;
-  return dark ? 'p5-darkroom' : 'p5-gallery';
+export function resolveMonacoTheme(appTheme: string): string {
+  if (appTheme === 'auto') {
+    const dark = typeof window === 'undefined' || window.matchMedia('(prefers-color-scheme: dark)').matches;
+    return dark ? 'p5-dark' : 'p5-gallery';
+  }
+  return APP_THEMES.find((t) => t.id === appTheme)?.monaco ?? 'p5-dark';
 }
 
 // Monaco JS tokenizer tokens (Monarch-based):

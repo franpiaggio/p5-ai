@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { EDITOR_THEMES } from '../Editor/editorConfig';
+import { APP_THEMES } from '../Editor/editorConfig';
 import type { EditorLanguage } from '../../store/editorStore';
 
 const LANGUAGES: { id: EditorLanguage; label: string }[] = [
@@ -14,8 +14,8 @@ export function CodeMenu() {
 
   const editorLanguage = useEditorStore((s) => s.editorLanguage);
   const setEditorLanguage = useEditorStore((s) => s.setEditorLanguage);
-  const editorTheme = useEditorStore((s) => s.editorTheme);
-  const setEditorTheme = useEditorStore((s) => s.setEditorTheme);
+  const appTheme = useEditorStore((s) => s.appTheme);
+  const setAppTheme = useEditorStore((s) => s.setAppTheme);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -64,14 +64,20 @@ export function CodeMenu() {
           <div className="px-3 py-1.5 text-[9px] uppercase tracking-widest text-text-muted/40">
             Theme
           </div>
-          {EDITOR_THEMES.map((theme) => (
+          {APP_THEMES.map((theme) => (
             <button
               key={theme.id}
-              onClick={() => { setEditorTheme(theme.id); setIsOpen(false); }}
+              onClick={() => { setAppTheme(theme.id); setIsOpen(false); }}
               className="dropdown-item flex items-center justify-between"
             >
-              <span>{theme.label}</span>
-              {editorTheme === theme.id && (
+              <span className="flex items-center gap-2">
+                <span
+                  className="w-3 h-3 rounded-full border border-white/10 shrink-0"
+                  style={{ background: theme.swatch.bg, boxShadow: `inset 0 0 0 1.5px ${theme.swatch.accent}` }}
+                />
+                {theme.label}
+              </span>
+              {appTheme === theme.id && (
                 <svg className="w-3.5 h-3.5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                 </svg>
