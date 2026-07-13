@@ -303,6 +303,17 @@ export function ChatPanel() {
     guardUnsaved(() => applyExample(example));
   }, [applyExample]);
 
+  // "New one": swap to a different example without piling up chat entries.
+  // Drop the previous example's message pair (and its history entry) first, then
+  // apply the new one, so there's always exactly one example pair in the chat.
+  const handleTryAnother = useCallback((example: SketchExample) => {
+    useEditorStore.setState((state) => ({
+      messages: state.messages.length >= 2 ? state.messages.slice(0, -2) : state.messages,
+      codeHistory: state.codeHistory.filter((c) => !String(c.id).startsWith('change-example-')),
+    }));
+    applyExample(example);
+  }, [applyExample]);
+
   useEffect(() => {
     if (fixRequest && !isLoading) {
       setFixRequest(null);
@@ -360,7 +371,7 @@ export function ChatPanel() {
       )}
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 flex flex-col">
         <div className="flex-1 flex flex-col space-y-2">
-          {messages.length === 0 && !chatDisabled && (
+          {messages.length === 0 && !chatDisabled && !showSuggestion && (
             <div className="flex-1 flex flex-col items-center justify-center text-center gap-3 px-4 py-6">
               <div className="w-9 h-9 grid place-items-center rounded-xl bg-accent/10 text-accent">
                 <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
@@ -406,6 +417,7 @@ export function ChatPanel() {
           <div className="w-full max-w-xs mx-auto mt-3 pt-1">
             <SketchSuggestion
               onSelect={handleExampleSelect}
+              onTryAnother={handleTryAnother}
               onKeep={() => useEditorStore.setState({ showSuggestion: false, exampleApplied: false, exampleAppliedLabel: null })}
             />
           </div>

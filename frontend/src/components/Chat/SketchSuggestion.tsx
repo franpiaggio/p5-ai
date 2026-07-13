@@ -5,10 +5,11 @@ import type { SketchExample } from '../../data/sketchExamples';
 
 interface SketchSuggestionProps {
   onSelect: (example: SketchExample) => void;
+  onTryAnother: (example: SketchExample) => void;
   onKeep: () => void;
 }
 
-export function SketchSuggestion({ onSelect, onKeep }: SketchSuggestionProps) {
+export function SketchSuggestion({ onSelect, onTryAnother, onKeep }: SketchSuggestionProps) {
   // Phase lives in the store so it survives ChatPanel unmount/remount (tab switch).
   const applied = useEditorStore((s) => s.exampleApplied);
   const appliedLabel = useEditorStore((s) => s.exampleAppliedLabel);
@@ -24,8 +25,8 @@ export function SketchSuggestion({ onSelect, onKeep }: SketchSuggestionProps) {
   }, [candidate, onSelect]);
 
   const handleGenerateNew = useCallback(() => {
-    onSelect(getRandomExample());
-  }, [onSelect]);
+    onTryAnother(getRandomExample());
+  }, [onTryAnother]);
 
   const label = applied ? appliedLabel : candidate?.label;
   if (!label) return null;
