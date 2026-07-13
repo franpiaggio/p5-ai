@@ -46,10 +46,10 @@ export function UserMenu() {
       {isOpen && (
         <div className="dropdown-menu right-0 mt-2 w-48">
           <div className="px-3 py-2 border-b border-border/40">
-            <p className="text-xs font-mono text-text-primary truncate">
+            <p className="text-xs text-text-primary truncate">
               {user.name}
             </p>
-            <p className="text-[10px] font-mono text-text-muted/50 truncate">
+            <p className="text-[10px] text-text-muted/50 truncate">
               {user.email}
             </p>
           </div>

@@ -124,7 +124,7 @@ export function MobileMenu() {
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
-        <span className="text-[10px] font-mono">Menu</span>
+        <span className="text-[10px]">Menu</span>
       </button>
 
       {isOpen && (
@@ -161,13 +161,13 @@ export function MobileMenu() {
 
           {/* Language toggle */}
           <div className="px-4 py-2.5 flex items-center justify-between">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-text-muted/40">Language</span>
+            <span className="text-[9px] uppercase tracking-widest text-text-muted/40">Language</span>
             <div className="flex rounded overflow-hidden border border-border/50">
               {(['javascript', 'typescript'] as EditorLanguage[]).map((lang) => (
                 <button
                   key={lang}
                   onClick={() => setEditorLanguage(lang)}
-                  className={`px-3 py-1 text-[10px] font-mono transition-colors ${
+                  className={`px-3 py-1 text-[10px] transition-colors ${
                     editorLanguage === lang
                       ? 'bg-info/20 text-info'
                       : 'text-text-muted/50 hover:text-text-primary'
@@ -181,7 +181,7 @@ export function MobileMenu() {
 
           {/* Theme selector */}
           <div className="px-4 py-2.5 flex items-center justify-between">
-            <span className="text-[9px] font-mono uppercase tracking-widest text-text-muted/40">Theme</span>
+            <span className="text-[9px] uppercase tracking-widest text-text-muted/40">Theme</span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => {
@@ -196,7 +196,7 @@ export function MobileMenu() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
               </button>
-              <span className="text-[11px] font-mono text-text-primary min-w-[80px] text-center">
+              <span className="text-[11px] text-text-primary min-w-[80px] text-center">
                 {EDITOR_THEMES.find((t) => t.id === editorTheme)?.label ?? editorTheme}
               </span>
               <button
@@ -228,8 +228,8 @@ export function MobileMenu() {
           {user ? (
             <>
               <div className="px-4 py-2 border-b border-border/30">
-                <p className="text-xs font-mono text-text-primary truncate">{user.name}</p>
-                <p className="text-[10px] font-mono text-text-muted/50 truncate">{user.email}</p>
+                <p className="text-xs text-text-primary truncate">{user.name}</p>
+                <p className="text-[10px] text-text-muted/50 truncate">{user.email}</p>
               </div>
               <button onClick={handleSketches} className={menuItemClass}>
                 My Sketches

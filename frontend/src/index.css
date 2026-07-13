@@ -2,20 +2,136 @@
 
 @import "tailwindcss";
 
-@theme {
-  --color-surface: #1a1a2e;
-  --color-surface-raised: #16213e;
-  --color-border: #0f3460;
-  --color-accent: #e94560;
-  --color-info: #53d8fb;
-  --color-warning: #f0c040;
-  --color-success: #22c55e;
-  --color-text-primary: #ccd6f6;
-  --color-text-muted: #a8b2d1;
+/* ============================================================
+   Theme tokens — runtime-swappable via CSS custom properties.
+
+   Default is "Darkroom" (dark, warm graphite + amber). If the user's OS
+   prefers light and no explicit theme is set, we fall back to "Gallery"
+   (light). An explicit [data-theme] on <html> always wins, so a future
+   in-app theme picker can override the system preference.
+
+   The palette lives on plain custom properties (--surface, --accent, …) and
+   `@theme inline` maps Tailwind's color utilities onto them, so bg-surface /
+   text-accent / border-border/40 all follow the active theme at runtime.
+   ============================================================ */
+:root {
+  color-scheme: dark;
+
+  --font-sans-stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono-stack: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Darkroom — dark (default) */
+  --surface: #1a1714;
+  --surface-raised: #221e1a;
+  --panel: #221e1a;
+  --surface-alt: #14110e;
+  --raised: #2b2621;
+  --border: #3a332b;
+  --accent: #f2a541;
+  --on-accent: #241d12;
+  --info: #83a6cc;
+  --warning: #e0a33a;
+  --success: #8bb56e;
+  --error: #e6604f;
+  --text-primary: #f1ebe0;
+  --text-muted: #b7ac9c;
+}
+
+/* Gallery — light (explicit) */
+:root[data-theme="gallery"],
+:root[data-theme="light"] {
+  color-scheme: light;
+  --surface: #f4f0e8;
+  --surface-raised: #fbf8f2;
+  --panel: #fbf8f2;
+  --surface-alt: #e9e3d6;
+  --raised: #efe9dd;
+  --border: #e3dccc;
+  --accent: #b9770f;
+  --on-accent: #fff8ec;
+  --info: #446c96;
+  --warning: #a9741a;
+  --success: #5c8842;
+  --error: #c1432c;
+  --text-primary: #2a251e;
+  --text-muted: #5d564a;
+}
+
+/* Follow the OS when the user hasn't picked a theme; light OS -> Gallery. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --surface: #f4f0e8;
+    --surface-raised: #fbf8f2;
+    --panel: #fbf8f2;
+    --surface-alt: #e9e3d6;
+    --raised: #efe9dd;
+    --border: #e3dccc;
+    --accent: #b9770f;
+    --on-accent: #fff8ec;
+    --info: #446c96;
+    --warning: #a9741a;
+    --success: #5c8842;
+    --error: #c1432c;
+    --text-primary: #2a251e;
+    --text-muted: #5d564a;
+  }
+}
+
+/* Explicit dark (belt-and-suspenders so a picker can force Darkroom). */
+:root[data-theme="darkroom"],
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #1a1714;
+  --surface-raised: #221e1a;
+  --panel: #221e1a;
+  --surface-alt: #14110e;
+  --raised: #2b2621;
+  --border: #3a332b;
+  --accent: #f2a541;
+  --on-accent: #241d12;
+  --info: #83a6cc;
+  --warning: #e0a33a;
+  --success: #8bb56e;
+  --error: #e6604f;
+  --text-primary: #f1ebe0;
+  --text-muted: #b7ac9c;
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-panel: var(--panel);
+  --color-surface-alt: var(--surface-alt);
+  --color-raised: var(--raised);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-text-primary: var(--text-primary);
+  --color-text-muted: var(--text-muted);
+  --font-sans: var(--font-sans-stack);
+  --font-mono: var(--font-mono-stack);
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Keyboard focus: a visible ring on every interactive control. Pointer users
+   never see it (:focus-visible), keyboard users always do. Previously only the
+   text inputs had any focus affordance. */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 html, body, #root {
@@ -25,7 +141,9 @@ html, body, #root {
 }
 
 body {
-  font-family: 'JetBrains Mono', monospace;
+  /* Chrome speaks in the system sans; only code and data use mono (applied
+     explicitly where needed). This is what breaks the mono-everywhere look. */
+  font-family: var(--font-sans-stack);
   background: var(--color-surface);
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
@@ -54,7 +172,7 @@ body {
 /* Selection */
 ::selection {
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
 }
 
 /* Select dropdown */
@@ -66,15 +184,15 @@ select option {
 /* ---------- Reusable component styles ---------- */
 
 .input-field {
-  @apply w-full bg-surface text-text-primary px-3 py-2 rounded-lg text-sm font-mono
+  @apply w-full bg-surface text-text-primary px-3 py-2 rounded-lg text-sm
          border border-border/40
          focus:outline-none focus:ring-1 focus:ring-info/50
-         placeholder:text-text-muted/20;
+         placeholder:text-text-muted/50;
 }
 
 .btn-primary {
-  @apply bg-accent hover:bg-accent/80 text-white px-4 py-2 rounded-lg text-sm
-         font-mono transition-colors disabled:opacity-30 disabled:cursor-not-allowed;
+  @apply bg-accent hover:bg-accent/85 text-on-accent px-4 py-2 rounded-lg text-sm
+         font-medium transition-colors disabled:opacity-30 disabled:cursor-not-allowed;
 }
 
 .btn-icon {
@@ -86,12 +204,12 @@ select option {
 }
 
 .dropdown-item {
-  @apply w-full text-left px-3 py-2 text-xs font-mono text-text-muted
-         hover:bg-border/30 hover:text-info transition-colors cursor-pointer;
+  @apply w-full text-left px-3 py-2 text-xs text-text-muted
+         hover:bg-border/30 hover:text-text-primary transition-colors cursor-pointer;
 }
 
 .dropdown-item-disabled {
-  @apply w-full text-left px-3 py-2 text-xs font-mono text-text-muted/30 cursor-not-allowed;
+  @apply w-full text-left px-3 py-2 text-xs text-text-muted/40 cursor-not-allowed;
 }
 
 .dropdown-separator {
@@ -107,7 +225,7 @@ select option {
 }
 
 .modal-title {
-  @apply text-base font-mono font-semibold text-text-primary tracking-wide;
+  @apply text-base font-semibold text-text-primary tracking-tight;
 }
 
 .modal-close {
@@ -115,7 +233,7 @@ select option {
 }
 
 .tab-btn {
-  @apply px-4 py-2 text-xs font-mono tracking-wide transition-colors relative;
+  @apply px-4 py-2 text-xs font-medium tracking-wide transition-colors relative;
 }
 
 .tab-indicator {

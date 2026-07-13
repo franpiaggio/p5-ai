@@ -103,19 +103,19 @@ export function SketchesGrid() {
           <div className="flex items-center gap-2">
             <span className="text-info font-bold text-base">p5</span>
             <span className="text-text-muted/30">|</span>
-            <h1 className="text-sm font-mono text-text-primary">My Sketches</h1>
+            <h1 className="text-sm text-text-primary">My Sketches</h1>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate('/examples')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono rounded bg-border/30 text-text-muted hover:text-text-primary hover:bg-border/50 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded bg-border/30 text-text-muted hover:text-text-primary hover:bg-border/50 transition-colors cursor-pointer"
           >
             Explore Examples
           </button>
           <button
             onClick={handleNewSketch}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono rounded bg-accent text-white hover:bg-accent/80 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded bg-accent text-white hover:bg-accent/80 transition-colors cursor-pointer"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -128,17 +128,17 @@ export function SketchesGrid() {
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         {loading && (
-          <p className="text-text-muted/50 text-xs font-mono text-center py-16">
+          <p className="text-text-muted/50 text-xs text-center py-16">
             Loading...
           </p>
         )}
 
         {!loading && sketches.length === 0 && (
           <div className="text-center py-16">
-            <p className="text-text-muted/30 text-sm font-mono mb-4">No sketches yet</p>
+            <p className="text-text-muted/30 text-sm mb-4">No sketches yet</p>
             <button
               onClick={handleNewSketch}
-              className="px-4 py-2 text-xs font-mono rounded bg-accent text-white hover:bg-accent/80 transition-colors cursor-pointer"
+              className="px-4 py-2 text-xs rounded bg-accent text-white hover:bg-accent/80 transition-colors cursor-pointer"
             >
               Create your first sketch
             </button>
@@ -176,11 +176,11 @@ export function SketchesGrid() {
 
                 {/* Info */}
                 <div className="p-3 flex flex-col flex-1">
-                  <h3 className="text-sm font-mono text-text-primary truncate">
+                  <h3 className="text-sm text-text-primary truncate">
                     {sketch.title}
                   </h3>
                   {sketch.description && (
-                    <p className="text-[11px] font-mono text-text-muted/60 mt-1 line-clamp-2">
+                    <p className="text-[11px] text-text-muted/60 mt-1 line-clamp-2">
                       {sketch.description}
                     </p>
                   )}
@@ -190,19 +190,19 @@ export function SketchesGrid() {
                   <div className="flex gap-2 mt-3 pt-3 border-t border-border/20">
                     <button
                       onClick={() => handleLoad(sketch.id)}
-                      className="px-3 py-1.5 text-[11px] font-mono rounded bg-info/10 text-info hover:bg-info/20 transition-colors cursor-pointer"
+                      className="px-3 py-1.5 text-[11px] rounded bg-info/10 text-info hover:bg-info/20 transition-colors cursor-pointer"
                     >
                       Load
                     </button>
                     <button
                       onClick={() => handleDuplicate(sketch.id)}
-                      className="px-3 py-1.5 text-[11px] font-mono rounded bg-info/10 text-info hover:bg-info/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                      className="px-3 py-1.5 text-[11px] rounded bg-info/10 text-info hover:bg-info/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
                     >
                       Duplicate
                     </button>
                     <button
                       onClick={() => handleDelete(sketch.id)}
-                      className="px-3 py-1.5 text-[11px] font-mono rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                      className="px-3 py-1.5 text-[11px] rounded bg-error/10 text-error hover:bg-error/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
                     >
                       Delete
                     </button>

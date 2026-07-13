@@ -58,14 +58,14 @@ export function ProfileModal() {
         if (e.target === e.currentTarget) setIsProfileOpen(false);
       }}
     >
-      <div className="modal-panel max-w-lg max-h-[80vh] flex flex-col">
+      <div className="modal-panel max-w-lg max-h-[80vh] flex flex-col" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
         <div className="flex justify-between items-center mb-5">
           <div>
-            <h2 className="modal-title">
+            <h2 id="profile-modal-title" className="modal-title">
               My Sketches
             </h2>
             {user && (
-              <p className="text-[10px] font-mono text-text-muted/50 mt-0.5">
+              <p className="text-[10px] text-text-muted/50 mt-0.5">
                 {user.email}
               </p>
             )}
@@ -73,6 +73,7 @@ export function ProfileModal() {
           <button
             onClick={() => setIsProfileOpen(false)}
             className="modal-close"
+            aria-label="Close"
           >
             <svg
               className="w-5 h-5"
@@ -92,13 +93,13 @@ export function ProfileModal() {
 
         <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
           {loading && (
-            <p className="text-text-muted/50 text-xs font-mono text-center py-8">
+            <p className="text-text-muted/50 text-xs text-center py-8">
               Loading...
             </p>
           )}
 
           {!loading && sketches.length === 0 && (
-            <p className="text-text-muted/30 text-xs font-mono text-center py-8">
+            <p className="text-text-muted/30 text-xs text-center py-8">
               No saved sketches yet
             </p>
           )}
@@ -110,11 +111,11 @@ export function ProfileModal() {
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-mono text-text-primary truncate">
+                  <h3 className="text-sm text-text-primary truncate">
                     {sketch.title}
                   </h3>
                   {sketch.description && (
-                    <p className="text-[10px] font-mono text-text-muted/40 mt-0.5 truncate">
+                    <p className="text-[10px] text-text-muted/40 mt-0.5 truncate">
                       {sketch.description}
                     </p>
                   )}
@@ -125,13 +126,13 @@ export function ProfileModal() {
                 <div className="flex gap-1.5 ml-2 shrink-0">
                   <button
                     onClick={() => handleLoad(sketch.id)}
-                    className="px-2.5 py-1 text-[10px] font-mono rounded bg-info/10 text-info hover:bg-info/20 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 text-[10px] rounded bg-info/10 text-info hover:bg-info/20 transition-colors cursor-pointer"
                   >
                     Load
                   </button>
                   <button
                     onClick={() => handleDelete(sketch.id)}
-                    className="px-2.5 py-1 text-[10px] font-mono rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                    className="px-2.5 py-1 text-[10px] rounded bg-error/10 text-error hover:bg-error/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
                   >
                     Delete
                   </button>

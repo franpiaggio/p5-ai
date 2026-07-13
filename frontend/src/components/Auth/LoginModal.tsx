@@ -76,14 +76,15 @@ export function LoginModal() {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="modal-panel max-w-sm">
+      <div className="modal-panel max-w-sm" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
         <div className="flex justify-between items-center mb-5">
-          <h2 className="modal-title">
+          <h2 id="login-modal-title" className="modal-title">
             Sign In
           </h2>
           <button
             onClick={handleClose}
             className="modal-close"
+            aria-label="Close"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
@@ -93,24 +94,26 @@ export function LoginModal() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+            <label htmlFor="login-username" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
               Username
             </label>
             <input
+              id="login-username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
+              placeholder="Username"
               className="input-field"
               autoFocus
             />
           </div>
 
           <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+            <label htmlFor="login-password" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
               Password
             </label>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -120,7 +123,7 @@ export function LoginModal() {
           </div>
 
           {error && (
-            <p className="text-[11px] font-mono text-accent">{error}</p>
+            <p className="text-[11px] text-error">{error}</p>
           )}
 
           <button
@@ -134,7 +137,7 @@ export function LoginModal() {
 
         <div className="flex items-center gap-3 my-5">
           <div className="flex-1 h-px bg-border/40" />
-          <span className="text-[10px] font-mono text-text-muted/30 uppercase tracking-widest">or</span>
+          <span className="text-[10px] text-text-muted/30 uppercase tracking-widest">or</span>
           <div className="flex-1 h-px bg-border/40" />
         </div>
 

@@ -82,14 +82,38 @@ export const EDITOR_OPTIONS = {
   'semanticHighlighting.enabled': true,
 };
 
-export type EditorThemeId = 'vs-dark' | 'p5-dark' | 'monokai' | 'github-dark';
+export type EditorThemeId =
+  | 'auto'
+  | 'p5-darkroom'
+  | 'p5-gallery'
+  | 'vs-dark'
+  | 'p5-dark'
+  | 'monokai'
+  | 'github-dark';
 
 export const EDITOR_THEMES: { id: EditorThemeId; label: string }[] = [
-  { id: 'vs-dark', label: 'VS Dark (default)' },
-  { id: 'p5-dark', label: 'p5 Dark' },
+  { id: 'auto', label: 'Auto (match app)' },
+  { id: 'p5-darkroom', label: 'Darkroom' },
+  { id: 'p5-gallery', label: 'Gallery (light)' },
+  { id: 'vs-dark', label: 'VS Dark' },
+  { id: 'p5-dark', label: 'p5 Dark (classic)' },
   { id: 'monokai', label: 'Monokai' },
   { id: 'github-dark', label: 'GitHub Dark' },
 ];
+
+/**
+ * Resolve the 'auto' editor theme to a concrete Monaco theme that tracks the
+ * app appearance, so the editor stays in sync with the chrome. An explicit
+ * editor-theme choice (monokai, github-dark, …) is always honored as-is.
+ */
+export function resolveEditorTheme(theme: string, appTheme: 'auto' | 'dark' | 'light' = 'auto'): string {
+  if (theme !== 'auto') return theme;
+  let dark: boolean;
+  if (appTheme === 'dark') dark = true;
+  else if (appTheme === 'light') dark = false;
+  else dark = typeof window === 'undefined' || window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return dark ? 'p5-darkroom' : 'p5-gallery';
+}
 
 // Monaco JS tokenizer tokens (Monarch-based):
 // identifier, keyword, keyword.flow, number, number.float, number.hex,
@@ -100,6 +124,90 @@ export const EDITOR_THEMES: { id: EditorThemeId; label: string }[] = [
 // function, method, property, variable, parameter, class, interface, enum, type
 
 export function defineCustomThemes(monaco: typeof Monaco) {
+  // Darkroom — warm graphite ground so the editor matches the app chrome.
+  monaco.editor.defineTheme('p5-darkroom', {
+    base: 'vs-dark',
+    inherit: true,
+    rules: [
+      { token: 'keyword', foreground: 'e6864f' },
+      { token: 'keyword.flow', foreground: 'e6864f' },
+      { token: 'identifier', foreground: 'cfc2ac' },
+      { token: 'type.identifier', foreground: '7fb7a8' },
+      { token: 'string', foreground: 'd99b7a' },
+      { token: 'string.escape', foreground: 'e0b877' },
+      { token: 'number', foreground: '9ec27a' },
+      { token: 'number.float', foreground: '9ec27a' },
+      { token: 'number.hex', foreground: '9ec27a' },
+      { token: 'regexp', foreground: 'd99b7a' },
+      { token: 'comment', foreground: '7a7060', fontStyle: 'italic' },
+      { token: 'delimiter', foreground: 'a89a86' },
+      { token: 'delimiter.bracket', foreground: 'e0b551' },
+      { token: 'operator', foreground: 'b7a68e' },
+      { token: 'function', foreground: 'f0c274' },
+      { token: 'method', foreground: 'f0c274' },
+      { token: 'property', foreground: 'cfc2ac' },
+      { token: 'variable', foreground: 'cfc2ac' },
+      { token: 'parameter', foreground: 'cfc2ac' },
+      { token: 'class', foreground: '7fb7a8' },
+      { token: 'interface', foreground: '7fb7a8' },
+      { token: 'enum', foreground: '7fb7a8' },
+      { token: 'type', foreground: '7fb7a8' },
+    ],
+    colors: {
+      'editor.background': '#1a1714',
+      'editor.foreground': '#d8ccbb',
+      'editor.lineHighlightBackground': '#ffffff06',
+      'editor.selectionBackground': '#4a3f2e',
+      'editorCursor.foreground': '#f2a541',
+      'editorLineNumber.foreground': '#6d6455',
+      'editorLineNumber.activeForeground': '#b7ac9c',
+      'editorIndentGuide.background': '#ffffff0d',
+      'editorIndentGuide.activeBackground': '#ffffff20',
+    },
+  });
+
+  // Gallery — warm paper for the light app theme.
+  monaco.editor.defineTheme('p5-gallery', {
+    base: 'vs',
+    inherit: true,
+    rules: [
+      { token: 'keyword', foreground: 'b5561f' },
+      { token: 'keyword.flow', foreground: 'b5561f' },
+      { token: 'identifier', foreground: '4a4136' },
+      { token: 'type.identifier', foreground: '2f7d70' },
+      { token: 'string', foreground: 'a85a37' },
+      { token: 'string.escape', foreground: '9a6b12' },
+      { token: 'number', foreground: '557a35' },
+      { token: 'number.float', foreground: '557a35' },
+      { token: 'number.hex', foreground: '557a35' },
+      { token: 'regexp', foreground: 'a85a37' },
+      { token: 'comment', foreground: 'a99b82', fontStyle: 'italic' },
+      { token: 'delimiter', foreground: '7c7263' },
+      { token: 'delimiter.bracket', foreground: 'b9770f' },
+      { token: 'operator', foreground: '7c7263' },
+      { token: 'function', foreground: '9a6b12' },
+      { token: 'method', foreground: '9a6b12' },
+      { token: 'property', foreground: '4a4136' },
+      { token: 'variable', foreground: '4a4136' },
+      { token: 'parameter', foreground: '4a4136' },
+      { token: 'class', foreground: '2f7d70' },
+      { token: 'interface', foreground: '2f7d70' },
+      { token: 'enum', foreground: '2f7d70' },
+      { token: 'type', foreground: '2f7d70' },
+    ],
+    colors: {
+      'editor.background': '#fbf8f2',
+      'editor.foreground': '#4a4136',
+      'editor.lineHighlightBackground': '#0000000a',
+      'editor.selectionBackground': '#e7dcc2',
+      'editorCursor.foreground': '#b9770f',
+      'editorLineNumber.foreground': '#b3a892',
+      'editorLineNumber.activeForeground': '#5d564a',
+      'editorIndentGuide.background': '#00000012',
+      'editorIndentGuide.activeBackground': '#00000026',
+    },
+  });
+
   monaco.editor.defineTheme('p5-dark', {
     base: 'vs-dark',
     inherit: true,

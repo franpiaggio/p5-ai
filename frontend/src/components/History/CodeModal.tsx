@@ -51,7 +51,7 @@ export function CodeModal({
       <div className="modal-panel max-w-3xl h-[80vh] flex flex-col">
         <div className="flex justify-between items-center px-5 py-3 border-b border-border/40 shrink-0">
           <div>
-            <h3 className="text-sm font-mono font-semibold text-text-primary">
+            <h3 className="text-sm font-semibold text-text-primary">
               {entry.summary || 'Code change'}
             </h3>
             <span className="text-[10px] font-mono text-text-muted/40">

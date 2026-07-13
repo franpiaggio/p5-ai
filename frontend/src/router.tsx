@@ -11,6 +11,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <EditorPage /> },
       { path: 'sketch/:sketchId', element: <EditorPage /> },
+      { path: 'example/:exampleSlug', element: <EditorPage /> },
       { path: 'examples', element: <ExamplesGrid /> },
       { path: 'sketches', element: <SketchesGrid /> },
     ],

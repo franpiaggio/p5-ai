@@ -86,7 +86,16 @@ export function CollapsibleCodeBlock({
       }}
     >
       <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
         onClick={handleToggle}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleToggle();
+          }
+        }}
         style={{
           display: 'flex',
           alignItems: 'center',

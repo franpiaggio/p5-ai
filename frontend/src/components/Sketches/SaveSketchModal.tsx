@@ -67,15 +67,16 @@ export function SaveSketchModal() {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <form className="modal-panel max-w-md" onSubmit={handleSave}>
+      <form className="modal-panel max-w-md" onSubmit={handleSave} role="dialog" aria-modal="true" aria-labelledby="save-sketch-modal-title">
         <div className="flex justify-between items-center mb-5">
-          <h2 className="modal-title">
+          <h2 id="save-sketch-modal-title" className="modal-title">
             Save Sketch
           </h2>
           <button
             type="button"
             onClick={handleClose}
             className="modal-close"
+            aria-label="Close"
           >
             <svg
               className="w-5 h-5"
@@ -95,10 +96,11 @@ export function SaveSketchModal() {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+            <label htmlFor="save-sketch-title" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
               Title
             </label>
             <input
+              id="save-sketch-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -109,10 +111,11 @@ export function SaveSketchModal() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+            <label htmlFor="save-sketch-description" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
               Description (optional)
             </label>
             <textarea
+              id="save-sketch-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="A short description..."
@@ -122,7 +125,7 @@ export function SaveSketchModal() {
           </div>
 
           {error && (
-            <p className="text-[11px] font-mono text-accent">{error}</p>
+            <p className="text-[11px] text-error">{error}</p>
           )}
         </div>
 
@@ -130,7 +133,7 @@ export function SaveSketchModal() {
           <button
             type="button"
             onClick={handleClose}
-            className="px-4 py-1.5 text-xs font-mono text-text-muted hover:text-text-primary transition-colors"
+            className="px-4 py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
           >
             Cancel
           </button>

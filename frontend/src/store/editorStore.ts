@@ -55,6 +55,8 @@ interface EditorState {
   sketchTitle: string;
   fixRequest: string | null;
   editorTheme: string;
+  /** App-wide appearance: follows the OS ('auto') or forces a mode. */
+  appTheme: 'auto' | 'dark' | 'light';
   editorLanguage: EditorLanguage;
   transpiler: ((code: string) => Promise<string>) | null;
   providerKeys: ProviderKeys;
@@ -96,6 +98,7 @@ interface EditorState {
   newSketch: () => void;
   setFixRequest: (request: string | null) => void;
   setEditorTheme: (theme: string) => void;
+  setAppTheme: (theme: 'auto' | 'dark' | 'light') => void;
   setEditorLanguage: (language: EditorLanguage) => void;
   setTranspiler: (transpiler: ((code: string) => Promise<string>) | null) => void;
   setProviderKey: (provider: LLMConfig['provider'], key: string) => void;
@@ -138,7 +141,8 @@ export const useEditorStore = create<EditorState>()(
       sketchId: null,
       sketchTitle: 'Untitled Sketch',
       fixRequest: null,
-      editorTheme: 'p5-dark',
+      editorTheme: 'auto',
+      appTheme: 'auto',
       editorLanguage: 'javascript' as EditorLanguage,
       transpiler: null,
       providerKeys: {} as ProviderKeys,
@@ -289,6 +293,11 @@ export const useEditorStore = create<EditorState>()(
       setSketchMeta: (sketchId, sketchTitle) => set({ sketchId, sketchTitle }),
       setFixRequest: (fixRequest) => set({ fixRequest }),
       setEditorTheme: (editorTheme) => set({ editorTheme }),
+      setAppTheme: (appTheme) =>
+        // Choosing an appearance snaps the editor back to 'auto' so it follows
+        // the app theme (Darkroom / Gallery). A specific editor syntax theme can
+        // still be re-selected afterward as an explicit override.
+        set({ appTheme, editorTheme: 'auto' }),
       setEditorLanguage: (editorLanguage) => set({ editorLanguage }),
       setTranspiler: (transpiler) => set({ transpiler }),
       setProviderKey: (provider, key) =>
@@ -347,6 +356,7 @@ export const useEditorStore = create<EditorState>()(
         autoApply: state.autoApply,
         autoSave: state.autoSave,
         editorTheme: state.editorTheme,
+        appTheme: state.appTheme,
         editorLanguage: state.editorLanguage,
         sketchId: state.sketchId,
         sketchTitle: state.sketchTitle,
@@ -354,6 +364,11 @@ export const useEditorStore = create<EditorState>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
+        // Migrate the old default editor theme to the new auto-follow theme so
+        // existing users (who never deliberately picked a theme) get the warm
+        // palette that matches the redesigned chrome instead of a cold seam.
+        if (state.editorTheme === 'p5-dark') state.editorTheme = 'auto';
+        if (!state.appTheme) state.appTheme = 'auto';
         // Migrate legacy single-key sessionStorage
         const legacyKey = sessionStorage.getItem('p5-ai-editor-key');
         const stored = sessionStorage.getItem('p5-ai-editor-keys');

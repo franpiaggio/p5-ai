@@ -1,10 +1,10 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import Editor, { DiffEditor, type OnMount, type DiffOnMount, type BeforeMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { useEditorStore } from '../../store/editorStore';
 import { DiffToolbar } from './DiffToolbar';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles, registerFunctionCallTokenProvider } from './editorConfig';
+import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles, registerFunctionCallTokenProvider, resolveEditorTheme } from './editorConfig';
 import { P5_TYPE_DEFS } from './p5Types';
 
 export function CodeEditor() {
@@ -18,7 +18,31 @@ export function CodeEditor() {
   const editorLanguage = useEditorStore((s) => s.editorLanguage);
   const streamingCode = useEditorStore((s) => s.streamingCode);
   const isLoading = useEditorStore((s) => s.isLoading);
+  const appTheme = useEditorStore((s) => s.appTheme);
   const isMobile = useIsMobile();
+
+  // When the theme is 'auto' it tracks the OS preference; re-render on change
+  // so the Monaco theme follows the app's light/dark default live. (When the
+  // app theme is forced to dark/light, appTheme drives it instead.)
+  const [, bumpTheme] = useState(0);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: light)');
+    const onChange = () => bumpTheme((n) => n + 1);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  const resolvedTheme = resolveEditorTheme(editorTheme, appTheme);
+
+  // Apply the theme imperatively. @monaco-editor/react's `theme` prop is
+  // unreliable when the value settles right around mount (store rehydration
+  // racing the first render), which left the editor on a light theme while the
+  // app was dark. We setTheme in onMount (via the ref below) and on every change
+  // here. setTheme is global + idempotent, so this is the source of truth.
+  const resolvedThemeRef = useRef(resolvedTheme);
+  resolvedThemeRef.current = resolvedTheme;
+  useEffect(() => {
+    monacoRef.current?.editor.setTheme(resolvedTheme);
+  }, [resolvedTheme]);
 
   const runRef = useRef(runSketch);
   const clearRef = useRef(clearConsoleLogs);
@@ -108,6 +132,10 @@ export function CodeEditor() {
     editorRef.current = editor;
     monacoRef.current = monaco;
 
+    // Ensure the resolved theme is applied once Monaco is ready, regardless of
+    // what the `theme` prop did during the mount race.
+    monaco.editor.setTheme(resolvedThemeRef.current);
+
     // Disable semantic validation (p5 globals cause false errors), keep syntax validation
     const diagOptions = { noSemanticValidation: true, noSyntaxValidation: false };
     monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(diagOptions);
@@ -128,6 +156,17 @@ export function CodeEditor() {
     if (!document.querySelector('[data-chat-input]:focus')) {
       editor.focus();
     }
+
+    // Force relayout after mount. When the editor mounts before its flex
+    // container has settled its size (a fresh route render, Monaco's CDN chunk
+    // resolving late), automaticLayout can miss the first measurement and render
+    // collapsed — showing only line 1 until a window resize. A few retries over
+    // the first frames guarantee the persisted code is visible immediately.
+    const forceLayout = () => editorRef.current?.layout();
+    requestAnimationFrame(forceLayout);
+    requestAnimationFrame(() => requestAnimationFrame(forceLayout));
+    setTimeout(forceLayout, 120);
+    setTimeout(forceLayout, 350);
   }, []);
 
   const handleDiffMount: DiffOnMount = useCallback((editor) => {
@@ -172,7 +211,7 @@ export function CodeEditor() {
           language={editorLanguage}
           original={code}
           modified={streamingCode}
-          theme={editorTheme}
+          theme={resolvedTheme}
           onMount={handleStreamingDiffMount}
           options={{
             ...EDITOR_OPTIONS,
@@ -198,7 +237,7 @@ export function CodeEditor() {
           language={editorLanguage}
           original={pendingDiff.previousCode}
           modified={code}
-          theme={editorTheme}
+          theme={resolvedTheme}
           beforeMount={handleBeforeMount}
           onMount={handleDiffMount}
           options={{

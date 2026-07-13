@@ -39,10 +39,10 @@ export function SketchSuggestion({ onSelect, onKeep }: SketchSuggestionProps) {
           </svg>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-mono text-text-primary/80 truncate">
+          <p className="text-[11px] text-text-primary/80 truncate">
             {label}
           </p>
-          <p className="text-[10px] font-mono text-text-muted/40 mt-0.5">
+          <p className="text-[10px] text-text-muted/40 mt-0.5">
             {applied ? 'Applied. Keep it or try another' : 'Example sketch'}
           </p>
         </div>
@@ -53,7 +53,7 @@ export function SketchSuggestion({ onSelect, onKeep }: SketchSuggestionProps) {
           <button
             type="button"
             onClick={handleGenerate}
-            className="group w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-accent/15 hover:bg-accent/25 border border-accent/30 hover:border-accent/50 text-[11px] font-mono text-text-primary/90 transition-all cursor-pointer"
+            className="group w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-accent/15 hover:bg-accent/25 border border-accent/30 hover:border-accent/50 text-[11px] text-text-primary/90 transition-all cursor-pointer"
           >
             Generate
             <svg className="w-3.5 h-3.5 text-accent/50 group-hover:text-accent/80 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -66,7 +66,7 @@ export function SketchSuggestion({ onSelect, onKeep }: SketchSuggestionProps) {
           <button
             type="button"
             onClick={onKeep}
-            className="group flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-success/15 hover:bg-success/25 border border-success/30 hover:border-success/50 text-[11px] font-mono text-text-primary/90 transition-all cursor-pointer"
+            className="group flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-success/15 hover:bg-success/25 border border-success/30 hover:border-success/50 text-[11px] text-text-primary/90 transition-all cursor-pointer"
           >
             <svg className="w-3.5 h-3.5 text-success/70 group-hover:text-success transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -77,7 +77,7 @@ export function SketchSuggestion({ onSelect, onKeep }: SketchSuggestionProps) {
             type="button"
             onClick={handleGenerateNew}
             title="Generate a different example"
-            className="group flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-border/10 hover:bg-border/20 border border-border/30 hover:border-border/50 text-[11px] font-mono text-text-muted/70 hover:text-text-primary/80 transition-all cursor-pointer"
+            className="group flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-border/10 hover:bg-border/20 border border-border/30 hover:border-border/50 text-[11px] text-text-muted/70 hover:text-text-primary/80 transition-all cursor-pointer"
           >
             <svg className="w-3.5 h-3.5 transition-transform group-hover:-rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

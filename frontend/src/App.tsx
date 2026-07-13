@@ -13,7 +13,10 @@ import type { LLMConfig } from './types';
 function App() {
   const user = useAuthStore((s) => s.user);
   const location = useLocation();
-  const isEditorPage = location.pathname === '/' || location.pathname.startsWith('/sketch/');
+  const isEditorPage =
+    location.pathname === '/' ||
+    location.pathname.startsWith('/sketch/') ||
+    location.pathname.startsWith('/example/');
 
   // Register a global 401 handler: if any authenticated request finds the session
   // expired/invalid, clear the stale local auth state and prompt re-login so the UI

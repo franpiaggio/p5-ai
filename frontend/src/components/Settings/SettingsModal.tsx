@@ -20,6 +20,8 @@ interface Draft {
 export function SettingsModal() {
   const isSettingsOpen = useEditorStore((s) => s.isSettingsOpen);
   const setIsSettingsOpen = useEditorStore((s) => s.setIsSettingsOpen);
+  const appTheme = useEditorStore((s) => s.appTheme);
+  const setAppTheme = useEditorStore((s) => s.setAppTheme);
   const user = useAuthStore((s) => s.user);
 
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -159,10 +161,10 @@ export function SettingsModal() {
         if (e.target === e.currentTarget && !saving) handleDiscard();
       }}
     >
-      <div className="modal-panel max-w-md relative">
+      <div className="modal-panel max-w-md relative" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
         {saving && (
           <div className="absolute inset-0 bg-surface/60 backdrop-blur-[1px] rounded-xl z-10 flex items-center justify-center">
-            <div className="flex items-center gap-2 text-[11px] font-mono text-text-muted">
+            <div className="flex items-center gap-2 text-[11px] text-text-muted">
               <span className="inline-block w-4 h-4 border-2 border-info/30 border-t-info rounded-full animate-spin" />
               Saving…
             </div>
@@ -170,8 +172,8 @@ export function SettingsModal() {
         )}
 
         <div className="flex justify-between items-center mb-5">
-          <h2 className="modal-title">Settings</h2>
-          <button onClick={handleDiscard} className="modal-close" disabled={saving}>
+          <h2 id="settings-modal-title" className="modal-title">Settings</h2>
+          <button onClick={handleDiscard} className="modal-close" disabled={saving} aria-label="Close settings">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -180,10 +182,11 @@ export function SettingsModal() {
 
         <fieldset disabled={disabled} className="space-y-4">
           <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+            <label htmlFor="settings-provider" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
               Provider
             </label>
             <select
+              id="settings-provider"
               value={draft.provider}
               onChange={(e) => handleProviderChange(e.target.value as LLMConfig['provider'])}
               className="input-field"
@@ -195,20 +198,21 @@ export function SettingsModal() {
           </div>
 
           {isDemo && (
-            <p className="text-[10px] font-mono text-info/60 bg-info/5 border border-info/15 rounded-lg px-3 py-2">
+            <p className="text-[10px] text-info/60 bg-info/5 border border-info/15 rounded-lg px-3 py-2">
               Free demo mode powered by Groq + Llama 3.3 70B. No API key needed.
             </p>
           )}
 
           {!isDemo && (
             <div>
-              <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+              <label htmlFor="settings-api-key" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
                 API Key
               </label>
               {storedKeyMask ? (
                 <>
                   <div className="flex gap-2">
                     <input
+                      id="settings-api-key"
                       type="text"
                       value={storedKeyMask}
                       disabled
@@ -217,7 +221,7 @@ export function SettingsModal() {
                     <button
                       type="button"
                       onClick={handleClearKey}
-                      className="px-2.5 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                      className="px-2.5 rounded-lg border border-error/30 text-error hover:bg-error/10 transition-colors cursor-pointer"
                       title="Delete key"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -225,7 +229,7 @@ export function SettingsModal() {
                       </svg>
                     </button>
                   </div>
-                  <p className="mt-1.5 text-[10px] font-mono text-success/50">
+                  <p className="mt-1.5 text-[10px] text-success/50">
                     Stored on server. Delete to set a new key.
                   </p>
                 </>
@@ -233,6 +237,7 @@ export function SettingsModal() {
                 <>
                   <div className="flex gap-2">
                     <input
+                      id="settings-api-key"
                       type="password"
                       value={currentKey}
                       onChange={(e) => handleKeyChange(e.target.value)}
@@ -243,7 +248,7 @@ export function SettingsModal() {
                       <button
                         type="button"
                         onClick={handleClearKey}
-                        className="px-2.5 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                        className="px-2.5 rounded-lg border border-error/30 text-error hover:bg-error/10 transition-colors cursor-pointer"
                         title="Delete key"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,7 +258,7 @@ export function SettingsModal() {
                     )}
                   </div>
                   {user && draft.storeApiKeys ? (
-                    <p className="mt-1.5 text-[10px] font-mono text-text-muted/30">
+                    <p className="mt-1.5 text-[10px] text-text-muted/30">
                       Will be encrypted &amp; saved to your account.
                     </p>
                   ) : (
@@ -261,8 +266,8 @@ export function SettingsModal() {
                       <svg className="w-3.5 h-3.5 text-warning shrink-0 mt-px" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86l-8.58 14.85A1 1 0 002.56 20h18.88a1 1 0 00.85-1.29L13.71 3.86a1 1 0 00-1.42 0z" />
                       </svg>
-                      <span className="text-[10px] font-mono text-warning/80 leading-relaxed">
-                        Session only — your key will be lost when you close this tab.
+                      <span className="text-[10px] text-warning/80 leading-relaxed">
+                        Session only. Your key will be lost when you close this tab.
                         {user && ' Enable "Store my API keys" below to save it.'}
                       </span>
                     </div>
@@ -280,17 +285,18 @@ export function SettingsModal() {
                 onChange={(e) => updateDraft({ storeApiKeys: e.target.checked })}
                 className="rounded border-border/50 accent-accent"
               />
-              <span className="text-[10px] font-mono text-text-muted/50">
+              <span className="text-[10px] text-text-muted/50">
                 Store my API keys (encrypted on server)
               </span>
             </label>
           )}
 
           <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-1.5">
+            <label htmlFor="settings-model" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
               Model {loadingModels && <span className="text-accent/50">loading...</span>}
             </label>
             <select
+              id="settings-model"
               value={draft.model}
               onChange={(e) => updateDraft({ model: e.target.value })}
               className="input-field"
@@ -306,12 +312,42 @@ export function SettingsModal() {
         </fieldset>
 
         <div className="mt-5 pt-4 border-t border-border/30 space-y-4">
+          <div>
+            <span className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
+              Appearance
+            </span>
+            <div className="flex gap-1 p-0.5 rounded-lg bg-surface border border-border/40" role="group" aria-label="Theme">
+              {([
+                { id: 'auto', label: 'Auto' },
+                { id: 'dark', label: 'Dark' },
+                { id: 'light', label: 'Light' },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setAppTheme(opt.id)}
+                  aria-pressed={appTheme === opt.id}
+                  className={`flex-1 py-1.5 rounded-md text-[11px] transition-colors cursor-pointer ${
+                    appTheme === opt.id
+                      ? 'bg-accent text-on-accent'
+                      : 'text-text-muted hover:text-text-primary'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[10px] text-text-muted/40">
+              Auto follows your system. Applies to the editor too.
+            </p>
+          </div>
+
           <label className={`flex items-center justify-between ${disabled ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}>
             <div>
-              <span className="block text-[10px] font-mono uppercase tracking-widest text-text-muted/50 mb-0.5">
+              <span className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-0.5">
                 Auto-apply code
               </span>
-              <span className="block text-[10px] font-mono text-text-muted/30">
+              <span className="block text-[10px] text-text-muted/30">
                 Show diff review automatically when AI responds with code
               </span>
             </div>

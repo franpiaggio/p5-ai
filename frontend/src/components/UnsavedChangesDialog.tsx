@@ -57,7 +57,7 @@ export function UnsavedChangesDialog() {
         if (e.target === e.currentTarget) dismiss();
       }}
     >
-      <div className="modal-panel max-w-sm">
+      <div className="modal-panel max-w-sm" role="dialog" aria-modal="true" aria-labelledby="unsaved-changes-title">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-9 h-9 rounded-lg bg-warning/15 flex items-center justify-center shrink-0">
             <svg className="w-5 h-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -65,8 +65,8 @@ export function UnsavedChangesDialog() {
             </svg>
           </div>
           <div>
-            <h2 className="text-sm font-mono font-semibold text-text-primary">Unsaved changes</h2>
-            <p className="text-[11px] font-mono text-text-muted/50 mt-0.5">
+            <h2 id="unsaved-changes-title" className="text-sm font-semibold text-text-primary">Unsaved changes</h2>
+            <p className="text-[11px] text-text-muted/50 mt-0.5">
               {user
                 ? 'Your changes will be lost if you don\u2019t save them.'
                 : 'Sign in to save your work. Changes will be lost.'}
@@ -75,21 +75,21 @@ export function UnsavedChangesDialog() {
         </div>
 
         {error && (
-          <p className="text-[10px] font-mono text-error mt-3">{error}</p>
+          <p className="text-[10px] text-error mt-3">{error}</p>
         )}
 
         <div className="flex justify-end gap-2 mt-5">
           <button
             onClick={dismiss}
             disabled={saving}
-            className="px-3 py-1.5 text-[11px] font-mono text-text-muted hover:text-text-primary transition-colors cursor-pointer disabled:opacity-40"
+            className="px-3 py-1.5 text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer disabled:opacity-40"
           >
             Cancel
           </button>
           <button
             onClick={discard}
             disabled={saving}
-            className="px-3 py-1.5 text-[11px] font-mono rounded bg-accent/10 text-accent hover:bg-accent/20 transition-colors cursor-pointer disabled:opacity-40"
+            className="px-3 py-1.5 text-[11px] rounded bg-error/10 text-error hover:bg-error/20 transition-colors cursor-pointer disabled:opacity-40"
           >
             Discard
           </button>

@@ -328,7 +328,7 @@ export function ChatPanel() {
       {backendOnline === null && (
         <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-border/10 border border-border/20 flex items-center gap-2">
           <div className="w-3 h-3 border-[1.5px] border-text-muted/20 border-t-text-muted/60 rounded-full animate-spin shrink-0" />
-          <p className="text-text-muted/60 text-[11px] font-mono">
+          <p className="text-text-muted/60 text-[11px]">
             Connecting...
           </p>
         </div>
@@ -336,7 +336,7 @@ export function ChatPanel() {
       {backendOnline === false && (
         <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-error/10 border border-error/20 flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-error shrink-0" />
-          <p className="text-error text-[11px] font-mono">
+          <p className="text-error text-[11px]">
             Backend unavailable. Chat is disabled, but the editor still works normally.
           </p>
         </div>
@@ -346,7 +346,7 @@ export function ChatPanel() {
           <svg className="w-3.5 h-3.5 text-warning/70 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
           </svg>
-          <p className="text-text-muted/70 text-[11px] font-mono">
+          <p className="text-text-muted/70 text-[11px]">
             Add your API key to start chatting.{' '}
             <button
               type="button"

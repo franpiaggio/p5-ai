@@ -114,7 +114,7 @@ export function ChatInput({ onSend, isLoading, disabled, showAttach, children }:
     >
       {dragOver && (
         <div className="absolute inset-0 z-50 bg-accent/10 border-2 border-dashed border-accent/40 flex items-center justify-center pointer-events-none rounded-lg">
-          <p className="text-accent text-xs font-mono">Drop images here</p>
+          <p className="text-accent text-xs">Drop images here</p>
         </div>
       )}
 
@@ -122,7 +122,7 @@ export function ChatInput({ onSend, isLoading, disabled, showAttach, children }:
 
       <form onSubmit={handleSubmit} autoComplete="off" className="p-2 border-t border-border/40 shrink-0">
         {imageError && (
-          <div className="mb-2 px-1 text-[11px] font-mono text-error">
+          <div className="mb-2 px-1 text-[11px] text-error">
             {imageError}
           </div>
         )}
@@ -178,6 +178,7 @@ export function ChatInput({ onSend, isLoading, disabled, showAttach, children }:
             data-lpignore="true"
             data-1p-ignore="true"
             data-form-type="other"
+            aria-label="Describe your idea"
             placeholder="Describe your idea..."
             disabled={disabled}
             autoComplete="one-time-code"

@@ -50,7 +50,7 @@ function SketchTitle() {
             setEditing(false);
           }
         }}
-        className="bg-transparent border border-info/30 rounded px-2 py-0.5 text-xs font-mono text-text-primary outline-none focus:border-info/60 w-full max-w-44"
+        className="bg-transparent border border-info/30 rounded px-2 py-0.5 text-xs text-text-primary outline-none focus:border-info/60 w-full max-w-44"
       />
     );
   }
@@ -61,7 +61,7 @@ function SketchTitle() {
       className="group flex items-center gap-1.5 px-2 py-0.5 rounded hover:bg-border/30 transition-colors cursor-pointer min-w-0"
       title="Click to rename"
     >
-      <span className="text-xs font-mono text-text-muted truncate">
+      <span className="text-xs text-text-muted truncate">
         {sketchTitle}
       </span>
       <svg
@@ -153,7 +153,7 @@ export function Toolbar() {
   return (
     <div className="h-11 bg-surface-raised border-b border-border/60 flex items-center px-3 md:px-4 gap-2 md:gap-3 shrink-0">
       <span className="text-accent font-black text-lg tracking-tight shrink-0">p5</span>
-      <span className="text-info text-[10px] font-mono uppercase tracking-[0.2em] opacity-70 hidden md:block">
+      <span className="text-info text-[10px] uppercase tracking-[0.2em] opacity-70 hidden md:block">
         AI Editor
       </span>
 
@@ -169,14 +169,24 @@ export function Toolbar() {
         <SketchTitle />
       </div>
 
-      {/* Desktop: hint + examples + settings + user */}
+      {/* Desktop: hint + my sketches + examples + settings + user */}
       <div className="hidden md:flex items-center gap-2">
         <span className="text-text-muted/40 text-[10px] font-mono">
           Alt+Enter to run
         </span>
         <button
+          onClick={() => (user ? navigate('/sketches') : setIsLoginOpen(true))}
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-info bg-info/10 border border-info/20 rounded hover:bg-info/20 hover:border-info/40 transition-colors cursor-pointer"
+          title="My sketches"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+          </svg>
+          My Sketches
+        </button>
+        <button
           onClick={() => navigate('/examples')}
-          className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono text-text-muted hover:text-info hover:bg-border/40 rounded transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 px-2.5 py-1 text-xs text-text-muted hover:text-info hover:bg-border/40 rounded transition-colors cursor-pointer"
           title="Browse examples"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

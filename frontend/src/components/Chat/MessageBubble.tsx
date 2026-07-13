@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { SafeImage } from './SafeImage';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import type { Message } from '../../types';
@@ -6,10 +7,13 @@ function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export function MessageBubble({ msg, isLastMessage, isLoading }: {
+// Memoized so that during streaming only the last (changing) bubble re-renders.
+// The parent replaces just the last message object per token, keeping every
+// prior message's reference stable, and passes a pre-combined `isGenerating`
+// (always false for older bubbles) so their props never churn.
+export const MessageBubble = memo(function MessageBubble({ msg, isGenerating }: {
   msg: Message;
-  isLastMessage: boolean;
-  isLoading: boolean;
+  isGenerating: boolean;
 }) {
   const time = formatTime(msg.timestamp);
 
@@ -29,7 +33,7 @@ export function MessageBubble({ msg, isLastMessage, isLoading }: {
               ))}
             </div>
           )}
-          <div className="whitespace-pre-wrap break-words font-mono">{msg.content}</div>
+          <div className="whitespace-pre-wrap break-words">{msg.content}</div>
         </div>
         <span className="text-[9px] font-mono text-text-muted/30 mt-0.5 px-1">{time}</span>
       </div>
@@ -39,15 +43,15 @@ export function MessageBubble({ msg, isLastMessage, isLoading }: {
   return (
     <div className="flex flex-col">
       <div className="px-3 py-2 rounded-lg text-xs leading-relaxed bg-surface-raised text-text-muted border border-border/20">
-        <div className="break-words font-mono markdown-chat">
+        <div className="break-words markdown-chat">
           <MarkdownRenderer
             content={msg.content}
             messageId={msg.id}
-            isGenerating={isLoading && isLastMessage}
+            isGenerating={isGenerating}
           />
         </div>
       </div>
       <span className="text-[9px] font-mono text-text-muted/30 mt-0.5 px-1">{time}</span>
     </div>
   );
-}
+});

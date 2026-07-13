@@ -18,29 +18,29 @@ export function BottomPanel() {
       <div className="flex items-center bg-surface-raised border-b border-border/60 shrink-0">
         <button
           onClick={() => setActiveTab('chat')}
-          className={`tab-btn ${activeTab === 'chat' ? 'text-accent' : 'text-text-muted/50 hover:text-text-muted'}`}
+          className={`tab-btn ${activeTab === 'chat' ? 'text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
         >
           AI Chat
           {activeTab === 'chat' && <div className="tab-indicator bg-accent" />}
         </button>
         <button
           onClick={() => setActiveTab('console')}
-          className={`tab-btn ${activeTab === 'console' ? 'text-info' : 'text-text-muted/50 hover:text-text-muted'}`}
+          className={`tab-btn ${activeTab === 'console' ? 'text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
         >
           Console
-          {activeTab === 'console' && <div className="tab-indicator bg-info" />}
+          {activeTab === 'console' && <div className="tab-indicator bg-accent" />}
         </button>
         <button
           onClick={() => setActiveTab('history')}
-          className={`tab-btn ${activeTab === 'history' ? 'text-warning' : 'text-text-muted/50 hover:text-text-muted'}`}
+          className={`tab-btn ${activeTab === 'history' ? 'text-text-primary' : 'text-text-muted hover:text-text-primary'}`}
         >
           History
-          {activeTab === 'history' && <div className="tab-indicator bg-warning" />}
+          {activeTab === 'history' && <div className="tab-indicator bg-accent" />}
         </button>
         <button
           onClick={() => setIsSettingsOpen(true)}
           className="ml-auto mr-2 px-2 py-0.5 text-[10px] font-mono text-text-muted/40 hover:text-text-muted/70 transition-colors cursor-pointer truncate max-w-[140px]"
-          title={`Model: ${isDemo ? 'Demo' : model} — Click to change`}
+          title={`Model: ${isDemo ? 'Demo' : model} (click to change)`}
         >
           {isDemo ? 'Demo' : formatModelName(model)}
         </button>

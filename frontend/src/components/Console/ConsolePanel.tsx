@@ -2,7 +2,7 @@ import { useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 
 const LOG_COLORS: Record<string, string> = {
-  error: 'text-accent',
+  error: 'text-error',
   warn: 'text-warning',
   info: 'text-info',
   log: 'text-text-primary',

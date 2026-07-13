@@ -10,20 +10,20 @@ export function PendingDiffBanner() {
         <svg className="w-3.5 h-3.5 text-warning shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <span className="text-[11px] font-mono text-text-muted truncate">
+        <span className="text-[11px] text-text-muted truncate">
           Review changes in the editor
         </span>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
         <button
           onClick={rejectPendingDiff}
-          className="px-2.5 py-1 text-[10px] font-mono rounded border border-border text-text-muted hover:border-error hover:text-error transition-colors cursor-pointer"
+          className="px-2.5 py-1 text-[10px] rounded border border-border text-text-muted hover:border-error hover:text-error transition-colors cursor-pointer"
         >
           Reject
         </button>
         <button
           onClick={acceptPendingDiff}
-          className="px-2.5 py-1 text-[10px] font-mono font-semibold rounded bg-success text-white hover:opacity-85 transition-opacity cursor-pointer"
+          className="px-2.5 py-1 text-[10px] font-semibold rounded bg-success text-white hover:opacity-85 transition-opacity cursor-pointer"
         >
           Accept
         </button>

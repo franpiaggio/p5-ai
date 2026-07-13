@@ -6,7 +6,7 @@ export function LoginButton() {
   return (
     <button
       onClick={() => setIsLoginOpen(true)}
-      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono
+      className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs
                  bg-border/40 text-text-muted hover:text-info hover:bg-border/60
                  transition-colors cursor-pointer"
     >

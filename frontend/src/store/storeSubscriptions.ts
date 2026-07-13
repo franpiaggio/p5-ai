@@ -1,6 +1,24 @@
 import { useEditorStore } from './editorStore';
 import { updateSketch } from '../services/api';
 
+// Apply the app theme to <html data-theme>. 'auto' removes the attribute so the
+// CSS (index.css) follows the OS via prefers-color-scheme; 'dark' -> Darkroom,
+// 'light' -> Gallery. The chrome tokens and the Monaco editor theme both key off
+// this, so switching in Settings updates the whole surface at once.
+function applyAppTheme(appTheme: 'auto' | 'dark' | 'light') {
+  const el = document.documentElement;
+  if (appTheme === 'dark') el.setAttribute('data-theme', 'darkroom');
+  else if (appTheme === 'light') el.setAttribute('data-theme', 'gallery');
+  else el.removeAttribute('data-theme');
+}
+applyAppTheme(useEditorStore.getState().appTheme);
+let prevAppTheme = useEditorStore.getState().appTheme;
+useEditorStore.subscribe((state) => {
+  if (state.appTheme === prevAppTheme) return;
+  prevAppTheme = state.appTheme;
+  applyAppTheme(state.appTheme);
+});
+
 // Sync sketchId to URL (only when on editor page)
 let prevSketchId = useEditorStore.getState().sketchId;
 useEditorStore.subscribe((state) => {

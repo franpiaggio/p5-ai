@@ -68,7 +68,6 @@ export function stopRecording(): Promise<string | null> {
 export function P5Preview() {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const blobUrlRef = useRef<string | null>(null);
-  const code = useEditorStore((s) => s.code);
   const previewCode = useEditorStore((s) => s.previewCode);
   const isRunning = useEditorStore((s) => s.isRunning);
   const runTrigger = useEditorStore((s) => s.runTrigger);
@@ -113,8 +112,12 @@ export function P5Preview() {
         URL.revokeObjectURL(blobUrlRef.current);
       }
 
-      const activeCode = previewCode?.code ?? code;
-      const { transpiler, editorLanguage } = useEditorStore.getState();
+      // Read code fresh from the store at run time rather than from the render
+      // closure: a route mount (/example/:slug, /sketch/:id) sets code + bumps
+      // runTrigger in one update, and the closure's `code` can lag a tick behind
+      // the runTrigger change, which would run stale code (e.g. the default sketch).
+      const { code: currentCode, transpiler, editorLanguage } = useEditorStore.getState();
+      const activeCode = previewCode?.code ?? currentCode;
       const jsCode = editorLanguage === 'typescript' && transpiler
         ? await transpiler(activeCode)
         : activeCode;

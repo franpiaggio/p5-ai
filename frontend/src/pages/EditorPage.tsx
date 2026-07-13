@@ -1,16 +1,54 @@
 import { useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { CodeEditor, P5Preview, BottomPanel, SplitPane, Panel } from '../components';
 import { PreviewControls } from '../components/Preview/PreviewControls';
 import { MobileLayout } from '../components/Layout/MobileLayout';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useEditorStore } from '../store/editorStore';
+import { getExampleBySlug } from '../data/sketchExamples';
 import { getPublicSketch } from '../services/api';
 
 export function EditorPage() {
   const isMobile = useIsMobile();
   const streamingCode = useEditorStore((s) => s.streamingCode);
-  const { sketchId } = useParams();
+  const { sketchId, exampleSlug } = useParams();
+  const navigate = useNavigate();
+
+  // Load an example from /example/:slug into the editor as an editable copy.
+  // Once the user edits the loaded code, drop the example URL back to '/' since
+  // it's now their own unsaved work (not the pristine example anymore).
+  useEffect(() => {
+    if (!exampleSlug) return;
+    const example = getExampleBySlug(exampleSlug);
+    if (!example) {
+      navigate('/', { replace: true });
+      return;
+    }
+    // Skip reload if this example's code is already in the editor (persist rehydrate / back-nav)
+    if (useEditorStore.getState().code !== example.code) {
+      const { runTrigger } = useEditorStore.getState();
+      useEditorStore.setState({
+        code: example.code,
+        lastSavedCode: example.code,
+        sketchId: null,
+        sketchTitle: example.label,
+        isRunning: true,
+        runTrigger: runTrigger + 1,
+        previewCode: null,
+        pendingDiff: null,
+        consoleLogs: [],
+        editorErrors: [],
+        messages: [],
+        appliedBlocks: {},
+        codeHistory: [],
+        showSuggestion: false,
+      });
+    }
+    const unsubscribe = useEditorStore.subscribe((state) => {
+      if (state.code !== example.code) navigate('/', { replace: true });
+    });
+    return unsubscribe;
+  }, [exampleSlug, navigate]);
 
   useEffect(() => {
     if (!sketchId) return;

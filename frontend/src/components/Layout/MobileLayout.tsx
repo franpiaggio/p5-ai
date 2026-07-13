@@ -47,6 +47,7 @@ export function MobileLayout() {
           onClick={() => { history.back(); }}
           className="absolute top-2 right-2 z-10 btn-icon bg-surface/80 backdrop-blur border border-border/40 text-text-muted/60 hover:text-text-primary"
           title="Exit fullscreen"
+          aria-label="Exit fullscreen"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 9L4 4m0 0h4M4 4v4m11-3l5-5m0 0h-4m4 0v4M9 15l-5 5m0 0h4m-4 0v-4m11 3l5 5m0 0h-4m4 0v-4" />
@@ -67,6 +68,7 @@ export function MobileLayout() {
           onClick={enterFullscreen}
           className="absolute top-2 right-2 z-10 btn-icon bg-surface/80 backdrop-blur border border-border/40 text-text-muted/60 hover:text-text-primary"
           title="Fullscreen"
+          aria-label="Enter fullscreen"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" />

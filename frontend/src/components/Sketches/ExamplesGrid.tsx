@@ -1,6 +1,5 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { SKETCH_EXAMPLES } from '../../data/sketchExamples';
 import { buildPreviewHtml } from '../Preview/previewTemplate';
@@ -115,26 +114,8 @@ export function ExamplesGrid() {
 
   const loadExample = (idx: number) => {
     const example = shuffled[idx];
-    guardUnsaved(() => {
-      const { runTrigger } = useEditorStore.getState();
-      useEditorStore.setState({
-        code: example.code,
-        lastSavedCode: example.code,
-        sketchId: null,
-        sketchTitle: example.label,
-        isRunning: true,
-        runTrigger: runTrigger + 1,
-        previewCode: null,
-        pendingDiff: null,
-        consoleLogs: [],
-        editorErrors: [],
-        messages: [],
-        appliedBlocks: {},
-        codeHistory: [],
-        showSuggestion: false,
-      });
-      navigate('/');
-    });
+    // Route to the example's own URL; EditorPage loads its code from the slug.
+    guardUnsaved(() => navigate(`/example/${example.slug}`));
   };
 
   const goBack = () => navigate('/');
@@ -155,13 +136,13 @@ export function ExamplesGrid() {
           <div className="flex items-center gap-2">
             <span className="text-info font-bold text-base">p5</span>
             <span className="text-text-muted/30">|</span>
-            <h1 className="text-sm font-mono text-text-primary">Examples</h1>
+            <h1 className="text-sm text-text-primary">Examples</h1>
           </div>
         </div>
         {user && (
           <button
             onClick={() => navigate('/sketches')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-mono rounded bg-border/30 text-text-muted hover:text-text-primary hover:bg-border/50 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded bg-border/30 text-text-muted hover:text-text-primary hover:bg-border/50 transition-colors cursor-pointer"
           >
             My Sketches
           </button>
@@ -181,10 +162,10 @@ export function ExamplesGrid() {
             >
               <ExamplePreview code={example.code} />
               <div className="p-3">
-                <h3 className="text-sm font-mono text-text-primary group-hover:text-info transition-colors truncate">
+                <h3 className="text-sm text-text-primary group-hover:text-info transition-colors truncate">
                   {example.label}
                 </h3>
-                <p className="text-[10px] font-mono text-text-muted/40 mt-1.5 line-clamp-2">
+                <p className="text-[10px] text-text-muted/40 mt-1.5 line-clamp-2">
                   {example.prompt}
                 </p>
               </div>

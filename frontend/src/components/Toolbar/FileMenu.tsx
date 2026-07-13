@@ -88,7 +88,7 @@ export function FileMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 px-2 py-1 text-xs font-mono text-text-muted hover:text-text-primary hover:bg-border/30 rounded transition-colors cursor-pointer"
+        className="flex items-center gap-1 px-2 py-1 text-xs text-text-muted hover:text-text-primary hover:bg-border/30 rounded transition-colors cursor-pointer"
       >
         File
         <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -114,7 +114,7 @@ export function FileMenu() {
           </button>
           <button
             onClick={handleSaveAs}
-            className={`w-full text-left px-3 py-2 text-xs font-mono transition-colors flex justify-between ${
+            className={`w-full text-left px-3 py-2 text-xs transition-colors flex justify-between ${
               user
                 ? 'text-text-muted hover:bg-border/30 hover:text-info cursor-pointer'
                 : 'text-text-muted/30 cursor-not-allowed'
@@ -124,7 +124,7 @@ export function FileMenu() {
             Save As...
           </button>
           <label
-            className={`flex items-center gap-2 px-3 py-2 text-xs font-mono transition-colors ${
+            className={`flex items-center gap-2 px-3 py-2 text-xs transition-colors ${
               user && sketchId
                 ? 'text-text-muted hover:bg-border/30 cursor-pointer'
                 : 'text-text-muted/30 cursor-not-allowed'
@@ -144,7 +144,7 @@ export function FileMenu() {
 
           <button
             onClick={handleDuplicate}
-            className={`w-full text-left px-3 py-2 text-xs font-mono transition-colors flex justify-between ${
+            className={`w-full text-left px-3 py-2 text-xs transition-colors flex justify-between ${
               user && sketchId
                 ? 'text-text-muted hover:bg-border/30 hover:text-info cursor-pointer'
                 : 'text-text-muted/30 cursor-not-allowed'

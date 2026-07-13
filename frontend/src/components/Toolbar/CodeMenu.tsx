@@ -31,7 +31,7 @@ export function CodeMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 px-2 py-1 text-xs font-mono text-text-muted hover:text-text-primary hover:bg-border/30 rounded transition-colors cursor-pointer"
+        className="flex items-center gap-1 px-2 py-1 text-xs text-text-muted hover:text-text-primary hover:bg-border/30 rounded transition-colors cursor-pointer"
       >
         Code
         <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -41,7 +41,7 @@ export function CodeMenu() {
 
       {isOpen && (
         <div className="dropdown-menu left-0">
-          <div className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest text-text-muted/40">
+          <div className="px-3 py-1.5 text-[9px] uppercase tracking-widest text-text-muted/40">
             Language
           </div>
           {LANGUAGES.map((lang) => (
@@ -61,7 +61,7 @@ export function CodeMenu() {
 
           <div className="dropdown-separator" />
 
-          <div className="px-3 py-1.5 text-[9px] font-mono uppercase tracking-widest text-text-muted/40">
+          <div className="px-3 py-1.5 text-[9px] uppercase tracking-widest text-text-muted/40">
             Theme
           </div>
           {EDITOR_THEMES.map((theme) => (
