@@ -82,14 +82,14 @@ export function UnsavedChangesDialog() {
           <button
             onClick={dismiss}
             disabled={saving}
-            className="px-3 py-1.5 text-[11px] text-text-muted hover:text-text-primary transition-colors cursor-pointer disabled:opacity-40"
+            className="btn-ghost btn-sm"
           >
             Cancel
           </button>
           <button
             onClick={discard}
             disabled={saving}
-            className="px-3 py-1.5 text-[11px] rounded bg-error/10 text-error hover:bg-error/20 transition-colors cursor-pointer disabled:opacity-40"
+            className="btn-danger btn-sm"
           >
             Discard
           </button>
@@ -97,7 +97,7 @@ export function UnsavedChangesDialog() {
             <button
               onClick={saveAndContinue}
               disabled={saving}
-              className="btn-primary px-4 text-[11px]"
+              className="btn-primary btn-sm"
             >
               {saving ? 'Saving...' : 'Save'}
             </button>
@@ -107,7 +107,7 @@ export function UnsavedChangesDialog() {
                 dismiss();
                 setIsLoginOpen(true);
               }}
-              className="btn-primary px-4 text-[11px]"
+              className="btn-primary btn-sm"
             >
               Sign in
             </button>

@@ -133,14 +133,14 @@ export function SaveSketchModal() {
           <button
             type="button"
             onClick={handleClose}
-            className="px-4 py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
+            className="btn-ghost"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={!title.trim() || saving}
-            className="btn-primary px-5 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn-primary"
           >
             {saving ? 'Saving...' : 'Save'}
           </button>

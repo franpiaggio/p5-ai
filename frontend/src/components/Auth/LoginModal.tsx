@@ -139,7 +139,7 @@ export function LoginModal() {
           <button
             type="submit"
             disabled={!username.trim() || !password || loading}
-            className="btn-primary w-full disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn-primary w-full"
           >
             {loading ? 'Signing in...' : 'Sign In'}
           </button>

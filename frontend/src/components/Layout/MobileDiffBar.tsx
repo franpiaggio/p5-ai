@@ -11,13 +11,13 @@ export function MobileDiffBar() {
       </span>
       <button
         onClick={rejectPendingDiff}
-        className="min-h-[44px] px-5 rounded-lg border border-border/60 text-text-muted text-xs hover:border-error hover:text-error transition-colors"
+        className="btn-danger min-h-[44px]"
       >
         Reject
       </button>
       <button
         onClick={acceptPendingDiff}
-        className="min-h-[44px] px-5 rounded-lg bg-success text-white text-xs font-semibold transition-opacity hover:opacity-85"
+        className="btn-primary min-h-[44px]"
       >
         Accept
       </button>

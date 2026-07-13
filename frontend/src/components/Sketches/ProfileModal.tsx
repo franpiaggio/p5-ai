@@ -93,9 +93,11 @@ export function ProfileModal() {
 
         <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
           {loading && (
-            <p className="text-text-muted/50 text-xs text-center py-8">
-              Loading...
-            </p>
+            <div className="space-y-2" aria-hidden="true">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="skeleton h-[68px] rounded-lg" />
+              ))}
+            </div>
           )}
 
           {!loading && sketches.length === 0 && (
@@ -126,13 +128,13 @@ export function ProfileModal() {
                 <div className="flex gap-1.5 ml-2 shrink-0">
                   <button
                     onClick={() => handleLoad(sketch.id)}
-                    className="px-2.5 py-1 text-[10px] rounded bg-info/10 text-info hover:bg-info/20 transition-colors cursor-pointer"
+                    className="btn-secondary btn-sm"
                   >
                     Load
                   </button>
                   <button
                     onClick={() => handleDelete(sketch.id)}
-                    className="px-2.5 py-1 text-[10px] rounded bg-error/10 text-error hover:bg-error/20 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+                    className="btn-danger btn-sm opacity-0 group-hover:opacity-100"
                   >
                     Delete
                   </button>

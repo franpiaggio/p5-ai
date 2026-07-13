@@ -21,7 +21,7 @@ export function GeneratingCodeIndicator({ onCancel }: GeneratingCodeIndicatorPro
         {onCancel && (
           <button
             onClick={onCancel}
-            className="px-2 py-0.5 rounded border border-border text-text-muted hover:border-error hover:text-error transition-colors cursor-pointer text-[10px]"
+            className="btn-secondary btn-sm"
           >
             Cancel
           </button>

@@ -17,13 +17,13 @@ export function PendingDiffBanner() {
       <div className="flex items-center gap-1.5 shrink-0">
         <button
           onClick={rejectPendingDiff}
-          className="px-2.5 py-1 text-[10px] rounded border border-border text-text-muted hover:border-error hover:text-error transition-colors cursor-pointer"
+          className="btn-danger btn-sm"
         >
           Reject
         </button>
         <button
           onClick={acceptPendingDiff}
-          className="px-2.5 py-1 text-[10px] font-semibold rounded bg-success text-white hover:opacity-85 transition-opacity cursor-pointer"
+          className="btn-primary btn-sm"
         >
           Accept
         </button>

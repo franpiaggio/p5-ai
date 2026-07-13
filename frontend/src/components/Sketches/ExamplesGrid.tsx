@@ -142,7 +142,7 @@ export function ExamplesGrid() {
         {user && (
           <button
             onClick={() => navigate('/sketches')}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] rounded bg-border/30 text-text-muted hover:text-text-primary hover:bg-border/50 transition-colors cursor-pointer"
+            className="btn-secondary btn-sm"
           >
             My Sketches
           </button>
