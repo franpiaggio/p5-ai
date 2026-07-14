@@ -39,8 +39,10 @@ pnpm --dir backend lint       # ESLint with --fix
 pnpm --dir backend format     # Prettier
 ```
 
-### Test (backend only, no frontend tests)
+### Test
 ```bash
+pnpm --dir frontend test             # Vitest (unit: multi-file logic, preview assembly)
+pnpm --dir frontend test:watch       # Vitest watch mode
 pnpm --dir backend test              # Jest
 pnpm --dir backend test:watch        # Watch mode
 pnpm --dir backend test:cov          # Coverage
@@ -78,6 +80,22 @@ pnpm install:all    # Installs both frontend and backend deps
 - `History/` — Code change history browser
 
 **Hooks**: `useResizable` (drag-resize panels), `useIsMobile`, `useEscapeClose`
+
+**Multi-file sketches**: A sketch is a `SketchFile[]` (name/content/language) plus a
+`Library[]` (CDN url list); `sketch.js` is the protected entry point. The store keeps
+the active file's content mirrored in the live `code` buffer (`syncActiveFile`).
+- **Preview assembly** (`Preview/previewTemplate.ts`): hybrid. If any file uses
+  `import`/`export`, files are assembled as **native ES modules** (import map + data
+  URLs, relative specifiers rewritten to bare, a bridge re-exposes `setup`/`draw` to
+  `window` for p5 global mode). Otherwise files are **concatenated** as global
+  `<script>`s with `sketch.js` last.
+- **AI edits** (`utils/fileEdits.ts`, pure + unit-tested): `planFileChanges` turns an
+  assistant message into per-file changes (search/replace, one block per file, or
+  several `// filename:` sections in one block). `presentationFor` decides UX: a single
+  edit to the active file → reviewable **diff**; anything else (multi-file, non-active,
+  new) → applied directly and recorded per-file in History. `ChatPanel` orchestrates.
+- **Tests**: `pnpm --dir frontend test` (Vitest). Pure logic in `utils/*.test.ts`,
+  `constants/*.test.ts`, `Preview/previewTemplate.test.ts`.
 
 ### Backend (`backend/src/`)
 
