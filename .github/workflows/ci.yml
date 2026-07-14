@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    name: Unit & API tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            backend/pnpm-lock.yaml
+            frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install:all
+      - name: Backend unit tests
+        run: pnpm --dir backend test
+      - name: Backend API (e2e) tests
+        run: pnpm --dir backend test:e2e
+      - name: Frontend unit tests
+        run: pnpm --dir frontend test
+      - name: Frontend typecheck
+        run: pnpm --dir frontend exec tsc -b
+
+  e2e:
+    name: Browser e2e (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            backend/pnpm-lock.yaml
+            frontend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install && pnpm install:all
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run e2e suite
+        run: pnpm test:e2e
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

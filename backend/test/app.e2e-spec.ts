@@ -1,25 +1,154 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-require-imports -- AppModule must load after test env vars are set */
+import { Test } from '@nestjs/testing';
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
-import { App } from 'supertest/types';
-import { AppModule } from './../src/app.module';
+import cookieParser from 'cookie-parser';
 
-describe('AppController (e2e)', () => {
-  let app: INestApplication<App>;
+/**
+ * API wiring smoke test: real HTTP through guards, validation and TypeORM
+ * against an in-memory SQLite database. Covers what unit tests can't — that
+ * the cookie auth, guards and controllers are actually wired together.
+ */
+describe('API (e2e)', () => {
+  let app: INestApplication;
+  let authCookie: string;
+  let sketchId: string;
 
-  beforeEach(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+  beforeAll(async () => {
+    process.env.DATABASE_PATH = ':memory:';
+    process.env.JWT_SECRET = 'e2e-jwt-secret';
+    process.env.ADMIN_PASSWORD = 'e2e-admin-password';
+
+    // Import after env is set so ConfigModule picks up the test values.
+    const { AppModule } =
+      require('../src/app.module') as typeof import('../src/app.module');
+    const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
+    app = moduleRef.createNestApplication();
+    // Mirror the middleware from main.ts that the routes depend on.
+    app.use(cookieParser());
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    );
     await app.init();
+  }, 30_000);
+
+  afterAll(async () => {
+    await app.close();
+  }, 15_000);
+
+  it('GET /api/health responds ok', async () => {
+    await request(app.getHttpServer())
+      .get('/api/health')
+      .expect(200)
+      .expect({ status: 'ok' });
   });
 
-  it('/ (GET)', () => {
-    return request(app.getHttpServer())
-      .get('/')
-      .expect(200)
-      .expect('Hello World!');
+  describe('auth', () => {
+    it('rejects a wrong password', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ username: 'admin', password: 'wrong' })
+        .expect(401);
+    });
+
+    it('logs in the seeded admin and sets an httpOnly token cookie', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send({ username: 'admin', password: 'e2e-admin-password' })
+        .expect(201);
+
+      expect(res.body.user.name).toBe('Admin');
+      const cookies = res.get('Set-Cookie')!;
+      const tokenCookie = cookies.find((c: string) => c.startsWith('token='));
+      expect(tokenCookie).toContain('HttpOnly');
+      authCookie = tokenCookie!.split(';')[0];
+    });
+  });
+
+  describe('sketches', () => {
+    it('requires auth to list sketches', async () => {
+      await request(app.getHttpServer()).get('/api/sketches').expect(401);
+    });
+
+    it('requires auth to create a sketch', async () => {
+      await request(app.getHttpServer())
+        .post('/api/sketches')
+        .send({ title: 'nope', code: 'x' })
+        .expect(401);
+    });
+
+    it('creates a sketch with the auth cookie', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/sketches')
+        .set('Cookie', authCookie)
+        .send({ title: 'E2E sketch', code: 'function setup() {}' })
+        .expect(201);
+
+      expect(res.body.id).toBeTruthy();
+      expect(res.body.title).toBe('E2E sketch');
+      sketchId = res.body.id;
+    });
+
+    it('rejects unknown fields via the validation whitelist', async () => {
+      await request(app.getHttpServer())
+        .post('/api/sketches')
+        .set('Cookie', authCookie)
+        .send({ title: 'x', code: 'y', hacker: true })
+        .expect(400);
+    });
+
+    it('lists the created sketch without the code payload', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/sketches')
+        .set('Cookie', authCookie)
+        .expect(200);
+
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].title).toBe('E2E sketch');
+      expect(res.body[0].code).toBeUndefined();
+    });
+
+    it('fetches the full sketch by id', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/sketches/${sketchId}`)
+        .set('Cookie', authCookie)
+        .expect(200);
+
+      expect(res.body.code).toBe('function setup() {}');
+    });
+
+    it('serves the public endpoint without auth and without owner info', async () => {
+      const res = await request(app.getHttpServer())
+        .get(`/api/sketches/public/${sketchId}`)
+        .expect(200);
+
+      expect(res.body.code).toBe('function setup() {}');
+      expect(res.body.userId).toBeUndefined();
+    });
+
+    it('updates and deletes the sketch', async () => {
+      await request(app.getHttpServer())
+        .put(`/api/sketches/${sketchId}`)
+        .set('Cookie', authCookie)
+        .send({ title: 'Renamed' })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .delete(`/api/sketches/${sketchId}`)
+        .set('Cookie', authCookie)
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get(`/api/sketches/${sketchId}`)
+        .set('Cookie', authCookie)
+        .expect(404);
+    });
   });
 });

@@ -3,9 +3,14 @@
   "private": true,
   "scripts": {
     "dev": "concurrently -n back,front -c blue,green \"pnpm --dir backend start:dev\" \"pnpm --dir frontend dev\"",
-    "install:all": "pnpm --dir backend install && pnpm --dir frontend install"
+    "install:all": "pnpm --dir backend install && pnpm --dir frontend install",
+    "test": "pnpm --dir backend test && pnpm --dir frontend test",
+    "test:api": "pnpm --dir backend test:e2e",
+    "test:e2e": "playwright test",
+    "test:all": "pnpm test && pnpm test:api && pnpm test:e2e"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "concurrently": "^9.1.0"
   }
 }

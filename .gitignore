@@ -28,3 +28,8 @@ generate_new_art.md
 
 # External / side projects (not part of the app)
 promo-video/
+
+# Test artifacts
+test-results/
+playwright-report/
+e2e/.data/
