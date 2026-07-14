@@ -95,10 +95,12 @@ import {
   breathingLight,
   infinityMirror3d,
   constellationNetwork,
+  modularParticleField,
 } from './sketches';
 
 export const SKETCH_EXAMPLES: SketchExampleEntry[] = [
   { slug: 'constellation-network', ...constellationNetwork },
+  { slug: 'modular-particle-field', ...modularParticleField },
   { slug: 'particle-flow-field', ...particleFlowField },
   { slug: 'depth-flow-field-3d', ...depthFlowField3d },
   { slug: 'interactive-animated-grid', ...interactiveAnimatedGrid },

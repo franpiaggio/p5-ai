@@ -64,3 +64,4 @@ export { default as parametricSculpture3d } from './parametricSculpture3d';
 export { default as breathingLight } from './breathingLight';
 export { default as infinityMirror3d } from './infinityMirror3d';
 export { default as constellationNetwork } from './constellationNetwork';
+export { default as modularParticleField } from './modularParticleField';

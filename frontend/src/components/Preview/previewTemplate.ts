@@ -119,12 +119,102 @@ function escapeScript(code: string): string {
   return code.replace(/<\/script/gi, '<\x2fscript');
 }
 
+/** True if any file uses ES module syntax (import/export) — triggers module mode. */
+function usesEsModules(files: SketchFile[]): boolean {
+  const re = /(^|\n)\s*(import\s+[^;\n]*from\s+['"]|import\s+['"]|import\s*\(|export\s+(default|const|let|var|function|class|async|\{|\*))/;
+  return files.some((f) => re.test(f.content));
+}
+
+// p5 lifecycle hooks that global mode looks for on `window`. In module scope,
+// top-level functions aren't global, so the entry module re-exposes them.
+const P5_LIFECYCLE = [
+  'setup', 'draw', 'preload', 'mousePressed', 'mouseReleased', 'mouseMoved',
+  'mouseDragged', 'mouseClicked', 'doubleClicked', 'mouseWheel', 'keyPressed',
+  'keyReleased', 'keyTyped', 'touchStarted', 'touchMoved', 'touchEnded',
+  'windowResized', 'deviceMoved', 'deviceTurned', 'deviceShaken',
+];
+
+const GLOBAL_BRIDGE = '\n// --- expose p5 lifecycle hooks to global scope ---\n' +
+  P5_LIFECYCLE.map((fn) => `if (typeof ${fn} !== 'undefined') window.${fn} = ${fn};`).join('\n');
+
+/** Rewrite relative specifiers that point at sibling files ('./x.js' or 'x.js')
+ * to bare specifiers, so the import map resolves them to the file's data URL. */
+function rewriteLocalSpecifiers(code: string, fileNames: Set<string>): string {
+  const resolve = (spec: string): string | null => {
+    const base = spec.replace(/^\.{0,2}\//, '');
+    if (fileNames.has(base)) return base;
+    if (fileNames.has(base + '.js')) return base + '.js';
+    return null;
+  };
+  // static: `from '...'`, side-effect `import '...'`, `export ... from '...'`
+  code = code.replace(/(\bfrom\s*|\bimport\s+)(['"])([^'"]+)(['"])/g, (m, kw, q1, spec, q2) => {
+    const r = resolve(spec);
+    return r ? `${kw}${q1}${r}${q2}` : m;
+  });
+  // dynamic import('...')
+  code = code.replace(/(\bimport\s*\(\s*)(['"])([^'"]+)(['"])(\s*\))/g, (m, pre, q1, spec, q2, post) => {
+    const r = resolve(spec);
+    return r ? `${pre}${q1}${r}${q2}${post}` : m;
+  });
+  return code;
+}
+
+/**
+ * Build preview HTML using native ES modules + an import map.
+ * Each file becomes a data-URL module; relative imports between files are
+ * rewritten to bare specifiers resolved via the import map. The entry (sketch.js)
+ * gets a bridge that re-exposes its p5 lifecycle functions on `window` so p5's
+ * global mode can find them.
+ */
+function buildModulePreviewHtml(files: SketchFile[], libraries: Library[]): string {
+  const libTags = libraries
+    .map((lib) => `  <script src="${lib.url}"><\/script>`)
+    .join('\n');
+
+  const fileNames = new Set(files.map((f) => f.name));
+  const toDataUrl = (content: string) => `data:text/javascript,${encodeURIComponent(content)}`;
+
+  const imports: Record<string, string> = {};
+  for (const f of files) {
+    let content = rewriteLocalSpecifiers(f.content, fileNames);
+    if (f.name === 'sketch.js') content += GLOBAL_BRIDGE;
+    imports[f.name] = toDataUrl(content);
+  }
+  const importMap = JSON.stringify({ imports }, null, 2);
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <script src="${P5_CDN}"><\/script>
+${libTags ? libTags + '\n' : ''}  <style>
+    body { margin: 0; padding: 0; overflow: hidden; background: #fff; }
+    canvas { display: block; }
+  </style>
+  <script>
+${INFRA_SCRIPT.replace('{{LINE_OFFSET}}', '0')}  <\/script>
+  <script type="importmap">
+${importMap}
+  <\/script>
+</head>
+<body>
+  <script type="module">import 'sketch.js';<\/script>
+</body>
+</html>`;
+}
+
 /**
  * Build preview HTML for multiple files + CDN libraries.
  * sketch.js is always loaded last (entry point with setup()/draw()).
  * Other files are loaded in array order before sketch.js.
  */
 export function buildMultiFilePreviewHtml(files: SketchFile[], libraries: Library[]): string {
+  // Hybrid: if any file uses import/export, assemble as real ES modules.
+  // Otherwise fall back to global-script concatenation (p5 global mode intact).
+  if (usesEsModules(files)) {
+    return buildModulePreviewHtml(files, libraries);
+  }
+
   const libTags = libraries
     .map((lib) => `  <script src="${lib.url}"><\/script>`)
     .join('\n');
