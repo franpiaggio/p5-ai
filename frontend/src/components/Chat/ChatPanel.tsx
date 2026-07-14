@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { simpleHash, extractFirstJsBlock, extractJsBlocks, splitFileSections, extractSearchReplaceBlocks, applySearchReplace, stripSearchReplaceBlocks, diffSummary } from '../../utils/codeUtils';
+import { simpleHash, extractJsBlocks, extractSearchReplaceBlocks, applySearchReplace, stripSearchReplaceBlocks, diffSummary } from '../../utils/codeUtils';
+import { planFileChanges, applyChangesToFiles, focusAfterChanges, presentationFor } from '../../utils/fileEdits';
 import { streamChat, checkBackendHealth } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';
@@ -9,8 +10,7 @@ import { GeneratingCodeIndicator } from './GeneratingCodeIndicator';
 import { PendingDiffBanner } from './PendingDiffBanner';
 import { SketchSuggestion } from './SketchSuggestion';
 import type { SketchExample } from '../../data/sketchExamples';
-import { createDefaultFiles, filesFromNamed, createFileId, isAllowedFileName, languageFromExtension } from '../../constants/defaultFiles';
-import type { SketchFile } from '../../types';
+import { createDefaultFiles, filesFromNamed } from '../../constants/defaultFiles';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAuthStore } from '../../store/authStore';
@@ -192,77 +192,74 @@ export function ChatPanel() {
 
       // Restore full message content, clear streaming, and auto-apply in one atomic update
       // to avoid a flicker frame between streaming DiffEditor and pendingDiff DiffEditor
-      let jsCode: string | null = null;
-      let targetFileName: string | null = null;
-      let isNewFile = false;
-      // Multiple `// filename:` sections in one response → apply them all at once.
-      // Sections may come from separate fences or several headers inside one fence.
-      let multiFileEdits: Array<{ name: string | null; code: string; isNew: boolean }> | null = null;
-      // Original fenced blocks, hashed to mark each chat "Applied" badge.
-      let multiFileRawBlocks: string[] = [];
-      if (assistantContent) {
-        const srBlocks = extractSearchReplaceBlocks(assistantContent);
-        if (srBlocks) {
-          try {
-            jsCode = applySearchReplace(originalCode, srBlocks);
-          } catch {
-            // search block didn't match — fall back to full code extraction
-            jsCode = extractFirstJsBlock(assistantContent);
-          }
-        } else {
-          const rawBlocks = extractJsBlocks(assistantContent);
-          const edits = rawBlocks
-            .flatMap((b) => splitFileSections(b))
-            .filter((e) => e.code.trim().length > 0);
-          if (edits.length > 1) {
-            multiFileEdits = edits;
-            multiFileRawBlocks = rawBlocks;
-          } else if (edits.length === 1) {
-            targetFileName = edits[0].name;
-            isNewFile = edits[0].isNew;
-            jsCode = edits[0].code;
-          }
-        }
-      }
+      // Fenced blocks (with their `// filename:` headers) — hashed to mark the
+      // chat "Applied" badge. Empty for search/replace responses (no fenced code).
+      const rawBlocks = hasSearchReplace ? [] : extractJsBlocks(assistantContent);
 
       let finalChatContent = hasSearchReplace
         ? stripSearchReplaceBlocks(assistantContent)
         : assistantContent;
 
-      // If stripping code left the message empty, show a brief note
-      if (!finalChatContent.trim() && jsCode) {
-        finalChatContent = diffSummary(originalCode, jsCode) || 'Code updated.';
-      }
-
       useEditorStore.setState((state) => {
         const newMessages = [...state.messages];
-        newMessages[newMessages.length - 1] = {
-          ...newMessages[newMessages.length - 1],
-          content: finalChatContent,
-        };
+        const lastMsg = { ...newMessages[newMessages.length - 1] };
 
-        // Multi-file response: create/update every targeted file at once.
-        if (state.autoApply && multiFileEdits) {
-          const lastMsg = newMessages[newMessages.length - 1];
-          const files: SketchFile[] = [...state.files];
-          for (const edit of multiFileEdits) {
-            const name = edit.name ?? 'sketch.js';
-            const idx = files.findIndex((f) => f.name === name);
-            if (idx >= 0) {
-              files[idx] = { ...files[idx], content: edit.code };
-            } else if (isAllowedFileName(name)) {
-              files.push({ id: createFileId(), name, content: edit.code, language: languageFromExtension(name) });
-            }
-          }
-          // Focus sketch.js if it was among the edits, otherwise the first edited file.
-          const editedNames = multiFileEdits.map((e) => e.name ?? 'sketch.js');
-          const activeName = editedNames.includes('sketch.js') ? 'sketch.js' : editedNames[0];
-          const activeFile = files.find((f) => f.name === activeName) ?? files[0];
-          // Mark each fenced block applied under the same key CollapsibleCodeBlock computes.
+        // Compute the file changes this response implies (pure).
+        const changes = assistantContent
+          ? planFileChanges(state.files, state.activeFileName, assistantContent)
+          : [];
+
+        // If stripping code left the message empty, show a brief note.
+        if (!finalChatContent.trim() && changes.length > 0) {
+          finalChatContent = diffSummary(changes[0].previousContent, changes[0].newContent) || 'Code updated.';
+        }
+        lastMsg.content = finalChatContent;
+        newMessages[newMessages.length - 1] = lastMsg;
+
+        const mode = state.autoApply ? presentationFor(changes, state.activeFileName) : 'none';
+
+        // Single edit to the file you're viewing → reviewable diff.
+        if (mode === 'diff') {
+          const change = changes[0];
+          const blockKey = `${lastMsg.id}:${simpleHash(rawBlocks[0] ?? change.newContent)}`;
+          return {
+            messages: newMessages,
+            streamingCode: null,
+            pendingDiff: { code: change.newContent, previousCode: change.previousContent, messageId: lastMsg.id, blockKey, prompt: userMessage, fileName: change.name },
+            previewCode: null,
+            code: change.newContent,
+            files: applyChangesToFiles(state.files, changes),
+            isRunning: true,
+            runTrigger: state.runTrigger + 1,
+          };
+        }
+
+        // Multi-file / non-active / new-file changes → apply directly, record
+        // each change in history (restorable), and mark every block applied.
+        if (mode === 'apply') {
+          const files = applyChangesToFiles(state.files, changes);
+          const focus = focusAfterChanges(changes, state.activeFileName);
+          const activeFile = files.find((f) => f.name === focus) ?? files[0];
+
           const appliedBlocks = { ...state.appliedBlocks };
-          for (const raw of multiFileRawBlocks) {
+          for (const raw of rawBlocks) {
             appliedBlocks[`${lastMsg.id}:${simpleHash(raw)}`] = true as const;
           }
+
+          const codeHistory = [
+            ...state.codeHistory,
+            ...changes.map((c) => ({
+              id: `change-${lastMsg.id}-${c.name}`,
+              messageId: lastMsg.id,
+              timestamp: Date.now(),
+              previousCode: c.previousContent,
+              newCode: c.newContent,
+              summary: `${c.isNew ? 'Created' : 'Updated'} ${c.name}`,
+              prompt: userMessage,
+              fileName: c.name,
+            })),
+          ];
+
           return {
             messages: newMessages,
             streamingCode: null,
@@ -270,51 +267,9 @@ export function ChatPanel() {
             code: activeFile.content,
             activeFileName: activeFile.name,
             appliedBlocks,
+            codeHistory,
             previewCode: null,
             pendingDiff: null,
-            isRunning: true,
-            runTrigger: state.runTrigger + 1,
-          };
-        }
-
-        if (state.autoApply && jsCode) {
-          const lastMsg = newMessages[newMessages.length - 1];
-          const blockKey = `${lastMsg.id}:${simpleHash(jsCode)}`;
-
-          // Handle new file creation from AI
-          if (isNewFile && targetFileName) {
-            const { addFile, setFileContent } = useEditorStore.getState();
-            addFile(targetFileName);
-            setFileContent(targetFileName, jsCode);
-            return { messages: newMessages, streamingCode: null };
-          }
-
-          // Handle targeting a specific existing file
-          if (targetFileName && targetFileName !== state.activeFileName) {
-            const targetFile = state.files.find((f) => f.name === targetFileName);
-            if (targetFile) {
-              const files = state.files.map((f) =>
-                f.name === targetFileName ? { ...f, content: jsCode! } : f,
-              );
-              return {
-                messages: newMessages,
-                streamingCode: null,
-                files,
-                isRunning: true,
-                runTrigger: state.runTrigger + 1,
-              };
-            }
-          }
-
-          return {
-            messages: newMessages,
-            streamingCode: null,
-            pendingDiff: { code: jsCode, previousCode: state.code, messageId: lastMsg.id, blockKey, prompt: userMessage, fileName: targetFileName ?? undefined },
-            previewCode: null,
-            code: jsCode,
-            files: state.files.map((f) =>
-              f.name === state.activeFileName ? { ...f, content: jsCode! } : f,
-            ),
             isRunning: true,
             runTrigger: state.runTrigger + 1,
           };

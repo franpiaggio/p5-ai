@@ -102,15 +102,6 @@ export function extractFileName(code: string): { fileName: string | null; isNew:
   };
 }
 
-/**
- * Extract filename from a search/replace block text that starts with `// filename: ...`.
- * Returns fileName or null if no filename header.
- */
-export function extractSearchReplaceFileName(blockText: string): string | null {
-  const match = /^\/\/\s*filename:\s*(\S+)\s*\n/.exec(blockText);
-  return match ? match[1] : null;
-}
-
 /** Top-level symbol names declared in a file (function/class/const/let/var).
  * Heuristic (regex, not a full parser) — used to warn before deleting a file
  * whose symbols other files rely on under global-script concatenation. */
