@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { simpleHash, extractFirstJsBlock, extractSearchReplaceBlocks, applySearchReplace, stripSearchReplaceBlocks, diffSummary, extractFileName } from '../../utils/codeUtils';
+import { simpleHash, extractFirstJsBlock, extractJsBlocks, splitFileSections, extractSearchReplaceBlocks, applySearchReplace, stripSearchReplaceBlocks, diffSummary } from '../../utils/codeUtils';
 import { streamChat, checkBackendHealth } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';
@@ -9,7 +9,8 @@ import { GeneratingCodeIndicator } from './GeneratingCodeIndicator';
 import { PendingDiffBanner } from './PendingDiffBanner';
 import { SketchSuggestion } from './SketchSuggestion';
 import type { SketchExample } from '../../data/sketchExamples';
-import { createDefaultFiles, filesFromNamed } from '../../constants/defaultFiles';
+import { createDefaultFiles, filesFromNamed, createFileId, isAllowedFileName, languageFromExtension } from '../../constants/defaultFiles';
+import type { SketchFile } from '../../types';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAuthStore } from '../../store/authStore';
@@ -194,6 +195,11 @@ export function ChatPanel() {
       let jsCode: string | null = null;
       let targetFileName: string | null = null;
       let isNewFile = false;
+      // Multiple `// filename:` sections in one response → apply them all at once.
+      // Sections may come from separate fences or several headers inside one fence.
+      let multiFileEdits: Array<{ name: string | null; code: string; isNew: boolean }> | null = null;
+      // Original fenced blocks, hashed to mark each chat "Applied" badge.
+      let multiFileRawBlocks: string[] = [];
       if (assistantContent) {
         const srBlocks = extractSearchReplaceBlocks(assistantContent);
         if (srBlocks) {
@@ -204,12 +210,17 @@ export function ChatPanel() {
             jsCode = extractFirstJsBlock(assistantContent);
           }
         } else {
-          const rawBlock = extractFirstJsBlock(assistantContent);
-          if (rawBlock) {
-            const { fileName, isNew, cleanCode } = extractFileName(rawBlock);
-            targetFileName = fileName;
-            isNewFile = isNew;
-            jsCode = cleanCode;
+          const rawBlocks = extractJsBlocks(assistantContent);
+          const edits = rawBlocks
+            .flatMap((b) => splitFileSections(b))
+            .filter((e) => e.code.trim().length > 0);
+          if (edits.length > 1) {
+            multiFileEdits = edits;
+            multiFileRawBlocks = rawBlocks;
+          } else if (edits.length === 1) {
+            targetFileName = edits[0].name;
+            isNewFile = edits[0].isNew;
+            jsCode = edits[0].code;
           }
         }
       }
@@ -229,6 +240,42 @@ export function ChatPanel() {
           ...newMessages[newMessages.length - 1],
           content: finalChatContent,
         };
+
+        // Multi-file response: create/update every targeted file at once.
+        if (state.autoApply && multiFileEdits) {
+          const lastMsg = newMessages[newMessages.length - 1];
+          const files: SketchFile[] = [...state.files];
+          for (const edit of multiFileEdits) {
+            const name = edit.name ?? 'sketch.js';
+            const idx = files.findIndex((f) => f.name === name);
+            if (idx >= 0) {
+              files[idx] = { ...files[idx], content: edit.code };
+            } else if (isAllowedFileName(name)) {
+              files.push({ id: createFileId(), name, content: edit.code, language: languageFromExtension(name) });
+            }
+          }
+          // Focus sketch.js if it was among the edits, otherwise the first edited file.
+          const editedNames = multiFileEdits.map((e) => e.name ?? 'sketch.js');
+          const activeName = editedNames.includes('sketch.js') ? 'sketch.js' : editedNames[0];
+          const activeFile = files.find((f) => f.name === activeName) ?? files[0];
+          // Mark each fenced block applied under the same key CollapsibleCodeBlock computes.
+          const appliedBlocks = { ...state.appliedBlocks };
+          for (const raw of multiFileRawBlocks) {
+            appliedBlocks[`${lastMsg.id}:${simpleHash(raw)}`] = true as const;
+          }
+          return {
+            messages: newMessages,
+            streamingCode: null,
+            files,
+            code: activeFile.content,
+            activeFileName: activeFile.name,
+            appliedBlocks,
+            previewCode: null,
+            pendingDiff: null,
+            isRunning: true,
+            runTrigger: state.runTrigger + 1,
+          };
+        }
 
         if (state.autoApply && jsCode) {
           const lastMsg = newMessages[newMessages.length - 1];

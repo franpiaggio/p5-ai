@@ -106,6 +106,13 @@ The user may have multiple JS/TS files. When provided, all files are shown with 
 - If no filename comment is present, changes target \`sketch.js\` by default
 - Search/replace blocks can target different files by prefixing each block with \`// filename: ...\`
 
+### Splitting work across files
+- When generating a substantial NEW sketch (multiple classes, systems, or clearly separable concerns), split it into multiple files instead of one large \`sketch.js\`.
+- Emit ONE code block per file, each starting with its \`// filename:\` header (use \`[NEW FILE]\` for files that don't exist yet).
+- Keep \`sketch.js\` as the entry point that holds \`setup()\`/\`draw()\`. Put helper classes/functions in their own files (e.g. \`particle.js\`, \`palette.js\`).
+- Files run as globals in load order (\`sketch.js\` last), so a class/function defined in one file is available in the others — no imports needed.
+- Don't over-split: only break out files when it genuinely improves clarity (roughly one file per class or cohesive system). A small sketch stays in \`sketch.js\`.
+
 ### CDN Libraries
 The user may have CDN libraries loaded (e.g. p5.sound, ml5.js). These are listed when provided. You can reference their APIs in your code. If the user needs a library that isn't loaded, mention they should add it via the Libraries panel.
 

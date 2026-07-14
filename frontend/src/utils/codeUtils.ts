@@ -12,6 +12,17 @@ export function extractFirstJsBlock(markdown: string): string | null {
   return match ? match[1].replace(/\n$/, '') : null;
 }
 
+/** Extract every JS/TS code block from markdown, in order. Empty array if none. */
+export function extractJsBlocks(markdown: string): string[] {
+  const regex = /```(?:javascript|js|jsx|typescript|ts|tsx)\s*\n([\s\S]*?)```/g;
+  const blocks: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(markdown)) !== null) {
+    blocks.push(m[1].replace(/\n$/, ''));
+  }
+  return blocks;
+}
+
 /** Parse all <<<SEARCH ... === ... >>>REPLACE blocks from markdown. Returns null if none found. */
 export function extractSearchReplaceBlocks(
   markdown: string,
@@ -46,6 +57,34 @@ export function stripSearchReplaceBlocks(text: string): string {
   let result = text.replace(/<<<SEARCH\n[\s\S]*?\n===\n[\s\S]*?\n>>>REPLACE/g, '');
   result = result.replace(/<<<SEARCH[\s\S]*$/, '');
   return result.trimEnd();
+}
+
+/** Split one code block into per-file sections by `// filename:` headers.
+ * Handles both "one file per block" and "several files in one block" (some models
+ * emit multiple `// filename:` headers inside a single fence). Leading content
+ * before the first header becomes an unnamed section (defaults to sketch.js). */
+export function splitFileSections(
+  block: string,
+): Array<{ name: string | null; isNew: boolean; code: string }> {
+  const headerRe = /^\/\/[ \t]*filename:[ \t]*(\S+?)([ \t]+\[NEW FILE\])?[ \t]*$/gm;
+  const matches = [...block.matchAll(headerRe)];
+  if (matches.length === 0) {
+    return [{ name: null, isNew: false, code: block }];
+  }
+  const sections: Array<{ name: string | null; isNew: boolean; code: string }> = [];
+  const firstIdx = matches[0].index ?? 0;
+  const lead = block.slice(0, firstIdx);
+  if (lead.trim()) {
+    sections.push({ name: null, isNew: false, code: lead.replace(/\n\s*$/, '') });
+  }
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const start = (m.index ?? 0) + m[0].length;
+    const end = i + 1 < matches.length ? (matches[i + 1].index ?? block.length) : block.length;
+    const code = block.slice(start, end).replace(/^\n/, '').replace(/\n\s*$/, '');
+    sections.push({ name: m[1], isNew: !!m[2], code });
+  }
+  return sections;
 }
 
 /**
