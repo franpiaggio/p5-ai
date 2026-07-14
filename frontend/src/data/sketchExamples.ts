@@ -1,7 +1,23 @@
+import type { Library } from '../types';
+
+/** A file inside a multi-file example. `content` of the file named `sketch.js`
+ * must match the example's top-level `code` (the entry point / thumbnail source). */
+export interface ExampleFile {
+  name: string;
+  content: string;
+}
+
 export interface SketchExample {
   label: string;
   prompt: string;
+  /** Entry-point (sketch.js) source. Always set — used for thumbnails and as the
+   * single-file fallback when `files` is absent. */
   code: string;
+  /** Optional multi-file set (includes sketch.js). When present, the sketch loads
+   * as multiple files instead of a single sketch.js. */
+  files?: ExampleFile[];
+  /** Optional CDN libraries this example needs. */
+  libraries?: Library[];
 }
 
 /** An example plus its stable, URL-safe identifier used in the /example/:slug
@@ -78,9 +94,11 @@ import {
   parametricSculpture3d,
   breathingLight,
   infinityMirror3d,
+  constellationNetwork,
 } from './sketches';
 
 export const SKETCH_EXAMPLES: SketchExampleEntry[] = [
+  { slug: 'constellation-network', ...constellationNetwork },
   { slug: 'particle-flow-field', ...particleFlowField },
   { slug: 'depth-flow-field-3d', ...depthFlowField3d },
   { slug: 'interactive-animated-grid', ...interactiveAnimatedGrid },

@@ -536,6 +536,20 @@ export const useEditorStore = create<EditorState>()(
           state.files = createDefaultFiles(state.code);
           state.activeFileName = 'sketch.js';
         }
+        // Reconcile: `code` is authoritative for the active file. When upgrading from
+        // a pre-multi-file version, the default `files` from the store initializer can
+        // survive zustand's shallow merge and leave the active file stale — the preview
+        // renders from `files`, not `code`, so it would show the wrong sketch. Also
+        // recovers from any other code↔files drift. Force the active file to match code.
+        if (!state.files.some((f) => f.name === state.activeFileName)) {
+          state.activeFileName = state.files[0]?.name ?? 'sketch.js';
+        }
+        const activeFile = state.files.find((f) => f.name === state.activeFileName);
+        if (activeFile && activeFile.content !== state.code) {
+          state.files = state.files.map((f) =>
+            f.name === state.activeFileName ? { ...f, content: state.code } : f,
+          );
+        }
         if (!state.lastSavedFiles || !Array.isArray(state.lastSavedFiles)) {
           state.lastSavedFiles = state.files.map((f) => ({ ...f }));
         }

@@ -9,7 +9,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { useEditorStore } from '../store/editorStore';
 import { getExampleBySlug } from '../data/sketchExamples';
 import { getPublicSketch } from '../services/api';
-import { createDefaultFiles } from '../constants/defaultFiles';
+import { createDefaultFiles, filesFromNamed } from '../constants/defaultFiles';
 
 export function EditorPage() {
   const isMobile = useIsMobile();
@@ -32,7 +32,10 @@ export function EditorPage() {
     // Skip reload if this example's code is already in the editor (persist rehydrate / back-nav)
     if (useEditorStore.getState().code !== example.code) {
       const { runTrigger } = useEditorStore.getState();
-      const exampleFiles = createDefaultFiles(example.code);
+      const exampleFiles = example.files && example.files.length > 0
+        ? filesFromNamed(example.files)
+        : createDefaultFiles(example.code);
+      const exampleLibraries = example.libraries ?? [];
       useEditorStore.setState({
         code: example.code,
         lastSavedCode: example.code,
@@ -51,8 +54,8 @@ export function EditorPage() {
         files: exampleFiles,
         lastSavedFiles: exampleFiles.map((f) => ({ ...f })),
         activeFileName: 'sketch.js',
-        libraries: [],
-        lastSavedLibraries: [],
+        libraries: exampleLibraries,
+        lastSavedLibraries: [...exampleLibraries],
       });
     }
     const unsubscribe = useEditorStore.subscribe((state) => {

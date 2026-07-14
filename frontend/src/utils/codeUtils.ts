@@ -72,6 +72,35 @@ export function extractSearchReplaceFileName(blockText: string): string | null {
   return match ? match[1] : null;
 }
 
+/** Top-level symbol names declared in a file (function/class/const/let/var).
+ * Heuristic (regex, not a full parser) — used to warn before deleting a file
+ * whose symbols other files rely on under global-script concatenation. */
+export function declaredSymbols(code: string): string[] {
+  const re = /^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?(?:function\*?|class|const|let|var)\s+([A-Za-z_$][\w$]*)/gm;
+  const names = new Set<string>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code))) names.add(m[1]);
+  return [...names];
+}
+
+/** Names of other files that reference any symbol declared in `target`.
+ * Best-effort: matches declared symbols as whole words in each other file's text. */
+export function filesReferencing(
+  target: { name: string; content: string },
+  others: { name: string; content: string }[],
+): string[] {
+  const symbols = declaredSymbols(target.content);
+  if (symbols.length === 0) return [];
+  const pattern = new RegExp(`\\b(?:${symbols.map(escapeRegExp).join('|')})\\b`);
+  return others
+    .filter((f) => f.name !== target.name && pattern.test(f.content))
+    .map((f) => f.name);
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /** Generate a short human summary of what changed between two code strings. */
 export function diffSummary(oldCode: string, newCode: string): string {
   const oldLines = oldCode.split('\n');

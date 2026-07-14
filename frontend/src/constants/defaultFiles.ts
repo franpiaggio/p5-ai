@@ -26,3 +26,13 @@ export function isAllowedFileName(name: string): boolean {
 export function languageFromExtension(name: string): 'javascript' | 'typescript' {
   return name.endsWith('.ts') ? 'typescript' : 'javascript';
 }
+
+/** Build store SketchFile[] from a plain {name, content}[] set (e.g. an example). */
+export function filesFromNamed(files: { name: string; content: string }[]): SketchFile[] {
+  return files.map((f) => ({
+    id: createFileId(),
+    name: f.name,
+    content: f.content,
+    language: languageFromExtension(f.name),
+  }));
+}

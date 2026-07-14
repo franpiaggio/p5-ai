@@ -9,6 +9,7 @@ import { GeneratingCodeIndicator } from './GeneratingCodeIndicator';
 import { PendingDiffBanner } from './PendingDiffBanner';
 import { SketchSuggestion } from './SketchSuggestion';
 import type { SketchExample } from '../../data/sketchExamples';
+import { createDefaultFiles, filesFromNamed } from '../../constants/defaultFiles';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAuthStore } from '../../store/authStore';
@@ -309,6 +310,14 @@ export function ChatPanel() {
     const assistantContent = `Here's a **${example.label}** sketch:\n\n\`\`\`javascript\n${example.code}\n\`\`\``;
     addMessage({ role: 'assistant', content: assistantContent });
 
+    // Build the file set: multi-file examples carry their own `files`; single-file
+    // ones become a lone sketch.js. Kept in sync with `code` so the preview — which
+    // renders from `files`, not `code` — actually shows the applied example.
+    const exampleFiles = example.files && example.files.length > 0
+      ? filesFromNamed(example.files)
+      : createDefaultFiles(example.code);
+    const exampleLibraries = example.libraries ?? [];
+
     useEditorStore.setState((state) => {
       const lastMsg = state.messages[state.messages.length - 1];
       const blockKey = `${lastMsg.id}:${simpleHash(example.code)}`;
@@ -333,6 +342,11 @@ export function ChatPanel() {
         previewCode: null,
         code: example.code,
         lastSavedCode: example.code,
+        files: exampleFiles,
+        lastSavedFiles: exampleFiles.map((f) => ({ ...f })),
+        activeFileName: 'sketch.js',
+        libraries: exampleLibraries,
+        lastSavedLibraries: [...exampleLibraries],
         isRunning: true,
         runTrigger: state.runTrigger + 1,
         // Move the suggestion card into its "applied" phase (Keep it / New one).

@@ -2,7 +2,9 @@ import { useRef, useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { SKETCH_EXAMPLES } from '../../data/sketchExamples';
-import { buildPreviewHtml } from '../Preview/previewTemplate';
+import type { SketchExample } from '../../data/sketchExamples';
+import { buildPreviewHtml, buildMultiFilePreviewHtml } from '../Preview/previewTemplate';
+import { filesFromNamed } from '../../constants/defaultFiles';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 
 function shuffle<T>(arr: T[]): T[] {
@@ -18,7 +20,7 @@ const CAPTURE_RENDER_DELAY_MS = 600;
 const CAPTURE_TIMEOUT_MS = 8000;
 
 /** Renders a p5 sketch in a hidden iframe, captures a snapshot, displays as image. */
-function ExamplePreview({ code }: { code: string }) {
+function ExamplePreview({ example }: { example: SketchExample }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [thumbnail, setThumbnail] = useState<string | null>(null);
   const [visible, setVisible] = useState(false);
@@ -39,7 +41,9 @@ function ExamplePreview({ code }: { code: string }) {
   useEffect(() => {
     if (!visible || thumbnail || !containerRef.current) return;
 
-    const html = buildPreviewHtml(code);
+    const html = example.files && example.files.length > 0
+      ? buildMultiFilePreviewHtml(filesFromNamed(example.files), example.libraries ?? [])
+      : buildPreviewHtml(example.code);
     const blob = new Blob([html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
 
@@ -85,7 +89,7 @@ function ExamplePreview({ code }: { code: string }) {
     iframe.src = url;
 
     return cleanup;
-  }, [visible, code, thumbnail]);
+  }, [visible, example, thumbnail]);
 
   return (
     <div ref={containerRef} className="w-full aspect-[4/3] bg-surface-alt relative overflow-hidden">
@@ -160,7 +164,7 @@ export function ExamplesGrid() {
               aria-label={`Load ${example.label}`}
               className="bg-panel rounded-lg border border-border/30 hover:border-info/30 transition-colors group flex flex-col overflow-hidden cursor-pointer text-left"
             >
-              <ExamplePreview code={example.code} />
+              <ExamplePreview example={example} />
               <div className="p-3">
                 <h3 className="text-sm text-text-primary group-hover:text-info transition-colors truncate">
                   {example.label}

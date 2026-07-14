@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { isAllowedFileName } from '../../constants/defaultFiles';
+import { filesReferencing } from '../../utils/codeUtils';
+import { useEscapeClose } from '../../hooks/useEscapeClose';
 
 export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }) {
   const files = useEditorStore((s) => s.files);
@@ -15,6 +17,8 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
   const [newFileName, setNewFileName] = useState('');
   const [renamingFile, setRenamingFile] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  // Name of the file pending an inline delete confirmation (replaces immediate delete).
+  const [confirmDeleteName, setConfirmDeleteName] = useState<string | null>(null);
   const addInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,6 +47,18 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
     setRenamingFile(null);
   };
 
+  const performDelete = (name: string) => {
+    deleteFile(name);
+    setConfirmDeleteName(null);
+  };
+
+  useEscapeClose(!!confirmDeleteName, () => setConfirmDeleteName(null));
+
+  const pendingFile = confirmDeleteName
+    ? files.find((f) => f.name === confirmDeleteName)
+    : undefined;
+  const pendingUsedBy = pendingFile ? filesReferencing(pendingFile, files) : [];
+
   return (
     <div className="w-44 bg-surface-raised border-r border-border/40 flex flex-col h-full shrink-0">
       {/* Header */}
@@ -61,54 +77,56 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
 
       {/* File list */}
       <div className="flex-1 overflow-y-auto py-1">
-        {files.map((file) => (
-          <div key={file.id} className="group relative">
-            {renamingFile === file.name ? (
-              <input
-                ref={renameInputRef}
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={handleRename}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleRename();
-                  if (e.key === 'Escape') setRenamingFile(null);
-                }}
-                className="w-full px-3 py-1 text-[11px] font-mono bg-border/20 text-text-primary outline-none border border-info/40"
-              />
-            ) : (
-              <button
-                onClick={() => setActiveFile(file.name)}
-                onDoubleClick={() => {
-                  if (file.name !== 'sketch.js') {
-                    setRenamingFile(file.name);
-                    setRenameValue(file.name);
-                  }
-                }}
-                className={`w-full text-left px-3 py-1.5 text-[11px] font-mono transition-colors flex items-center gap-1.5 ${
-                  activeFileName === file.name
-                    ? 'bg-info/10 text-info'
-                    : 'text-text-muted hover:bg-border/20 hover:text-text-primary'
-                }`}
-              >
-                <svg className="w-3 h-3 shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span className="truncate">{file.name}</span>
-              </button>
-            )}
-            {file.name !== 'sketch.js' && !renamingFile && (
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteFile(file.name); }}
-                className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-accent/20 text-text-muted/30 hover:text-accent transition-all cursor-pointer"
-                title="Delete file"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-        ))}
+        {files.map((file) => {
+          return (
+            <div key={file.id} className="group relative">
+              {renamingFile === file.name ? (
+                <input
+                  ref={renameInputRef}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onBlur={handleRename}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleRename();
+                    if (e.key === 'Escape') setRenamingFile(null);
+                  }}
+                  className="w-full px-3 py-1 text-[11px] font-mono bg-border/20 text-text-primary outline-none border border-info/40"
+                />
+              ) : (
+                <button
+                  onClick={() => setActiveFile(file.name)}
+                  onDoubleClick={() => {
+                    if (file.name !== 'sketch.js') {
+                      setRenamingFile(file.name);
+                      setRenameValue(file.name);
+                    }
+                  }}
+                  className={`w-full text-left px-3 py-1.5 text-[11px] font-mono transition-colors flex items-center gap-1.5 ${
+                    activeFileName === file.name
+                      ? 'bg-info/10 text-info'
+                      : 'text-text-muted hover:bg-border/20 hover:text-text-primary'
+                  }`}
+                >
+                  <svg className="w-3 h-3 shrink-0 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="truncate">{file.name}</span>
+                </button>
+              )}
+              {file.name !== 'sketch.js' && !renamingFile && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteName(file.name); }}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-accent/20 text-text-muted/30 hover:text-accent transition-all cursor-pointer"
+                  title="Delete file"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          );
+        })}
 
         {/* Add file input */}
         {isAdding && (
@@ -148,6 +166,51 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
           )}
         </button>
       </div>
+
+      {/* Delete confirmation modal */}
+      {pendingFile && (
+        <div
+          className="modal-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmDeleteName(null); }}
+        >
+          <div className="modal-panel max-w-sm" role="dialog" aria-modal="true" aria-labelledby="delete-file-title">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 rounded-lg bg-accent/15 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <div className="min-w-0">
+                <h2 id="delete-file-title" className="text-sm font-semibold text-text-primary">Delete file</h2>
+                <p className="text-[11px] text-text-muted/50 mt-0.5 font-mono truncate">{pendingFile.name}</p>
+              </div>
+            </div>
+
+            <p className="text-[12px] text-text-muted">
+              This permanently removes <span className="font-mono text-text-primary">{pendingFile.name}</span> from the sketch. This can’t be undone.
+            </p>
+            {pendingUsedBy.length > 0 && (
+              <div className="mt-3 flex items-start gap-2 rounded-md bg-warning/10 border border-warning/20 px-3 py-2">
+                <svg className="w-4 h-4 text-warning shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M10.29 3.86l-8.58 14.85A1 1 0 002.56 20h18.88a1 1 0 00.85-1.29L13.71 3.86a1 1 0 00-1.42 0z" />
+                </svg>
+                <p className="text-[11px] text-warning/90 leading-snug">
+                  Referenced by <span className="font-mono">{pendingUsedBy.join(', ')}</span> — deleting it may break the sketch.
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setConfirmDeleteName(null)} className="btn-ghost btn-sm">
+                Cancel
+              </button>
+              <button onClick={() => performDelete(pendingFile.name)} className="btn-danger btn-sm" autoFocus>
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
