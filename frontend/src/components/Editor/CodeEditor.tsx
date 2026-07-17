@@ -122,7 +122,9 @@ export function CodeEditor() {
       allowJs: true,
       checkJs: false,
       allowNonTsExtensions: true,
-      noEmit: true,
+      // noEmit must stay false: the preview transpiles TS via getEmitOutput(),
+      // which returns nothing when emit is disabled.
+      noEmit: false,
     };
 
     // Configure both JS and TS defaults so language switching works without remount
@@ -148,17 +150,32 @@ export function CodeEditor() {
     monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions(diagOptions);
     monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions(diagOptions);
 
-    // Register transpiler using Monaco's TypeScript worker
+    // Register a transpiler that strips types from ARBITRARY code (not just the
+    // active model) via a throwaway model — so every file in a multi-file TS
+    // sketch transpiles correctly, not just the one on screen.
     const setTranspiler = useEditorStore.getState().setTranspiler;
     setTranspiler(async (code: string) => {
-      const worker = await monaco.languages.typescript.getTypeScriptWorker();
-      const model = editor.getModel();
-      if (!model) return code;
-      const client = await worker(model.uri);
-      const result = await client.getEmitOutput(model.uri.toString());
-      const jsFile = result.outputFiles.find((f: { name: string }) => f.name.endsWith('.js'));
-      return jsFile ? jsFile.text : code;
+      try {
+        const worker = await monaco.languages.typescript.getTypeScriptWorker();
+        // Auto-generated model uri (no explicit scheme) so the TS worker resolves it.
+        const model = monaco.editor.createModel(code, 'typescript');
+        try {
+          const client = await worker(model.uri);
+          const result = await client.getEmitOutput(model.uri.toString());
+          const jsFile = result.outputFiles.find((f: { name: string }) => f.name.endsWith('.js'));
+          return jsFile ? jsFile.text : code;
+        } finally {
+          model.dispose();
+        }
+      } catch {
+        return code;
+      }
     });
+
+    // The first preview may have run before this transpiler existed (TS files
+    // need it to strip types, which would otherwise throw). Re-run now that
+    // transpilation is available, clearing any transient first-run error.
+    useEditorStore.getState().runSketch();
 
     if (!document.querySelector('[data-chat-input]:focus')) {
       editor.focus();

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildMultiFilePreviewHtml, buildPreviewHtml } from './previewTemplate';
+import { buildMultiFilePreviewHtml, buildPreviewHtml, isEsmUrl, usesEsModules } from './previewTemplate';
 import type { SketchFile } from '../../types';
 
 function file(name: string, content: string): SketchFile {
-  return { id: name, name, content, language: 'javascript' };
+  return { id: name, name, content, language: name.endsWith('.ts') ? 'typescript' : 'javascript' };
 }
 
 describe('buildPreviewHtml (single file)', () => {
@@ -75,5 +75,65 @@ describe('buildMultiFilePreviewHtml — module mode (import/export)', () => {
     const plain = [file('sketch.js', '// export the drawing later\nfunction setup(){}')];
     const html = buildMultiFilePreviewHtml(plain, []);
     expect(html).not.toContain('type="importmap"');
+  });
+});
+
+describe('usesEsModules', () => {
+  it('detects import/export', () => {
+    expect(usesEsModules([file('sketch.js', "import x from './y.js';")])).toBe(true);
+    expect(usesEsModules([file('sketch.js', 'export const A = 1;')])).toBe(true);
+  });
+  it('ignores plain global sketches', () => {
+    expect(usesEsModules([file('sketch.js', 'function setup(){}')])).toBe(false);
+  });
+});
+
+describe('isEsmUrl', () => {
+  it('recognizes ESM CDN URLs', () => {
+    expect(isEsmUrl('https://esm.sh/three')).toBe(true);
+    expect(isEsmUrl('https://cdn.jsdelivr.net/npm/canvas-confetti@1/+esm')).toBe(true);
+    expect(isEsmUrl('https://cdn.skypack.dev/lodash')).toBe(true);
+    expect(isEsmUrl('https://example.com/lib.mjs')).toBe(true);
+    expect(isEsmUrl('https://unpkg.com/three?module')).toBe(true);
+  });
+  it('treats classic/UMD CDN scripts as non-ESM', () => {
+    expect(isEsmUrl('https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/addons/p5.sound.min.js')).toBe(false);
+    expect(isEsmUrl('https://cdn.jsdelivr.net/npm/tone@15/build/Tone.min.js')).toBe(false);
+  });
+});
+
+describe('TypeScript file resolution in module mode', () => {
+  const tsFiles = [
+    file('particle.ts', 'export class Particle {}'),
+    // extensionless import + p5 lifecycle in the entry
+    file('sketch.js', "import { Particle } from './particle';\nfunction setup(){ new Particle(); }"),
+  ];
+
+  it('resolves an extensionless import to the sibling .ts file', () => {
+    const decoded = decodeURIComponent(buildMultiFilePreviewHtml(tsFiles, []));
+    expect(decoded).toContain("from 'particle.ts'");
+    expect(decoded).not.toContain("from './particle'");
+  });
+});
+
+describe('ESM libraries in module mode', () => {
+  const files = [
+    file('sketch.js', "import confetti from 'canvas-confetti';\nfunction setup(){}"),
+  ];
+
+  it('adds an ESM library to the import map, not a <script> tag', () => {
+    const html = buildMultiFilePreviewHtml(files, [
+      { name: 'canvas-confetti', url: 'https://esm.sh/canvas-confetti' },
+    ]);
+    expect(html).toContain('"canvas-confetti": "https://esm.sh/canvas-confetti"');
+    expect(html).not.toContain('<script src="https://esm.sh/canvas-confetti">');
+  });
+
+  it('keeps a UMD/global library as a <script> tag', () => {
+    const html = buildMultiFilePreviewHtml(files, [
+      { name: 'p5.sound', url: 'https://cdn/p5.sound.min.js' },
+    ]);
+    expect(html).toContain('<script src="https://cdn/p5.sound.min.js">');
+    expect(html).not.toContain('"p5.sound": "https://cdn/p5.sound.min.js"');
   });
 });

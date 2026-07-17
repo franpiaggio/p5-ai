@@ -120,9 +120,23 @@ function escapeScript(code: string): string {
 }
 
 /** True if any file uses ES module syntax (import/export) — triggers module mode. */
-function usesEsModules(files: SketchFile[]): boolean {
+export function usesEsModules(files: SketchFile[]): boolean {
   const re = /(^|\n)\s*(import\s+[^;\n]*from\s+['"]|import\s+['"]|import\s*\(|export\s+(default|const|let|var|function|class|async|\{|\*))/;
   return files.some((f) => re.test(f.content));
+}
+
+/** Heuristic: does this CDN URL serve an ES module (importable by name) rather
+ * than a classic UMD/global script? ESM libs go in the import map; the rest load
+ * as `<script>` globals (p5 addons, etc.). */
+export function isEsmUrl(url: string): boolean {
+  return (
+    /(^|\/\/)esm\.(sh|run)\//.test(url) ||
+    /\/npm\/[^?]*\+esm(\b|$)/.test(url) ||
+    /skypack\.dev\//.test(url) ||
+    /jspm\.io\//.test(url) ||
+    /[?&]module(=|&|$)/.test(url) ||
+    /\.mjs(\?|$)/.test(url)
+  );
 }
 
 // p5 lifecycle hooks that global mode looks for on `window`. In module scope,
@@ -137,13 +151,17 @@ const P5_LIFECYCLE = [
 const GLOBAL_BRIDGE = '\n// --- expose p5 lifecycle hooks to global scope ---\n' +
   P5_LIFECYCLE.map((fn) => `if (typeof ${fn} !== 'undefined') window.${fn} = ${fn};`).join('\n');
 
-/** Rewrite relative specifiers that point at sibling files ('./x.js' or 'x.js')
- * to bare specifiers, so the import map resolves them to the file's data URL. */
+/** Rewrite relative specifiers that point at sibling files ('./x', './x.js',
+ * './x.ts') to bare specifiers, so the import map resolves them to the file's
+ * data URL. Handles extensionless imports and the TS convention of importing
+ * '.js' to mean a sibling '.ts'. */
 function rewriteLocalSpecifiers(code: string, fileNames: Set<string>): string {
   const resolve = (spec: string): string | null => {
     const base = spec.replace(/^\.{0,2}\//, '');
-    if (fileNames.has(base)) return base;
-    if (fileNames.has(base + '.js')) return base + '.js';
+    const candidates = [base, base + '.js', base + '.ts'];
+    // TS often imports './x.js' referring to the sibling './x.ts'.
+    if (base.endsWith('.js')) candidates.push(base.slice(0, -3) + '.ts');
+    for (const c of candidates) if (fileNames.has(c)) return c;
     return null;
   };
   // static: `from '...'`, side-effect `import '...'`, `export ... from '...'`
@@ -167,7 +185,11 @@ function rewriteLocalSpecifiers(code: string, fileNames: Set<string>): string {
  * global mode can find them.
  */
 function buildModulePreviewHtml(files: SketchFile[], libraries: Library[]): string {
-  const libTags = libraries
+  // ESM libraries are importable by name via the import map; UMD/global libs
+  // (p5 addons, etc.) still load as classic <script>s before the module runs.
+  const esmLibs = libraries.filter((lib) => isEsmUrl(lib.url));
+  const scriptLibs = libraries.filter((lib) => !isEsmUrl(lib.url));
+  const libTags = scriptLibs
     .map((lib) => `  <script src="${lib.url}"><\/script>`)
     .join('\n');
 
@@ -175,6 +197,8 @@ function buildModulePreviewHtml(files: SketchFile[], libraries: Library[]): stri
   const toDataUrl = (content: string) => `data:text/javascript,${encodeURIComponent(content)}`;
 
   const imports: Record<string, string> = {};
+  // ESM libs first so a same-named file could still override intentionally.
+  for (const lib of esmLibs) imports[lib.name] = lib.url;
   for (const f of files) {
     let content = rewriteLocalSpecifiers(f.content, fileNames);
     if (f.name === 'sketch.js') content += GLOBAL_BRIDGE;
