@@ -59,6 +59,25 @@ export function stripSearchReplaceBlocks(text: string): string {
   return result.trimEnd();
 }
 
+/** Rewrite import specifiers that pointed at `oldName` to `newName`, so imports
+ * survive a file rename. Matches './old', 'old' and the extensionless base
+ * (e.g. './old' for 'old.ts'). Pure. */
+export function updateImportPath(code: string, oldName: string, newName: string): string {
+  const oldBase = oldName.replace(/\.(js|ts)$/, '');
+  const target = `./${newName}`;
+  const matches = (spec: string): boolean => {
+    const s = spec.replace(/^\.{0,2}\//, '');
+    return s === oldName || s === oldBase;
+  };
+  code = code.replace(/(\bfrom\s*|\bimport\s+)(['"])([^'"]+)(['"])/g, (m, kw, q1, spec, q2) =>
+    matches(spec) ? `${kw}${q1}${target}${q2}` : m,
+  );
+  code = code.replace(/(\bimport\s*\(\s*)(['"])([^'"]+)(['"])(\s*\))/g, (m, pre, q1, spec, q2, post) =>
+    matches(spec) ? `${pre}${q1}${target}${q2}${post}` : m,
+  );
+  return code;
+}
+
 /** Split one code block into per-file sections by `// filename:` headers.
  * Handles both "one file per block" and "several files in one block" (some models
  * emit multiple `// filename:` headers inside a single fence). Leading content
@@ -119,7 +138,8 @@ export function filesReferencing(
   target: { name: string; content: string },
   others: { name: string; content: string }[],
 ): string[] {
-  const symbols = declaredSymbols(target.content);
+  // Ignore short names (loop vars like i/x/p) to avoid noisy false positives.
+  const symbols = declaredSymbols(target.content).filter((s) => s.length >= 3);
   if (symbols.length === 0) return [];
   const pattern = new RegExp(`\\b(?:${symbols.map(escapeRegExp).join('|')})\\b`);
   return others

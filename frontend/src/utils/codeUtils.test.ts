@@ -6,6 +6,7 @@ import {
   extractFileName,
   declaredSymbols,
   filesReferencing,
+  updateImportPath,
   extractSearchReplaceBlocks,
   applySearchReplace,
   stripSearchReplaceBlocks,
@@ -96,6 +97,35 @@ describe('declaredSymbols / filesReferencing', () => {
     const target = { name: 'unused.js', content: 'const LOCAL = 1;' };
     const others = [{ name: 'sketch.js', content: 'function setup() {}' }];
     expect(filesReferencing(target, others)).toEqual([]);
+  });
+
+  it('ignores short symbol names to avoid false positives', () => {
+    const target = { name: 'a.js', content: 'const x = 1;\nlet i = 0;' };
+    const others = [{ name: 'sketch.js', content: 'for (let i = 0; i < x; i++) {}' }];
+    expect(filesReferencing(target, others)).toEqual([]);
+  });
+});
+
+describe('updateImportPath', () => {
+  it('rewrites ./old.js imports to the new name', () => {
+    const code = "import { X } from './particle.js';\nnew X();";
+    expect(updateImportPath(code, 'particle.js', 'foo.js')).toContain("from './foo.js'");
+  });
+
+  it('rewrites bare and extensionless specifiers', () => {
+    expect(updateImportPath("from 'particle.js'", 'particle.js', 'foo.js')).toContain("'./foo.js'");
+    expect(updateImportPath("from './particle'", 'particle.ts', 'foo.ts')).toContain("'./foo.ts'");
+  });
+
+  it('rewrites dynamic imports', () => {
+    const code = "const m = await import('./util.js');";
+    expect(updateImportPath(code, 'util.js', 'helpers.js')).toContain("import('./helpers.js')");
+  });
+
+  it('leaves unrelated imports untouched', () => {
+    const code = "import x from 'three';\nimport { Y } from './other.js';";
+    const out = updateImportPath(code, 'particle.js', 'foo.js');
+    expect(out).toBe(code);
   });
 });
 

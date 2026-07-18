@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Message, ConsoleLog, LLMConfig, TabType, EditorError, CodeChange, ProviderKeys, SketchFile, Library } from '../types';
 import type { AppThemeId } from '../components/Editor/editorConfig';
-import { diffSummary } from '../utils/codeUtils';
+import { diffSummary, updateImportPath } from '../utils/codeUtils';
 import { createDefaultFiles, createFileId, isAllowedFileName, languageFromExtension } from '../constants/defaultFiles';
 
 export type EditorLanguage = 'javascript' | 'typescript';
@@ -399,12 +399,20 @@ export const useEditorStore = create<EditorState>()(
           if (oldName === 'sketch.js') return state;
           if (!isAllowedFileName(newName)) return state;
           if (state.files.some((f) => f.name === newName)) return state;
-          const files = state.files.map((f) =>
-            f.name === oldName ? { ...f, name: newName, language: languageFromExtension(newName) } : f,
-          );
+          const files = state.files.map((f) => {
+            if (f.name === oldName) {
+              return { ...f, name: newName, language: languageFromExtension(newName) };
+            }
+            // Keep imports in sibling files pointing at the renamed file.
+            const content = updateImportPath(f.content, oldName, newName);
+            return content === f.content ? f : { ...f, content };
+          });
+          const activeFileName = state.activeFileName === oldName ? newName : state.activeFileName;
+          const activeFile = files.find((f) => f.name === activeFileName);
           return {
             files,
-            activeFileName: state.activeFileName === oldName ? newName : state.activeFileName,
+            activeFileName,
+            ...(activeFile ? { code: activeFile.content } : {}),
           };
         }),
       setFileContent: (name, content) =>

@@ -172,10 +172,13 @@ export function CodeEditor() {
       }
     });
 
-    // The first preview may have run before this transpiler existed (TS files
-    // need it to strip types, which would otherwise throw). Re-run now that
-    // transpilation is available, clearing any transient first-run error.
-    useEditorStore.getState().runSketch();
+    // The first preview may have run before this transpiler existed. Only TS
+    // files need it (to strip types, which would otherwise throw), so re-run —
+    // clearing the transient first-run error — just for those.
+    const st = useEditorStore.getState();
+    if (st.files.some((f) => f.language === 'typescript')) {
+      st.runSketch();
+    }
 
     if (!document.querySelector('[data-chat-input]:focus')) {
       editor.focus();
