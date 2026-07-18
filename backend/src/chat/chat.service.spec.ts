@@ -1,0 +1,292 @@
+import { BadRequestException } from '@nestjs/common';
+import { ChatService } from './chat.service';
+import { ChatRequestDto, MessageDto, ImageAttachmentDto } from './dto/chat.dto';
+import type { LLMMessage } from './providers/llm.interface';
+
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+const JPEG_MAGIC = [0xff, 0xd8, 0xff];
+
+function imageOf(
+  magic: number[],
+  totalBytes: number,
+  mimeType: 'image/png' | 'image/jpeg',
+): ImageAttachmentDto {
+  const buf = Buffer.alloc(totalBytes);
+  magic.forEach((b, i) => (buf[i] = b));
+  return { base64: buf.toString('base64'), mimeType };
+}
+
+const png = (bytes = 64) => imageOf(PNG_MAGIC, bytes, 'image/png');
+const jpeg = (bytes = 64) => imageOf(JPEG_MAGIC, bytes, 'image/jpeg');
+
+function message(overrides: Partial<MessageDto> = {}): MessageDto {
+  return {
+    id: 'm1',
+    role: 'user',
+    content: 'hello',
+    timestamp: 1,
+    ...overrides,
+  };
+}
+
+function request(overrides: Partial<ChatRequestDto> = {}): ChatRequestDto {
+  return {
+    message: 'change the background color',
+    code: 'function setup() {}',
+    language: 'javascript',
+    history: [],
+    config: { provider: 'openai', model: 'gpt-4o', apiKey: 'sk-test' },
+    ...overrides,
+  };
+}
+
+async function consume(gen: AsyncGenerator<string>): Promise<string[]> {
+  const out: string[] = [];
+  for await (const chunk of gen) out.push(chunk);
+  return out;
+}
+
+describe('ChatService', () => {
+  let openai: { stream: jest.Mock; listModels: jest.Mock };
+  let anthropic: { stream: jest.Mock; listModels: jest.Mock };
+  let groq: { stream: jest.Mock; listModels: jest.Mock };
+  let deepseek: { stream: jest.Mock; listModels: jest.Mock };
+  let usersService: { getProviderKey: jest.Mock };
+  let service: ChatService;
+
+  const mockProvider = () => ({
+    // eslint-disable-next-line @typescript-eslint/require-await
+    stream: jest.fn(async function* (): AsyncGenerator<string> {
+      yield 'chunk';
+    }),
+    listModels: jest.fn(),
+  });
+
+  beforeEach(() => {
+    openai = mockProvider();
+    anthropic = mockProvider();
+    groq = mockProvider();
+    deepseek = mockProvider();
+    usersService = { getProviderKey: jest.fn().mockResolvedValue(null) };
+    service = new ChatService(
+      openai as never,
+      anthropic as never,
+      groq as never,
+      deepseek as never,
+      usersService as never,
+    );
+  });
+
+  /** Messages the (mocked) provider actually received. */
+  const sentMessages = (provider = openai): LLMMessage[] =>
+    provider.stream.mock.calls[0][0] as LLMMessage[];
+
+  describe('resolveApiKey', () => {
+    it('returns empty string for demo provider without touching the DB', async () => {
+      await expect(
+        service.resolveApiKey('demo', 'ignored', 'user-1'),
+      ).resolves.toBe('');
+      expect(usersService.getProviderKey).not.toHaveBeenCalled();
+    });
+
+    it('prefers the key from the request body over the stored key', async () => {
+      usersService.getProviderKey.mockResolvedValue('sk-stored');
+      await expect(
+        service.resolveApiKey('openai', 'sk-body', 'user-1'),
+      ).resolves.toBe('sk-body');
+    });
+
+    it('falls back to the stored key for the logged-in user', async () => {
+      usersService.getProviderKey.mockResolvedValue('sk-stored');
+      await expect(
+        service.resolveApiKey('openai', undefined, 'user-1'),
+      ).resolves.toBe('sk-stored');
+      expect(usersService.getProviderKey).toHaveBeenCalledWith(
+        'user-1',
+        'openai',
+      );
+    });
+
+    it('throws when there is no key anywhere', async () => {
+      await expect(
+        service.resolveApiKey('openai', undefined, 'user-1'),
+      ).rejects.toThrow(BadRequestException);
+      await expect(service.resolveApiKey('openai')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('streamChat message assembly', () => {
+    it('sends system prompt, current code, history, then the new message', async () => {
+      const req = request({
+        history: [
+          message({ id: 'a', role: 'user', content: 'make it blue' }),
+          message({ id: 'b', role: 'assistant', content: 'done, it is blue' }),
+        ],
+      });
+
+      await consume(service.streamChat(req));
+
+      const msgs = sentMessages();
+      expect(msgs.map((m) => m.role)).toEqual([
+        'system',
+        'user',
+        'user',
+        'assistant',
+        'user',
+      ]);
+      expect(msgs[1].content).toContain(
+        '```javascript\nfunction setup() {}\n```',
+      );
+      expect(msgs[2].content).toBe('make it blue');
+      expect(msgs[3].content).toBe('done, it is blue');
+      expect(msgs[4].content).toBe('change the background color');
+      expect(openai.stream).toHaveBeenCalledWith(
+        expect.anything(),
+        'gpt-4o',
+        'sk-test',
+      );
+    });
+
+    it('attaches images to the current message and history messages', async () => {
+      const historyImage = png();
+      const currentImage = jpeg();
+      const req = request({
+        history: [message({ content: 'look at this', images: [historyImage] })],
+        images: [currentImage],
+      });
+
+      await consume(service.streamChat(req));
+
+      const msgs = sentMessages();
+      expect(msgs[2].images).toEqual([historyImage]);
+      expect(msgs[msgs.length - 1].images).toEqual([currentImage]);
+    });
+
+    it('rejects unknown providers', async () => {
+      const req = request({
+        config: { provider: 'weird' as never, model: 'x', apiKey: 'k' },
+      });
+      await expect(consume(service.streamChat(req))).rejects.toThrow(
+        'Unknown provider: weird',
+      );
+    });
+  });
+
+  describe('streamChat history clamping', () => {
+    it('keeps only the last 20 history messages', async () => {
+      const history = Array.from({ length: 25 }, (_, i) =>
+        message({ id: `m${i}`, content: `msg-${i}` }),
+      );
+
+      await consume(service.streamChat(request({ history })));
+
+      const msgs = sentMessages();
+      // system + code + 20 history + current message
+      expect(msgs).toHaveLength(23);
+      expect(msgs[2].content).toBe('msg-5');
+      expect(msgs[21].content).toBe('msg-24');
+    });
+
+    it('drops older messages once the 250KB history budget is exceeded, keeping newest first', async () => {
+      const big = 'a'.repeat(100_000);
+      const history = [
+        message({ id: 'old-small', content: 'old small message' }),
+        message({ id: 'big-1', content: big }),
+        message({ id: 'big-2', content: big }),
+        message({ id: 'big-3', content: big }),
+      ];
+
+      await consume(service.streamChat(request({ history })));
+
+      const msgs = sentMessages();
+      const historyContents = msgs.slice(2, -1).map((m) => m.content);
+      // Walking newest-first: big-3 (100k) + big-2 (200k) fit, big-1 would hit 300k > 250k
+      // and is skipped, then old-small still fits — leaving a gap in the middle.
+      expect(historyContents).toEqual(['old small message', big, big]);
+    });
+  });
+
+  describe('streamChat image validation', () => {
+    it('accepts valid PNG and JPEG attachments', async () => {
+      const req = request({ images: [png(), jpeg()] });
+      await expect(consume(service.streamChat(req))).resolves.toEqual([
+        'chunk',
+      ]);
+    });
+
+    it('rejects an image whose bytes do not match its declared PNG type', async () => {
+      const fake = { ...jpeg(), mimeType: 'image/png' as const };
+      await expect(
+        consume(service.streamChat(request({ images: [fake] }))),
+      ).rejects.toThrow('does not match declared PNG');
+    });
+
+    it('rejects an image whose bytes do not match its declared JPEG type', async () => {
+      const fake = { ...png(), mimeType: 'image/jpeg' as const };
+      await expect(
+        consume(service.streamChat(request({ images: [fake] }))),
+      ).rejects.toThrow('does not match declared JPEG');
+    });
+
+    it('rejects a single image above the per-image size limit', async () => {
+      const huge = png(10 * 1024 * 1024 + 64);
+      await expect(
+        consume(service.streamChat(request({ images: [huge] }))),
+      ).rejects.toThrow('exceeds maximum size');
+    });
+
+    it('rejects more than 12 images across message + history', async () => {
+      const history = Array.from({ length: 5 }, (_, i) =>
+        message({ id: `h${i}`, images: [png(), png(), png()] }),
+      ); // 15 images
+      await expect(
+        consume(service.streamChat(request({ history }))),
+      ).rejects.toThrow('Too many images');
+    });
+
+    it('rejects when combined image size exceeds the 20MB budget', async () => {
+      const sevenMb = 7 * 1024 * 1024;
+      const history = [
+        message({ id: 'h1', images: [png(sevenMb)] }),
+        message({ id: 'h2', images: [png(sevenMb)] }),
+      ];
+      const req = request({ history, images: [png(sevenMb)] }); // 21MB total, each under 10MB
+      await expect(consume(service.streamChat(req))).rejects.toThrow(
+        'exceed maximum combined size',
+      );
+    });
+  });
+
+  describe('demo mode', () => {
+    const originalGroqKey = process.env.GROQ_API_KEY;
+
+    afterEach(() => {
+      if (originalGroqKey === undefined) delete process.env.GROQ_API_KEY;
+      else process.env.GROQ_API_KEY = originalGroqKey;
+    });
+
+    it('routes demo requests to Groq with the server-side key and fixed model', async () => {
+      process.env.GROQ_API_KEY = 'gsk-server';
+      const req = request({ config: { provider: 'demo', model: 'ignored' } });
+
+      await consume(service.streamChat(req));
+
+      expect(groq.stream).toHaveBeenCalledWith(
+        expect.anything(),
+        'llama-3.3-70b-versatile',
+        'gsk-server',
+      );
+      expect(openai.stream).not.toHaveBeenCalled();
+    });
+
+    it('fails clearly when demo mode is not configured', async () => {
+      delete process.env.GROQ_API_KEY;
+      const req = request({ config: { provider: 'demo', model: 'x' } });
+      await expect(consume(service.streamChat(req))).rejects.toThrow(
+        'Demo mode is not configured',
+      );
+    });
+  });
+});

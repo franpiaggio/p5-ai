@@ -41,13 +41,15 @@ pnpm --dir backend format     # Prettier
 
 ### Test
 ```bash
-pnpm --dir frontend test             # Vitest (unit: multi-file logic, preview assembly)
-pnpm --dir frontend test:watch       # Vitest watch mode
-pnpm --dir backend test              # Jest
-pnpm --dir backend test:watch        # Watch mode
-pnpm --dir backend test:cov          # Coverage
-pnpm --dir backend test:e2e          # E2E tests (jest-e2e.json config)
+pnpm test                            # All unit tests (backend Jest + frontend Vitest)
+pnpm --dir backend test              # Backend unit tests (Jest)
+pnpm --dir frontend test             # Frontend unit tests (Vitest)
+pnpm test:api                        # Backend API smoke via supertest (in-memory SQLite)
+pnpm test:e2e                        # Browser e2e (Playwright; boots its own backend+frontend on ports 3211/5273)
+pnpm test:all                        # Everything
 ```
+
+Unit tests live next to their source (`*.spec.ts` backend, `*.test.ts` frontend). Browser e2e specs live in `e2e/` (LLM responses are mocked at the network layer via `page.route`, so no API keys are needed). CI runs all of these on every push/PR (`.github/workflows/ci.yml`).
 
 ### Docker
 ```bash

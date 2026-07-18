@@ -1,0 +1,101 @@
+import { test, expect } from '@playwright/test';
+import {
+  waitForApp,
+  editorContent,
+  chatInput,
+  mockChatResponse,
+  sendChatMessage,
+} from './helpers';
+
+const FULL_CODE_RESPONSE = [
+  "I'll rewrite the sketch:\n",
+  [
+    '```javascript',
+    'function setup() {',
+    '  createCanvas(windowWidth, windowHeight);',
+    '}',
+    '',
+    'function draw() {',
+    '  background(1, 2, 3); // E2E_CHAT_MARKER',
+    '}',
+    '```',
+  ].join('\n'),
+];
+
+test.describe('chat → diff review flow (LLM mocked at the network layer)', () => {
+  test('a full-code suggestion streams in and Accept applies it', async ({ page }) => {
+    await page.goto('/');
+    await waitForApp(page);
+    await mockChatResponse(page, FULL_CODE_RESPONSE);
+
+    await sendChatMessage(page, 'rewrite my sketch');
+
+    await expect(page.getByText("I'll rewrite the sketch:")).toBeVisible();
+    await expect(page.getByText('Review changes in the editor')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Accept', exact: true }).click();
+
+    await expect(page.getByText('Review changes in the editor')).toHaveCount(0);
+    await expect(editorContent(page)).toContainText('E2E_CHAT_MARKER');
+    await expect(chatInput(page)).toBeEnabled();
+  });
+
+  test('Reject restores the previous code', async ({ page }) => {
+    await page.goto('/');
+    await waitForApp(page);
+    await mockChatResponse(page, FULL_CODE_RESPONSE);
+
+    await sendChatMessage(page, 'rewrite my sketch');
+    await expect(page.getByText('Review changes in the editor')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Reject', exact: true }).click();
+
+    await expect(editorContent(page)).toContainText('rectMode(CENTER)');
+    await expect(editorContent(page)).not.toContainText('E2E_CHAT_MARKER');
+    await expect(chatInput(page)).toBeEnabled();
+  });
+
+  test('search/replace blocks patch the current code', async ({ page }) => {
+    await page.goto('/');
+    await waitForApp(page);
+    await mockChatResponse(page, [
+      'Tweaking the background color.\n',
+      [
+        '<<<SEARCH',
+        '  background(30);',
+        '===',
+        '  background(230, 80, 15); // E2E_SR_MARKER',
+        '>>>REPLACE',
+      ].join('\n'),
+    ]);
+
+    await sendChatMessage(page, 'warmer background please');
+
+    // The raw block is stripped from the chat bubble; only the prose remains.
+    await expect(page.getByText('Tweaking the background color.')).toBeVisible();
+    await expect(page.getByText('<<<SEARCH')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Accept', exact: true }).click();
+
+    await expect(editorContent(page)).toContainText('E2E_SR_MARKER');
+    // The rest of the sketch is untouched.
+    await expect(editorContent(page)).toContainText('rectMode(CENTER)');
+  });
+
+  test('a stream error surfaces as a warning message, not a crash', async ({ page }) => {
+    await page.goto('/');
+    await waitForApp(page);
+    await page.route('**/api/chat', (route) =>
+      route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+        body: 'data: {"error":"Provider exploded"}\n\n',
+      }),
+    );
+
+    await sendChatMessage(page, 'hello');
+
+    await expect(page.getByText('Warning: Provider exploded')).toBeVisible();
+    await expect(chatInput(page)).toBeEnabled();
+  });
+});
