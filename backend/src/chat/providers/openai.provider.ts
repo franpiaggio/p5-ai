@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import type { LLMProvider, LLMMessage } from './llm.interface';
+import type { LLMProvider, LLMMessage, LLMStreamOptions } from './llm.interface';
+
+const MAX_COMPLETION_TOKENS = 16_384;
+
+/** Predicted Outputs is only accepted by the gpt-4o / gpt-4.1 families —
+ * passing `prediction` to other models fails the whole request. */
+const supportsPrediction = (model: string): boolean =>
+  /^gpt-4o|^gpt-4\.1/.test(model);
 
 @Injectable()
 export class OpenAIProvider implements LLMProvider {
@@ -24,6 +31,7 @@ export class OpenAIProvider implements LLMProvider {
     messages: LLMMessage[],
     model: string,
     apiKey: string,
+    options?: LLMStreamOptions,
   ): AsyncGenerator<string> {
     const client = new OpenAI({ apiKey });
 
@@ -35,6 +43,13 @@ export class OpenAIProvider implements LLMProvider {
           content: this.buildContent(m),
         })) as OpenAI.ChatCompletionMessageParam[],
         stream: true,
+        max_completion_tokens: MAX_COMPLETION_TOKENS,
+        // Speculative decoding against the current code: full-rewrite responses
+        // are a near-copy of it, cutting latency 2-4x. Rejected prediction
+        // tokens bill at output rates — acceptable for sketch-sized files.
+        ...(options?.prediction && supportsPrediction(model)
+          ? { prediction: { type: 'content' as const, content: options.prediction } }
+          : {}),
       });
 
       for await (const chunk of stream) {

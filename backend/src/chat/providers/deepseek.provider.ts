@@ -15,7 +15,8 @@ export class DeepSeekProvider implements LLMProvider {
     });
 
     try {
-      // DeepSeek doesn't support vision — always send content as plain string
+      // DeepSeek doesn't support vision — always send content as plain string.
+      // 8k is deepseek-chat's maximum output length.
       const stream = await client.chat.completions.create({
         model,
         messages: messages.map((m) => ({
@@ -23,6 +24,7 @@ export class DeepSeekProvider implements LLMProvider {
           content: m.content,
         })) as OpenAI.ChatCompletionMessageParam[],
         stream: true,
+        max_tokens: 8_192,
       });
 
       for await (const chunk of stream) {

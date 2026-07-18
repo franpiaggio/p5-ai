@@ -146,7 +146,26 @@ describe('ChatService', () => {
         expect.anything(),
         'gpt-4o',
         'sk-test',
+        expect.anything(),
       );
+    });
+
+    it('passes the current code as a prediction for speculative decoding', async () => {
+      await consume(service.streamChat(request()));
+      const opts = openai.stream.mock.calls[0][3] as { prediction?: string };
+      expect(opts.prediction).toBe('```javascript\nfunction setup() {}\n```');
+    });
+
+    it('builds the prediction from all files in a multi-file sketch', async () => {
+      const req = request({
+        files: [
+          { name: 'sketch.js', content: 'function setup() {}' },
+          { name: 'particle.js', content: 'class P {}' },
+        ],
+      });
+      await consume(service.streamChat(req));
+      const opts = openai.stream.mock.calls[0][3] as { prediction?: string };
+      expect(opts.prediction).toContain('// filename: particle.js\nclass P {}');
     });
 
     it('attaches images to the current message and history messages', async () => {
@@ -205,6 +224,56 @@ describe('ChatService', () => {
       // Walking newest-first: big-3 (100k) + big-2 (200k) fit, big-1 would hit 300k > 250k
       // and is skipped, then old-small still fits — leaving a gap in the middle.
       expect(historyContents).toEqual(['old small message', big, big]);
+    });
+  });
+
+  describe('streamChat history code stripping', () => {
+    const fenced = '```javascript\nfunction draw() { background(0); }\n```';
+
+    it('replaces code in older assistant messages, keeps the newest one and user messages intact', async () => {
+      const history = [
+        message({ id: 'u1', role: 'user', content: `mine does this:\n${fenced}` }),
+        message({ id: 'a1', role: 'assistant', content: `Here you go:\n${fenced}` }),
+        message({ id: 'u2', role: 'user', content: 'now make it red' }),
+        message({ id: 'a2', role: 'assistant', content: `Sure:\n${fenced}` }),
+      ];
+
+      await consume(service.streamChat(request({ history })));
+
+      const hist = sentMessages().slice(2, -1);
+      expect(hist[0].content).toContain('function draw'); // user message untouched
+      expect(hist[1].content).not.toContain('function draw');
+      expect(hist[1].content).toContain('[previous code omitted');
+      expect(hist[3].content).toContain('function draw'); // newest assistant intact
+    });
+
+    it('replaces search/replace blocks and their filename prefix in older assistant messages', async () => {
+      const sr =
+        '// filename: particle.js\n<<<SEARCH\nlet r = 1;\n===\nlet r = 2;\n>>>REPLACE';
+      const history = [
+        message({ id: 'a1', role: 'assistant', content: `Patch:\n${sr}` }),
+        message({ id: 'a2', role: 'assistant', content: 'anything else?' }),
+      ];
+
+      await consume(service.streamChat(request({ history })));
+
+      const hist = sentMessages().slice(2, -1);
+      expect(hist[0].content).not.toContain('<<<SEARCH');
+      expect(hist[0].content).not.toContain('// filename:');
+      expect(hist[0].content).toContain('[previous code omitted');
+    });
+
+    it('leaves code-free history untouched', async () => {
+      const history = [
+        message({ id: 'a1', role: 'assistant', content: 'it uses perlin noise' }),
+        message({ id: 'a2', role: 'assistant', content: 'yes' }),
+      ];
+
+      await consume(service.streamChat(request({ history })));
+
+      const hist = sentMessages().slice(2, -1);
+      expect(hist[0].content).toBe('it uses perlin noise');
+      expect(hist[1].content).toBe('yes');
     });
   });
 

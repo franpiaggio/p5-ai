@@ -101,16 +101,16 @@ You have TWO response formats. Choose based on how much code changes:
 The user may have multiple JS/TS files. When provided, all files are shown with headers like \`// filename: utils.js\`.
 
 ### Targeting files in responses
-- To modify a specific file, start the code block or search/replace block with a comment: \`// filename: utils.js\`
-- To create a new file, use: \`// filename: particle.js [NEW FILE]\`
-- If no filename comment is present, changes target \`sketch.js\` by default
-- Search/replace blocks can target different files by prefixing each block with \`// filename: ...\`
+- To modify a specific file, start the code block with a comment: \`// filename: utils.js\`
+- To create a new file, use: \`// filename: particle.js [NEW FILE]\` (full code blocks only — search/replace cannot create files)
+- A code block with no filename comment targets the entry file (\`sketch.js\`, or \`sketch.ts\` in TypeScript sketches)
+- For search/replace blocks, put \`// filename: utils.js\` on its own line directly ABOVE \`<<<SEARCH\`. ALWAYS include it when the sketch has more than one file. A block without it is applied to the file whose current content contains the SEARCH text.
 
 ### Splitting work across files
 - When generating a substantial NEW sketch (multiple classes, systems, or clearly separable concerns), split it into multiple files instead of one large \`sketch.js\`.
 - Emit ONE code block per file, each starting with its \`// filename:\` header (use \`[NEW FILE]\` for files that don't exist yet).
-- Keep \`sketch.js\` as the entry point that holds \`setup()\`/\`draw()\`. Put helper classes/functions in their own files (e.g. \`particle.js\`, \`palette.js\`).
-- Files run as globals in load order (\`sketch.js\` last), so a class/function defined in one file is available in the others — no imports needed.
+- Keep the entry file (\`sketch.js\` / \`sketch.ts\`) as the one that holds \`setup()\`/\`draw()\`. Put helper classes/functions in their own files (e.g. \`particle.js\`, \`palette.js\`). Match the sketch's existing extension for new files.
+- Files run as globals in load order (the entry file last), so a class/function defined in one file is available in the others — no imports needed.
 - Don't over-split: only break out files when it genuinely improves clarity (roughly one file per class or cohesive system). A small sketch stays in \`sketch.js\`.
 
 ### CDN Libraries
@@ -129,6 +129,13 @@ const MAX_TOTAL_IMAGES = 12;
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_HISTORY_TEXT_BYTES = 250_000;
 const MAX_MESSAGE_TEXT_BYTES = 100_000;
+
+const FENCED_JS_BLOCK_REGEX =
+  /```(?:javascript|js|jsx|typescript|ts|tsx)\s*\n[\s\S]*?```/g;
+const SEARCH_REPLACE_BLOCK_REGEX =
+  /(?:^\/\/[ \t]*filename:[ \t]*\S+[ \t]*\n)?<<<SEARCH\n[\s\S]*?\n>>>REPLACE/gm;
+const CODE_OMITTED_NOTE =
+  '[previous code omitted — the current sketch code above already includes every applied change]';
 
 @Injectable()
 export class ChatService {
@@ -239,6 +246,33 @@ export class ChatService {
     }
   }
 
+  /** Replace code suggestions inside older assistant messages with a short note.
+   * Their full code duplicates the current-code context (and each other), easily
+   * multiplying input tokens several times over. The newest assistant message is
+   * kept intact so follow-ups like "apply what you just suggested" keep their
+   * referent. User messages are never touched. */
+  private stripHistoryCode(
+    history: ChatRequestDto['history'],
+  ): ChatRequestDto['history'] {
+    if (!history?.length) return history ?? [];
+
+    let lastAssistant = -1;
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i].role === 'assistant') {
+        lastAssistant = i;
+        break;
+      }
+    }
+
+    return history.map((msg, i) => {
+      if (msg.role !== 'assistant' || i === lastAssistant) return msg;
+      const content = msg.content
+        .replace(FENCED_JS_BLOCK_REGEX, CODE_OMITTED_NOTE)
+        .replace(SEARCH_REPLACE_BLOCK_REGEX, CODE_OMITTED_NOTE);
+      return content === msg.content ? msg : { ...msg, content };
+    });
+  }
+
   private clampHistory(
     history: ChatRequestDto['history'],
   ): ChatRequestDto['history'] {
@@ -269,22 +303,24 @@ export class ChatService {
   }
 
   async *streamChat(request: ChatRequestDto): AsyncGenerator<string> {
-    const history = this.clampHistory(request.history);
+    const history = this.clampHistory(this.stripHistoryCode(request.history));
     this.enforceImageBudgets({ ...request, history });
 
     const codeFence =
       request.language === 'javascript' ? 'javascript' : 'typescript';
 
     // Build code context: multi-file or single file
-    let codeContext: string;
-    if (request.files && request.files.length > 0) {
-      const fileBlocks = request.files
-        .map((f) => `// filename: ${f.name}\n${f.content}`)
-        .join('\n\n');
-      codeContext = `Current p5.js sketch files:\n\`\`\`${codeFence}\n${fileBlocks}\n\`\`\``;
-    } else {
-      codeContext = `Current p5.js code:\n\`\`\`${codeFence}\n${request.code}\n\`\`\``;
-    }
+    const codeBody =
+      request.files && request.files.length > 0
+        ? request.files
+            .map((f) => `// filename: ${f.name}\n${f.content}`)
+            .join('\n\n')
+        : request.code;
+    const codeBlock = `\`\`\`${codeFence}\n${codeBody}\n\`\`\``;
+    let codeContext =
+      request.files && request.files.length > 0
+        ? `Current p5.js sketch files:\n${codeBlock}`
+        : `Current p5.js code:\n${codeBlock}`;
 
     if (request.libraries && request.libraries.length > 0) {
       const libList = request.libraries
@@ -337,6 +373,9 @@ export class ChatService {
       messages,
       request.config.model,
       request.config.apiKey!,
+      // A full-rewrite response is a near-copy of the current code — providers
+      // that support speculative decoding (OpenAI Predicted Outputs) use this.
+      { prediction: codeBlock },
     );
   }
 

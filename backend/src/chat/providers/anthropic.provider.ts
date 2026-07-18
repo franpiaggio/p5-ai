@@ -6,10 +6,11 @@ import type { LLMProvider, LLMMessage } from './llm.interface';
 export class AnthropicProvider implements LLMProvider {
   private buildContent(
     msg: LLMMessage,
+    cacheBreakpoint = false,
   ): string | Anthropic.ContentBlockParam[] {
-    if (!msg.images?.length) return msg.content;
+    if (!msg.images?.length && !cacheBreakpoint) return msg.content;
     const parts: Anthropic.ContentBlockParam[] = [];
-    for (const img of msg.images) {
+    for (const img of msg.images ?? []) {
       parts.push({
         type: 'image',
         source: {
@@ -19,7 +20,11 @@ export class AnthropicProvider implements LLMProvider {
         },
       });
     }
-    parts.push({ type: 'text', text: msg.content });
+    parts.push({
+      type: 'text',
+      text: msg.content,
+      ...(cacheBreakpoint ? { cache_control: { type: 'ephemeral' as const } } : {}),
+    });
     return parts;
   }
 
@@ -31,18 +36,27 @@ export class AnthropicProvider implements LLMProvider {
     const client = new Anthropic({ apiKey });
 
     const systemMessage = messages.find((m) => m.role === 'system');
+    // Two cache breakpoints: the static system prompt always hits on later
+    // turns; the code-context message (always first in the chat) hits as long
+    // as the sketch hasn't changed since the previous request.
     const chatMessages = messages
       .filter((m) => m.role !== 'system')
-      .map((m) => ({
+      .map((m, idx) => ({
         role: m.role as 'user' | 'assistant',
-        content: this.buildContent(m),
+        content: this.buildContent(m, idx === 0),
       }));
 
     try {
       const stream = client.messages.stream({
         model,
         max_tokens: 16_384,
-        system: systemMessage?.content || '',
+        system: [
+          {
+            type: 'text',
+            text: systemMessage?.content || '',
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: chatMessages,
       });
 

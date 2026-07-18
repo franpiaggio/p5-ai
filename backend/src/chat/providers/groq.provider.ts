@@ -15,7 +15,8 @@ export class GroqProvider implements LLMProvider {
     });
 
     try {
-      // Groq doesn't support vision — always send content as plain string
+      // Groq doesn't support vision — always send content as plain string.
+      // 8k output cap: safe across Groq's model lineup (some cap at 8k).
       const stream = await client.chat.completions.create({
         model,
         messages: messages.map((m) => ({
@@ -23,6 +24,7 @@ export class GroqProvider implements LLMProvider {
           content: m.content,
         })) as OpenAI.ChatCompletionMessageParam[],
         stream: true,
+        max_tokens: 8_192,
       });
 
       for await (const chunk of stream) {
