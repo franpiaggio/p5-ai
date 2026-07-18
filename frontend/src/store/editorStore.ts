@@ -3,7 +3,16 @@ import { persist } from 'zustand/middleware';
 import type { Message, ConsoleLog, LLMConfig, TabType, EditorError, CodeChange, ProviderKeys, SketchFile, Library } from '../types';
 import type { AppThemeId } from '../components/Editor/editorConfig';
 import { diffSummary, updateImportPath } from '../utils/codeUtils';
-import { createDefaultFiles, createFileId, isAllowedFileName, languageFromExtension } from '../constants/defaultFiles';
+import {
+  createDefaultFiles,
+  createFileId,
+  isAllowedFileName,
+  languageFromExtension,
+  isEntryFile,
+  entryFileName,
+  findEntryFile,
+} from '../constants/defaultFiles';
+import type { FileChange } from '../utils/fileEdits';
 
 export type EditorLanguage = 'javascript' | 'typescript';
 
@@ -15,6 +24,19 @@ export interface PendingDiff {
   prompt?: string;
   isRestore?: boolean;
   fileName?: string;
+}
+
+/** Cursor-style review of a multi-file AI edit: changes are already applied to
+ * `files` (so the preview runs with them), and the user steps through each
+ * file's diff accepting or rejecting it individually. */
+export interface PendingFilesReview {
+  changes: FileChange[];
+  index: number;
+  /** How many files have been accepted so far — decides applied vs rejected chat badges. */
+  accepted: number;
+  messageId: string;
+  prompt?: string;
+  blockKeys: string[];
 }
 
 const DEFAULT_CODE = `function setup() {
@@ -74,6 +96,9 @@ interface EditorState {
   exampleAppliedLabel: string | null;
   files: SketchFile[];
   activeFileName: string;
+  /** File names shown as editor tabs, in tab order. Closing a tab never deletes the file. */
+  openFiles: string[];
+  pendingFilesReview: PendingFilesReview | null;
   lastSavedFiles: SketchFile[];
   isFileSidebarOpen: boolean;
   libraries: Library[];
@@ -118,6 +143,10 @@ interface EditorState {
   addFile: (name: string) => void;
   deleteFile: (name: string) => void;
   renameFile: (oldName: string, newName: string) => void;
+  closeTab: (name: string) => void;
+  acceptReviewFile: () => void;
+  rejectReviewFile: () => void;
+  acceptAllReviewFiles: () => void;
   setFileContent: (name: string, content: string) => void;
   setFiles: (files: SketchFile[]) => void;
   addLibrary: (lib: Library) => void;
@@ -137,6 +166,76 @@ const syncActiveFile = (
   content: string,
 ): SketchFile[] =>
   files.map((f) => (f.name === activeFileName ? { ...f, content } : f));
+
+const markKeys = (
+  record: Record<string, true>,
+  keys: string[],
+): Record<string, true> => {
+  if (keys.length === 0) return record;
+  const next = { ...record };
+  for (const k of keys) next[k] = true;
+  return next;
+};
+
+/** Step a multi-file review forward (or finish it): focuses the next change's
+ * file, or on the last change closes the review and marks the chat blocks
+ * applied/rejected based on whether anything was accepted. */
+const advanceFilesReview = (
+  state: EditorState,
+  review: PendingFilesReview,
+  files: SketchFile[],
+  openFiles: string[],
+  newEntries: CodeChange[],
+  acceptedDelta: number,
+): Partial<EditorState> => {
+  const accepted = review.accepted + acceptedDelta;
+  const codeHistory = newEntries.length
+    ? [...state.codeHistory, ...newEntries]
+    : state.codeHistory;
+  const nextIndex = review.index + 1;
+
+  if (nextIndex >= review.changes.length) {
+    // Finished — if the active file was a rejected new file, fall back to the entry.
+    const activeFile =
+      files.find((f) => f.name === state.activeFileName) ?? findEntryFile(files);
+    return {
+      files,
+      openFiles,
+      codeHistory,
+      pendingFilesReview: null,
+      activeFileName: activeFile?.name ?? state.activeFileName,
+      code: activeFile?.content ?? state.code,
+      ...(accepted > 0
+        ? { appliedBlocks: markKeys(state.appliedBlocks, review.blockKeys) }
+        : { rejectedBlocks: markKeys(state.rejectedBlocks, review.blockKeys) }),
+    };
+  }
+
+  const next = review.changes[nextIndex];
+  const nextFile = files.find((f) => f.name === next.name);
+  return {
+    files,
+    openFiles,
+    codeHistory,
+    pendingFilesReview: { ...review, index: nextIndex, accepted },
+    activeFileName: next.name,
+    code: nextFile?.content ?? next.newContent,
+  };
+};
+
+const reviewHistoryEntry = (
+  review: PendingFilesReview,
+  change: FileChange,
+): CodeChange => ({
+  id: `change-${++changeCounter}-${Date.now()}`,
+  messageId: review.messageId,
+  timestamp: Date.now(),
+  previousCode: change.previousContent,
+  newCode: change.newContent,
+  summary: `${change.isNew ? 'Created' : 'Updated'} ${change.name}`,
+  ...(review.prompt ? { prompt: review.prompt } : {}),
+  fileName: change.name,
+});
 
 export const useEditorStore = create<EditorState>()(
   persist(
@@ -179,6 +278,8 @@ export const useEditorStore = create<EditorState>()(
       exampleAppliedLabel: null,
       files: createDefaultFiles(DEFAULT_CODE),
       activeFileName: 'sketch.js',
+      openFiles: ['sketch.js'],
+      pendingFilesReview: null,
       lastSavedFiles: createDefaultFiles(DEFAULT_CODE),
       isFileSidebarOpen: false,
       libraries: [] as Library[],
@@ -336,7 +437,30 @@ export const useEditorStore = create<EditorState>()(
       setSketchMeta: (sketchId, sketchTitle) => set({ sketchId, sketchTitle }),
       setFixRequest: (fixRequest) => set({ fixRequest }),
       setAppTheme: (appTheme) => set({ appTheme }),
-      setEditorLanguage: (editorLanguage) => set({ editorLanguage }),
+      setEditorLanguage: (editorLanguage) =>
+        set((state) => {
+          // Migrate the entry file's extension (sketch.js ↔ sketch.ts) so the
+          // editor, preview transpile, and AI targeting all agree on the language.
+          const entry = state.files.find((f) => isEntryFile(f.name));
+          const newName = entryFileName(editorLanguage);
+          if (!entry || entry.name === newName) return { editorLanguage };
+          const files = state.files.map((f) => {
+            if (f.name === entry.name) {
+              return { ...f, name: newName, language: editorLanguage };
+            }
+            const content = updateImportPath(f.content, entry.name, newName);
+            return content === f.content ? f : { ...f, content };
+          });
+          return {
+            editorLanguage,
+            files,
+            activeFileName:
+              state.activeFileName === entry.name ? newName : state.activeFileName,
+            openFiles: state.openFiles.map((n) => (n === entry.name ? newName : n)),
+            isRunning: true,
+            runTrigger: state.runTrigger + 1,
+          };
+        }),
       setTranspiler: (transpiler) => set({ transpiler }),
       setProviderKey: (provider, key) =>
         set((state) => {
@@ -363,12 +487,20 @@ export const useEditorStore = create<EditorState>()(
         set((state) => {
           const file = state.files.find((f) => f.name === name);
           if (!file) return state;
-          return { activeFileName: name, code: file.content };
+          return {
+            activeFileName: name,
+            code: file.content,
+            openFiles: state.openFiles.includes(name)
+              ? state.openFiles
+              : [...state.openFiles, name],
+          };
         }),
       addFile: (name) =>
         set((state) => {
           if (!isAllowedFileName(name)) return state;
           if (state.files.some((f) => f.name === name)) return state;
+          // Only one entry file may exist (sketch.js OR sketch.ts).
+          if (isEntryFile(name) && state.files.some((f) => isEntryFile(f.name))) return state;
           const newFile: SketchFile = {
             id: createFileId(),
             name,
@@ -379,25 +511,32 @@ export const useEditorStore = create<EditorState>()(
             files: [...state.files, newFile],
             activeFileName: name,
             code: '',
+            openFiles: [...state.openFiles, name],
           };
         }),
       deleteFile: (name) =>
         set((state) => {
-          if (name === 'sketch.js') return state;
+          if (isEntryFile(name)) return state;
           const files = state.files.filter((f) => f.name !== name);
           if (files.length === state.files.length) return state;
-          const switchTo = state.activeFileName === name ? 'sketch.js' : state.activeFileName;
-          const switchFile = files.find((f) => f.name === switchTo) ?? files[0];
+          const openFiles = state.openFiles.filter((n) => n !== name);
+          if (state.activeFileName !== name) {
+            return { files, openFiles };
+          }
+          const switchFile = findEntryFile(files) ?? files[0];
           return {
             files,
             activeFileName: switchFile.name,
             code: switchFile.content,
+            openFiles: openFiles.includes(switchFile.name)
+              ? openFiles
+              : [...openFiles, switchFile.name],
           };
         }),
       renameFile: (oldName, newName) =>
         set((state) => {
-          if (oldName === 'sketch.js') return state;
-          if (!isAllowedFileName(newName)) return state;
+          if (isEntryFile(oldName)) return state;
+          if (!isAllowedFileName(newName) || isEntryFile(newName)) return state;
           if (state.files.some((f) => f.name === newName)) return state;
           const files = state.files.map((f) => {
             if (f.name === oldName) {
@@ -412,8 +551,72 @@ export const useEditorStore = create<EditorState>()(
           return {
             files,
             activeFileName,
+            openFiles: state.openFiles.map((n) => (n === oldName ? newName : n)),
             ...(activeFile ? { code: activeFile.content } : {}),
           };
+        }),
+      closeTab: (name) =>
+        set((state) => {
+          const idx = state.openFiles.indexOf(name);
+          // The last remaining tab can't be closed — the editor needs a buffer.
+          if (idx === -1 || state.openFiles.length <= 1) return state;
+          const openFiles = state.openFiles.filter((n) => n !== name);
+          if (state.activeFileName !== name) return { openFiles };
+          const nextName = openFiles[Math.min(idx, openFiles.length - 1)];
+          const nextFile = state.files.find((f) => f.name === nextName);
+          return {
+            openFiles,
+            activeFileName: nextName,
+            code: nextFile?.content ?? '',
+          };
+        }),
+      acceptReviewFile: () =>
+        set((state) => {
+          const review = state.pendingFilesReview;
+          if (!review) return state;
+          const change = review.changes[review.index];
+          return advanceFilesReview(
+            state,
+            review,
+            state.files,
+            state.openFiles,
+            [reviewHistoryEntry(review, change)],
+            1,
+          );
+        }),
+      rejectReviewFile: () =>
+        set((state) => {
+          const review = state.pendingFilesReview;
+          if (!review) return state;
+          const change = review.changes[review.index];
+          // Revert this file: drop it if the AI created it, else restore its content.
+          const files = change.isNew
+            ? state.files.filter((f) => f.name !== change.name)
+            : state.files.map((f) =>
+                f.name === change.name ? { ...f, content: change.previousContent } : f,
+              );
+          const openFiles = change.isNew
+            ? state.openFiles.filter((n) => n !== change.name)
+            : state.openFiles;
+          return {
+            ...advanceFilesReview(state, review, files, openFiles, [], 0),
+            isRunning: true,
+            runTrigger: state.runTrigger + 1,
+          };
+        }),
+      acceptAllReviewFiles: () =>
+        set((state) => {
+          const review = state.pendingFilesReview;
+          if (!review) return state;
+          const remaining = review.changes.slice(review.index);
+          const entries = remaining.map((c) => reviewHistoryEntry(review, c));
+          // Jump to the last change and advance once — advanceFilesReview finishes the review.
+          const jumped = {
+            ...review,
+            index: review.changes.length - 1,
+            accepted: review.accepted + remaining.length - 1,
+          };
+          return advanceFilesReview(state, jumped, state.files, state.openFiles, entries, 1);
         }),
       setFileContent: (name, content) =>
         set((state) => {
@@ -428,10 +631,13 @@ export const useEditorStore = create<EditorState>()(
       setFiles: (files) =>
         set((state) => {
           const active = files.find((f) => f.name === state.activeFileName) ?? files[0];
+          const activeFileName = active?.name ?? 'sketch.js';
+          const kept = state.openFiles.filter((n) => files.some((f) => f.name === n));
           return {
             files,
-            activeFileName: active?.name ?? 'sketch.js',
+            activeFileName,
             code: active?.content ?? '',
+            openFiles: kept.includes(activeFileName) ? kept : [...kept, activeFileName],
           };
         }),
       addLibrary: (lib) =>
@@ -447,7 +653,7 @@ export const useEditorStore = create<EditorState>()(
       setFileSidebarOpen: (isFileSidebarOpen) => set({ isFileSidebarOpen }),
       newSketch: () =>
         set((state) => {
-          const newFiles = createDefaultFiles(DEFAULT_CODE);
+          const newFiles = createDefaultFiles(DEFAULT_CODE, state.editorLanguage);
           return {
             code: DEFAULT_CODE,
             lastSavedCode: DEFAULT_CODE,
@@ -467,7 +673,9 @@ export const useEditorStore = create<EditorState>()(
             exampleApplied: false,
             exampleAppliedLabel: null,
             files: newFiles,
-            activeFileName: 'sketch.js',
+            activeFileName: newFiles[0].name,
+            openFiles: [newFiles[0].name],
+            pendingFilesReview: null,
             lastSavedFiles: newFiles.map((f) => ({ ...f })),
             libraries: [],
             lastSavedLibraries: [],
@@ -499,6 +707,7 @@ export const useEditorStore = create<EditorState>()(
         files: state.files,
         lastSavedFiles: state.lastSavedFiles,
         activeFileName: state.activeFileName,
+        openFiles: state.openFiles,
         isFileSidebarOpen: state.isFileSidebarOpen,
         libraries: state.libraries,
         lastSavedLibraries: state.lastSavedLibraries,
@@ -560,6 +769,15 @@ export const useEditorStore = create<EditorState>()(
         }
         if (!state.lastSavedFiles || !Array.isArray(state.lastSavedFiles)) {
           state.lastSavedFiles = state.files.map((f) => ({ ...f }));
+        }
+        // Reconcile open tabs: drop tabs for missing files, always keep the
+        // active file open (also seeds pre-tabs persisted states).
+        if (!Array.isArray(state.openFiles)) state.openFiles = [];
+        state.openFiles = state.openFiles.filter((n) =>
+          state.files.some((f) => f.name === n),
+        );
+        if (!state.openFiles.includes(state.activeFileName)) {
+          state.openFiles.push(state.activeFileName);
         }
         if (!state.libraries || !Array.isArray(state.libraries)) {
           state.libraries = [];

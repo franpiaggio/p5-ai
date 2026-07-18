@@ -6,7 +6,7 @@ import { DiffToolbar } from './DiffToolbar';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles, registerFunctionCallTokenProvider, resolveMonacoTheme } from './editorConfig';
 import { P5_TYPE_DEFS } from './p5Types';
-import { languageFromExtension } from '../../constants/defaultFiles';
+import { languageFromExtension, isEntryFile } from '../../constants/defaultFiles';
 
 export function CodeEditor() {
   const code = useEditorStore((s) => s.code);
@@ -23,6 +23,9 @@ export function CodeEditor() {
   const files = useEditorStore((s) => s.files);
   const activeFileName = useEditorStore((s) => s.activeFileName);
   const setActiveFile = useEditorStore((s) => s.setActiveFile);
+  const openFiles = useEditorStore((s) => s.openFiles);
+  const closeTab = useEditorStore((s) => s.closeTab);
+  const pendingFilesReview = useEditorStore((s) => s.pendingFilesReview);
   const isFileSidebarOpen = useEditorStore((s) => s.isFileSidebarOpen);
   const setFileSidebarOpen = useEditorStore((s) => s.setFileSidebarOpen);
 
@@ -255,6 +258,34 @@ export function CodeEditor() {
     );
   }
 
+  // Multi-file review: step through each changed file's diff. The changes are
+  // already applied to `files`; `code` holds the current file's new content.
+  if (pendingFilesReview) {
+    const change = pendingFilesReview.changes[pendingFilesReview.index];
+    return (
+      <div className="h-full w-full" style={{ position: 'relative' }}>
+        {!isMobile && <DiffToolbar />}
+        <DiffEditor
+          key={change.name}
+          height="100%"
+          language={languageFromExtension(change.name)}
+          original={change.previousContent}
+          modified={code}
+          theme={resolvedTheme}
+          beforeMount={handleBeforeMount}
+          onMount={handleDiffMount}
+          options={{
+            ...EDITOR_OPTIONS,
+            readOnly: true,
+            renderSideBySide: false,
+            renderOverviewRuler: false,
+            glyphMargin: false,
+          }}
+        />
+      </div>
+    );
+  }
+
   if (pendingDiff) {
     return (
       <div className="h-full w-full" style={{ position: 'relative' }}>
@@ -295,19 +326,53 @@ export function CodeEditor() {
             </svg>
           </button>
           <div className="flex-1 flex items-center overflow-x-auto scrollbar-none">
-            {files.map((file) => (
-              <button
-                key={file.id}
-                onClick={() => setActiveFile(file.name)}
-                className={`px-3 py-1.5 text-[11px] font-mono whitespace-nowrap transition-colors border-b-2 cursor-pointer ${
-                  activeFileName === file.name
-                    ? 'text-info border-info bg-info/5'
-                    : 'text-text-muted/60 border-transparent hover:text-text-primary hover:bg-border/20'
-                }`}
-              >
-                {file.name}
-              </button>
-            ))}
+            {openFiles.map((name) => {
+              const file = files.find((f) => f.name === name);
+              if (!file) return null;
+              const isActive = activeFileName === name;
+              return (
+                <div
+                  key={file.id}
+                  className={`group/tab flex items-center whitespace-nowrap transition-colors border-b-2 ${
+                    isActive
+                      ? 'text-info border-info bg-info/5'
+                      : 'text-text-muted/60 border-transparent hover:text-text-primary hover:bg-border/20'
+                  }`}
+                >
+                  <button
+                    onClick={() => setActiveFile(name)}
+                    className="flex items-center gap-1.5 pl-3 py-1.5 text-[11px] font-mono cursor-pointer"
+                  >
+                    {name}
+                    {isEntryFile(name) && (
+                      <span
+                        className={`px-1 py-px rounded text-[8px] uppercase tracking-wider ${
+                          isActive ? 'bg-info/15 text-info' : 'bg-border/40 text-text-muted/50'
+                        }`}
+                        title="Entry point — holds setup() and draw()"
+                      >
+                        entry
+                      </span>
+                    )}
+                  </button>
+                  {openFiles.length > 1 ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); closeTab(name); }}
+                      className={`mx-1 p-0.5 rounded hover:bg-border/50 hover:text-text-primary transition-opacity cursor-pointer ${
+                        isActive ? 'opacity-60' : 'opacity-0 group-hover/tab:opacity-60'
+                      }`}
+                      title="Close tab (file stays in the sketch)"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <span className="pr-3" />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

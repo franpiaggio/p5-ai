@@ -6,13 +6,30 @@ export function createFileId(): string {
   return `file-${++fileIdCounter}-${Date.now()}`;
 }
 
-export function createDefaultFiles(code: string): SketchFile[] {
+/** The entry point holds setup()/draw(); its extension follows the sketch language. */
+export function isEntryFile(name: string): boolean {
+  return name === 'sketch.js' || name === 'sketch.ts';
+}
+
+export function entryFileName(language: 'javascript' | 'typescript'): string {
+  return language === 'typescript' ? 'sketch.ts' : 'sketch.js';
+}
+
+/** The sketch's entry file; falls back to the first file for malformed sets. */
+export function findEntryFile<T extends { name: string }>(files: T[]): T | undefined {
+  return files.find((f) => isEntryFile(f.name)) ?? files[0];
+}
+
+export function createDefaultFiles(
+  code: string,
+  language: 'javascript' | 'typescript' = 'javascript',
+): SketchFile[] {
   return [
     {
       id: createFileId(),
-      name: 'sketch.js',
+      name: entryFileName(language),
       content: code,
-      language: 'javascript',
+      language,
     },
   ];
 }

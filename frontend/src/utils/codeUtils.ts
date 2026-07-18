@@ -1,3 +1,5 @@
+import { diffLines } from 'diff';
+
 export function simpleHash(str: string): string {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -23,39 +25,146 @@ export function extractJsBlocks(markdown: string): string[] {
   return blocks;
 }
 
-/** Parse all <<<SEARCH ... === ... >>>REPLACE blocks from markdown. Returns null if none found. */
-export function extractSearchReplaceBlocks(
-  markdown: string,
-): Array<{ search: string; replace: string }> | null {
-  const blocks: Array<{ search: string; replace: string }> = [];
-  const regex = /<<<SEARCH\n([\s\S]*?)\n===\n([\s\S]*?)\n>>>REPLACE/g;
+export interface SearchReplaceBlock {
+  search: string;
+  replace: string;
+  /** Target file from a `// filename: x` line directly above <<<SEARCH; absent = resolve by content. */
+  fileName?: string;
+}
+
+/** Parse all <<<SEARCH ... === ... >>>REPLACE blocks from markdown, each with an
+ * optional `// filename: x` line directly above it. Returns null if none found. */
+export function extractSearchReplaceBlocks(markdown: string): SearchReplaceBlock[] | null {
+  const blocks: SearchReplaceBlock[] = [];
+  const regex =
+    /(?:^\/\/[ \t]*filename:[ \t]*(\S+)[ \t]*\n)?<<<SEARCH\n([\s\S]*?)\n===\n([\s\S]*?)\n>>>REPLACE/gm;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(markdown)) !== null) {
-    blocks.push({ search: match[1], replace: match[2] });
+    blocks.push({
+      search: match[2],
+      replace: match[3],
+      ...(match[1] ? { fileName: match[1] } : {}),
+    });
   }
   return blocks.length > 0 ? blocks : null;
 }
 
-/** Apply search/replace blocks sequentially to code. Throws if a search string isn't found. */
+/** Start indices (in lines) where every search line matches under `norm`. */
+function matchLineBlock(
+  codeLines: string[],
+  searchLines: string[],
+  norm: (line: string) => string,
+): number[] {
+  const starts: number[] = [];
+  for (let i = 0; i + searchLines.length <= codeLines.length; i++) {
+    let ok = true;
+    for (let j = 0; j < searchLines.length; j++) {
+      if (norm(codeLines[i + j]) !== norm(searchLines[j])) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) starts.push(i);
+  }
+  return starts;
+}
+
+const leadingWhitespace = (line: string): string => /^[ \t]*/.exec(line)![0];
+
+/**
+ * Apply one search/replace block with cascading match tolerance (Aider-style):
+ *  1. exact substring — first occurrence, as models usually include enough context
+ *  2. per-line, ignoring trailing whitespace — must match exactly once
+ *  3. per-line, fully trimmed (indentation-insensitive) — must match exactly once,
+ *     and the replacement is re-indented to the target's leading whitespace
+ * Throws when no tier produces a usable match.
+ */
+function applyOneSearchReplace(
+  code: string,
+  block: { search: string; replace: string },
+): string {
+  const idx = code.indexOf(block.search);
+  if (idx !== -1) {
+    return code.slice(0, idx) + block.replace + code.slice(idx + block.search.length);
+  }
+
+  const codeLines = code.split('\n');
+  const searchLines = block.search.split('\n');
+
+  let starts = matchLineBlock(codeLines, searchLines, (l) => l.replace(/[ \t]+$/, ''));
+  let reindent = false;
+  if (starts.length !== 1) {
+    starts = matchLineBlock(codeLines, searchLines, (l) => l.trim());
+    reindent = true;
+    if (starts.length !== 1) {
+      throw new Error(
+        starts.length === 0
+          ? `Search block not found in code:\n${block.search.slice(0, 80)}...`
+          : `Search block is ambiguous (${starts.length} matches):\n${block.search.slice(0, 80)}...`,
+      );
+    }
+  }
+
+  const start = starts[0];
+  let replaceLines = block.replace === '' ? [] : block.replace.split('\n');
+  if (reindent && replaceLines.length > 0) {
+    // Shift the replacement to the target's indentation: swap the search block's
+    // leading whitespace prefix for the matched code's.
+    const targetIndent = leadingWhitespace(codeLines[start]);
+    const searchIndent = leadingWhitespace(searchLines[0]);
+    if (targetIndent !== searchIndent) {
+      replaceLines = replaceLines.map((l) =>
+        l.startsWith(searchIndent) ? targetIndent + l.slice(searchIndent.length) : l,
+      );
+    }
+  }
+
+  return [
+    ...codeLines.slice(0, start),
+    ...replaceLines,
+    ...codeLines.slice(start + searchLines.length),
+  ].join('\n');
+}
+
+/** Apply search/replace blocks sequentially to code. Throws if a block can't be placed. */
 export function applySearchReplace(
   code: string,
   blocks: Array<{ search: string; replace: string }>,
 ): string {
   let result = code;
   for (const block of blocks) {
-    const idx = result.indexOf(block.search);
-    if (idx === -1) {
-      throw new Error(`Search block not found in code:\n${block.search.slice(0, 80)}...`);
-    }
-    result = result.slice(0, idx) + block.replace + result.slice(idx + block.search.length);
+    result = applyOneSearchReplace(result, block);
   }
   return result;
 }
 
-/** Strip completed and in-progress search/replace blocks from text for chat display. */
+/** Best-effort variant for the live streaming preview: applies the blocks that
+ * match and silently skips the ones that don't (yet). */
+export function applySearchReplaceLenient(
+  code: string,
+  blocks: Array<{ search: string; replace: string }>,
+): string {
+  let result = code;
+  for (const block of blocks) {
+    try {
+      result = applyOneSearchReplace(result, block);
+    } catch {
+      // still streaming in, or genuinely unmatched — skip
+    }
+  }
+  return result;
+}
+
+/** Strip completed and in-progress search/replace blocks (and their `// filename:`
+ * prefix lines) from text for chat display. */
 export function stripSearchReplaceBlocks(text: string): string {
-  let result = text.replace(/<<<SEARCH\n[\s\S]*?\n===\n[\s\S]*?\n>>>REPLACE/g, '');
-  result = result.replace(/<<<SEARCH[\s\S]*$/, '');
+  let result = text.replace(
+    /(?:^\/\/[ \t]*filename:[ \t]*\S+[ \t]*\n)?<<<SEARCH\n[\s\S]*?\n===\n[\s\S]*?\n>>>REPLACE/gm,
+    '',
+  );
+  result = result.replace(/(?:^\/\/[ \t]*filename:[ \t]*\S+[ \t]*\n)?<<<SEARCH[\s\S]*$/m, '');
+  // A filename header whose block hasn't started streaming yet.
+  result = result.replace(/\n?\/\/[ \t]*filename:[ \t]*\S*[ \t]*$/, '');
   return result.trimEnd();
 }
 
@@ -153,14 +262,15 @@ function escapeRegExp(s: string): string {
 
 /** Generate a short human summary of what changed between two code strings. */
 export function diffSummary(oldCode: string, newCode: string): string {
-  const oldLines = oldCode.split('\n');
-  const newLines = newCode.split('\n');
-  const oldSet = new Set(oldLines);
-  const newSet = new Set(newLines);
+  // Ensure both inputs end with a newline: otherwise jsdiff treats an unchanged
+  // final line as removed+added whenever anything is appended after it.
+  const eol = (s: string) => (s.endsWith('\n') ? s : s + '\n');
   let added = 0;
   let removed = 0;
-  for (const l of newLines) if (!oldSet.has(l)) added++;
-  for (const l of oldLines) if (!newSet.has(l)) removed++;
+  for (const part of diffLines(eol(oldCode), eol(newCode))) {
+    if (part.added) added += part.count ?? 0;
+    else if (part.removed) removed += part.count ?? 0;
+  }
   const parts: string[] = [];
   if (added) parts.push(`+${added}`);
   if (removed) parts.push(`-${removed}`);

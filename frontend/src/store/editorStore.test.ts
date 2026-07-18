@@ -317,4 +317,204 @@ describe('file operations', () => {
     store().renameFile('thing.js', 'bad.exe');
     expect(names()).toContain('thing.js');
   });
+
+  it('refuses renaming a file to the other entry alias (sketch.ts)', () => {
+    store().renameFile('particle.js', 'sketch.ts');
+    expect(names()).toContain('particle.js');
+    expect(names()).not.toContain('sketch.ts');
+  });
+
+  it('refuses adding a second entry-like file', () => {
+    store().addFile('sketch.ts');
+    expect(names()).not.toContain('sketch.ts');
+  });
+});
+
+describe('editor tabs (openFiles / closeTab)', () => {
+  beforeEach(() => {
+    seedFiles([
+      f('sketch.js', 'function setup(){}'),
+      f('particle.js', 'class P {}'),
+      f('palette.js', 'const HUES = [];'),
+    ]);
+  });
+
+  it('setActiveFile opens a tab for the file', () => {
+    store().setActiveFile('particle.js');
+    expect(store().openFiles).toContain('particle.js');
+    store().setActiveFile('particle.js');
+    expect(store().openFiles.filter((n) => n === 'particle.js')).toHaveLength(1);
+  });
+
+  it('closing a non-active tab keeps the active file', () => {
+    store().setActiveFile('particle.js');
+    store().setActiveFile('sketch.js');
+    store().closeTab('particle.js');
+    expect(store().openFiles).not.toContain('particle.js');
+    expect(store().activeFileName).toBe('sketch.js');
+    // The file itself still exists — closing a tab never deletes.
+    expect(names()).toContain('particle.js');
+  });
+
+  it('closing the active tab activates its neighbor', () => {
+    store().setActiveFile('particle.js');
+    store().setActiveFile('palette.js');
+    store().closeTab('palette.js');
+    expect(store().activeFileName).toBe('particle.js');
+    expect(store().code).toBe('class P {}');
+  });
+
+  it('the last remaining tab cannot be closed', () => {
+    store().closeTab('sketch.js');
+    expect(store().openFiles).toEqual(['sketch.js']);
+    expect(store().activeFileName).toBe('sketch.js');
+  });
+
+  it('deleting a file also closes its tab', () => {
+    store().setActiveFile('particle.js');
+    store().deleteFile('particle.js');
+    expect(store().openFiles).not.toContain('particle.js');
+  });
+
+  it('renaming a file renames its tab', () => {
+    store().setActiveFile('particle.js');
+    store().renameFile('particle.js', 'thing.js');
+    expect(store().openFiles).toContain('thing.js');
+    expect(store().openFiles).not.toContain('particle.js');
+  });
+});
+
+describe('setEditorLanguage entry-file migration', () => {
+  beforeEach(() => {
+    seedFiles([
+      f('sketch.js', "import { P } from './sketch-helpers.js';\nfunction setup(){}"),
+      f('helpers.js', "import { setup } from './sketch.js';"),
+    ]);
+  });
+
+  it('switching to TypeScript renames sketch.js → sketch.ts and updates imports', () => {
+    store().setEditorLanguage('typescript');
+    const s = store();
+    expect(s.editorLanguage).toBe('typescript');
+    expect(names()).toContain('sketch.ts');
+    expect(names()).not.toContain('sketch.js');
+    expect(s.files.find((x) => x.name === 'sketch.ts')!.language).toBe('typescript');
+    expect(contentOf('helpers.js')).toContain("from './sketch.ts'");
+    expect(s.activeFileName).toBe('sketch.ts');
+    expect(s.openFiles).toContain('sketch.ts');
+    expect(s.openFiles).not.toContain('sketch.js');
+  });
+
+  it('switching back to JavaScript restores sketch.js', () => {
+    store().setEditorLanguage('typescript');
+    store().setEditorLanguage('javascript');
+    expect(names()).toContain('sketch.js');
+    expect(names()).not.toContain('sketch.ts');
+  });
+
+  it('is a no-op on the files when the entry already matches', () => {
+    const before = store().files;
+    store().setEditorLanguage('javascript');
+    expect(store().files).toBe(before);
+  });
+
+  it('entry guards follow the extension: sketch.ts cannot be deleted or renamed', () => {
+    store().setEditorLanguage('typescript');
+    store().deleteFile('sketch.ts');
+    expect(names()).toContain('sketch.ts');
+    store().renameFile('sketch.ts', 'main.ts');
+    expect(names()).toContain('sketch.ts');
+  });
+});
+
+describe('multi-file review (accept / reject / accept all)', () => {
+  const review = () => store().pendingFilesReview;
+
+  beforeEach(() => {
+    // Simulate what ChatPanel does for 'apply' mode: changes already applied.
+    seedFiles([
+      f('sketch.js', 'new sketch code'),
+      f('particle.js', 'new particle code'),
+    ]);
+    useEditorStore.setState({
+      openFiles: ['sketch.js', 'particle.js'],
+      pendingFilesReview: {
+        changes: [
+          { name: 'sketch.js', previousContent: 'old sketch code', newContent: 'new sketch code', isNew: false },
+          { name: 'particle.js', previousContent: '', newContent: 'new particle code', isNew: true },
+        ],
+        index: 0,
+        accepted: 0,
+        messageId: 'msg-1',
+        prompt: 'split into files',
+        blockKeys: ['msg-1:k1', 'msg-1:k2'],
+      },
+    });
+  });
+
+  it('accept records history and advances to the next file', () => {
+    store().acceptReviewFile();
+    const s = store();
+    expect(s.codeHistory).toHaveLength(1);
+    expect(s.codeHistory[0]).toMatchObject({
+      fileName: 'sketch.js',
+      previousCode: 'old sketch code',
+      newCode: 'new sketch code',
+      prompt: 'split into files',
+    });
+    expect(review()!.index).toBe(1);
+    expect(s.activeFileName).toBe('particle.js');
+    expect(s.code).toBe('new particle code');
+  });
+
+  it('accepting the last file finishes the review and marks blocks applied', () => {
+    store().acceptReviewFile();
+    store().acceptReviewFile();
+    const s = store();
+    expect(s.pendingFilesReview).toBeNull();
+    expect(s.codeHistory).toHaveLength(2);
+    expect(s.appliedBlocks['msg-1:k1']).toBe(true);
+    expect(s.appliedBlocks['msg-1:k2']).toBe(true);
+  });
+
+  it('rejecting an edited file restores its previous content without history', () => {
+    store().rejectReviewFile();
+    const s = store();
+    expect(contentOf('sketch.js')).toBe('old sketch code');
+    expect(s.codeHistory).toHaveLength(0);
+    expect(review()!.index).toBe(1);
+  });
+
+  it('rejecting a new file removes it (and its tab)', () => {
+    store().acceptReviewFile(); // accept sketch.js, now reviewing particle.js
+    store().rejectReviewFile();
+    const s = store();
+    expect(names()).not.toContain('particle.js');
+    expect(s.openFiles).not.toContain('particle.js');
+    expect(s.pendingFilesReview).toBeNull();
+    // Something was accepted → blocks count as applied.
+    expect(s.appliedBlocks['msg-1:k1']).toBe(true);
+    // Active file fell back to the entry after the reviewed file disappeared.
+    expect(s.activeFileName).toBe('sketch.js');
+  });
+
+  it('rejecting everything marks the blocks rejected, not applied', () => {
+    store().rejectReviewFile();
+    store().rejectReviewFile();
+    const s = store();
+    expect(s.pendingFilesReview).toBeNull();
+    expect(s.rejectedBlocks['msg-1:k1']).toBe(true);
+    expect(s.appliedBlocks['msg-1:k1']).toBeUndefined();
+    expect(names()).not.toContain('particle.js');
+    expect(contentOf('sketch.js')).toBe('old sketch code');
+  });
+
+  it('accept all records history for every remaining file and finishes', () => {
+    store().acceptAllReviewFiles();
+    const s = store();
+    expect(s.pendingFilesReview).toBeNull();
+    expect(s.codeHistory).toHaveLength(2);
+    expect(s.codeHistory.map((c) => c.fileName)).toEqual(['sketch.js', 'particle.js']);
+    expect(s.appliedBlocks['msg-1:k1']).toBe(true);
+  });
 });

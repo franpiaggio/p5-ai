@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { isAllowedFileName } from '../../constants/defaultFiles';
+import { isAllowedFileName, isEntryFile } from '../../constants/defaultFiles';
 import { filesReferencing } from '../../utils/codeUtils';
 import { useEscapeClose } from '../../hooks/useEscapeClose';
 
@@ -52,6 +52,16 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
     setConfirmDeleteName(null);
   };
 
+  // Empty, unreferenced files delete instantly; anything with content (or that
+  // other files depend on) goes through the confirmation modal.
+  const requestDelete = (name: string) => {
+    const file = files.find((f) => f.name === name);
+    if (!file) return;
+    const isTrivial = !file.content.trim() && filesReferencing(file, files).length === 0;
+    if (isTrivial) deleteFile(name);
+    else setConfirmDeleteName(name);
+  };
+
   useEscapeClose(!!confirmDeleteName, () => setConfirmDeleteName(null));
 
   const pendingFile = confirmDeleteName
@@ -96,7 +106,7 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
                 <button
                   onClick={() => setActiveFile(file.name)}
                   onDoubleClick={() => {
-                    if (file.name !== 'sketch.js') {
+                    if (!isEntryFile(file.name)) {
                       setRenamingFile(file.name);
                       setRenameValue(file.name);
                     }
@@ -111,16 +121,28 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                   <span className="truncate">{file.name}</span>
+                  {isEntryFile(file.name) && (
+                    <span
+                      className={`ml-auto mr-1 px-1 py-px rounded text-[8px] uppercase tracking-wider shrink-0 ${
+                        activeFileName === file.name
+                          ? 'bg-info/15 text-info'
+                          : 'bg-border/40 text-text-muted/50'
+                      }`}
+                      title="Entry point — holds setup() and draw()"
+                    >
+                      entry
+                    </span>
+                  )}
                 </button>
               )}
-              {file.name !== 'sketch.js' && !renamingFile && (
+              {!isEntryFile(file.name) && !renamingFile && (
                 <button
-                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteName(file.name); }}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-accent/20 text-text-muted/30 hover:text-accent transition-all cursor-pointer"
+                  onClick={(e) => { e.stopPropagation(); requestDelete(file.name); }}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-accent/20 text-text-muted/50 hover:text-accent transition-all cursor-pointer"
                   title="Delete file"
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </button>
               )}

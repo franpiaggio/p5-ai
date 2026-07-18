@@ -1,5 +1,6 @@
 /* eslint-disable no-useless-escape */
 import type { SketchFile, Library } from '../../types';
+import { isEntryFile, findEntryFile } from '../../constants/defaultFiles';
 
 const P5_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js';
 
@@ -196,12 +197,13 @@ function buildModulePreviewHtml(files: SketchFile[], libraries: Library[]): stri
   const fileNames = new Set(files.map((f) => f.name));
   const toDataUrl = (content: string) => `data:text/javascript,${encodeURIComponent(content)}`;
 
+  const entryName = findEntryFile(files)?.name ?? 'sketch.js';
   const imports: Record<string, string> = {};
   // ESM libs first so a same-named file could still override intentionally.
   for (const lib of esmLibs) imports[lib.name] = lib.url;
   for (const f of files) {
     let content = rewriteLocalSpecifiers(f.content, fileNames);
-    if (f.name === 'sketch.js') content += GLOBAL_BRIDGE;
+    if (f.name === entryName) content += GLOBAL_BRIDGE;
     imports[f.name] = toDataUrl(content);
   }
   const importMap = JSON.stringify({ imports }, null, 2);
@@ -222,7 +224,7 @@ ${importMap}
   <\/script>
 </head>
 <body>
-  <script type="module">import 'sketch.js';<\/script>
+  <script type="module">import '${entryName}';<\/script>
 </body>
 </html>`;
 }
@@ -243,9 +245,9 @@ export function buildMultiFilePreviewHtml(files: SketchFile[], libraries: Librar
     .map((lib) => `  <script src="${lib.url}"><\/script>`)
     .join('\n');
 
-  // Separate sketch.js from other files; sketch.js goes last
-  const sketchFile = files.find((f) => f.name === 'sketch.js');
-  const otherFiles = files.filter((f) => f.name !== 'sketch.js');
+  // Separate the entry file (sketch.js/sketch.ts) from other files; it goes last
+  const sketchFile = findEntryFile(files);
+  const otherFiles = files.filter((f) => !isEntryFile(f.name) && f.name !== sketchFile?.name);
 
   // Calculate line offset for sketch.js error mapping
   // Count lines in everything before sketch.js's <script> tag
@@ -273,7 +275,7 @@ ${INFRA_SCRIPT}  <\/script>`;
 
   const sketchContent = sketchFile?.content ?? '';
 
-  return `${beforeSketch}  <script>/* sketch.js */
+  return `${beforeSketch}  <script>/* ${sketchFile?.name ?? 'sketch.js'} */
 ${escapeScript(sketchContent)}
   <\/script>
 </body>

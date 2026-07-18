@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { simpleHash, extractJsBlocks, extractSearchReplaceBlocks, applySearchReplace, stripSearchReplaceBlocks, diffSummary } from '../../utils/codeUtils';
-import { planFileChanges, applyChangesToFiles, focusAfterChanges, presentationFor } from '../../utils/fileEdits';
+import { simpleHash, extractJsBlocks, extractSearchReplaceBlocks, applySearchReplaceLenient, stripSearchReplaceBlocks, diffSummary } from '../../utils/codeUtils';
+import { planFileChanges, applyChangesToFiles, presentationFor } from '../../utils/fileEdits';
 import { streamChat, checkBackendHealth } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';
@@ -10,7 +10,7 @@ import { GeneratingCodeIndicator } from './GeneratingCodeIndicator';
 import { PendingDiffBanner } from './PendingDiffBanner';
 import { SketchSuggestion } from './SketchSuggestion';
 import type { SketchExample } from '../../data/sketchExamples';
-import { createDefaultFiles, filesFromNamed } from '../../constants/defaultFiles';
+import { createDefaultFiles, filesFromNamed, findEntryFile } from '../../constants/defaultFiles';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAuthStore } from '../../store/authStore';
@@ -37,6 +37,7 @@ export function ChatPanel() {
   const setFixRequest = useEditorStore((s) => s.setFixRequest);
   const streamingCode = useEditorStore((s) => s.streamingCode);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
+  const pendingFilesReview = useEditorStore((s) => s.pendingFilesReview);
   const showSuggestion = useEditorStore((s) => s.showSuggestion);
   const isMobile = useIsMobile();
 
@@ -99,6 +100,7 @@ export function ChatPanel() {
 
       const currentState = useEditorStore.getState();
       const originalCode = currentState.code;
+      const activeName = currentState.activeFileName;
       // Send real key in body if available; omit masked/empty keys (backend resolves from DB)
       const apiKey = currentState.llmConfig.apiKey;
       const hasRealKey = !!apiKey && !apiKey.startsWith('...');
@@ -139,12 +141,10 @@ export function ChatPanel() {
           displayContent = stripSearchReplaceBlocks(assistantContent);
           const srBlocks = extractSearchReplaceBlocks(assistantContent);
           if (srBlocks) {
-            try {
-              newStreamingCode = applySearchReplace(originalCode, srBlocks);
-            } catch {
-              // block didn't match yet — show original so indicator appears
-              newStreamingCode = originalCode;
-            }
+            // Preview only the blocks aimed at the file on screen; blocks for
+            // other files apply at finalization (planFileChanges).
+            const activeBlocks = srBlocks.filter((b) => !b.fileName || b.fileName === activeName);
+            newStreamingCode = applySearchReplaceLenient(originalCode, activeBlocks);
           } else {
             // block started but not complete yet — show indicator immediately
             newStreamingCode = originalCode;
@@ -215,40 +215,33 @@ export function ChatPanel() {
           };
         }
 
-        // Multi-file / non-active / new-file changes → apply directly, record
-        // each change in history (restorable), and mark every block applied.
+        // Multi-file / non-active / new-file changes → apply to the preview
+        // immediately (like the single-file flow) and open a per-file review:
+        // the user steps through each file's diff with accept/reject/accept-all.
         if (mode === 'apply') {
           const files = applyChangesToFiles(state.files, changes);
-          const focus = focusAfterChanges(changes, state.activeFileName);
-          const activeFile = files.find((f) => f.name === focus) ?? files[0];
-
-          const appliedBlocks = { ...state.appliedBlocks };
-          for (const raw of rawBlocks) {
-            appliedBlocks[`${lastMsg.id}:${simpleHash(raw)}`] = true as const;
-          }
-
-          const codeHistory = [
-            ...state.codeHistory,
-            ...changes.map((c) => ({
-              id: `change-${lastMsg.id}-${c.name}`,
-              messageId: lastMsg.id,
-              timestamp: Date.now(),
-              previousCode: c.previousContent,
-              newCode: c.newContent,
-              summary: `${c.isNew ? 'Created' : 'Updated'} ${c.name}`,
-              prompt: userMessage,
-              fileName: c.name,
-            })),
+          const first = changes[0];
+          const firstFile = files.find((f) => f.name === first.name) ?? files[0];
+          const openFiles = [
+            ...state.openFiles,
+            ...changes.map((c) => c.name).filter((n) => !state.openFiles.includes(n)),
           ];
 
           return {
             messages: newMessages,
             streamingCode: null,
             files,
-            code: activeFile.content,
-            activeFileName: activeFile.name,
-            appliedBlocks,
-            codeHistory,
+            code: firstFile.content,
+            activeFileName: firstFile.name,
+            openFiles,
+            pendingFilesReview: {
+              changes,
+              index: 0,
+              accepted: 0,
+              messageId: lastMsg.id,
+              prompt: userMessage,
+              blockKeys: rawBlocks.map((raw) => `${lastMsg.id}:${simpleHash(raw)}`),
+            },
             previewCode: null,
             pendingDiff: null,
             isRunning: true,
@@ -322,12 +315,14 @@ export function ChatPanel() {
         ],
         appliedBlocks: { ...state.appliedBlocks, [blockKey]: true as const },
         pendingDiff: null,
+        pendingFilesReview: null,
         previewCode: null,
         code: example.code,
         lastSavedCode: example.code,
         files: exampleFiles,
         lastSavedFiles: exampleFiles.map((f) => ({ ...f })),
-        activeFileName: 'sketch.js',
+        activeFileName: findEntryFile(exampleFiles)?.name ?? exampleFiles[0].name,
+        openFiles: exampleFiles.map((f) => f.name),
         libraries: exampleLibraries,
         lastSavedLibraries: [...exampleLibraries],
         isRunning: true,
@@ -367,7 +362,7 @@ export function ChatPanel() {
   const showTypingIndicator = isStreaming && lastMessage?.role === 'assistant' && !lastMessage.content;
   const serverCanResolve = storeApiKeys && !!user;
   const missingApiKey = llmConfig.provider !== 'demo' && !llmConfig.apiKey && !serverCanResolve;
-  const chatDisabled = backendOnline === false || backendOnline === null || missingApiKey || !!pendingDiff;
+  const chatDisabled = backendOnline === false || backendOnline === null || missingApiKey || !!pendingDiff || !!pendingFilesReview;
 
   return (
     <ChatInput
@@ -425,7 +420,7 @@ export function ChatPanel() {
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5 justify-center">
-                {['make it a spiral galaxy', 'slow the motion down', 'shift the palette to teal'].map((p) => (
+                {['make it react to the mouse', 'slow the motion down', 'shift the palette to teal'].map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -451,7 +446,7 @@ export function ChatPanel() {
             );
           })}
           {streamingCode !== null && <GeneratingCodeIndicator onCancel={cancelStreaming} />}
-          {pendingDiff && !isMobile && <PendingDiffBanner />}
+          {(pendingDiff || pendingFilesReview) && !isMobile && <PendingDiffBanner />}
         </div>
         {showSuggestion && (
           <div className="w-full max-w-xs mx-auto mt-3 pt-1">

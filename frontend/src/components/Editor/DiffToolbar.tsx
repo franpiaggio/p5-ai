@@ -1,24 +1,36 @@
 import { useEffect } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 
+/** Floating accept/reject controls over the diff editor. Handles both the
+ * single-file pendingDiff and the multi-file pendingFilesReview (Cursor-style:
+ * one file at a time, with an Accept-all shortcut). */
 export function DiffToolbar() {
   const acceptPendingDiff = useEditorStore((s) => s.acceptPendingDiff);
   const rejectPendingDiff = useEditorStore((s) => s.rejectPendingDiff);
+  const review = useEditorStore((s) => s.pendingFilesReview);
+  const acceptReviewFile = useEditorStore((s) => s.acceptReviewFile);
+  const rejectReviewFile = useEditorStore((s) => s.rejectReviewFile);
+  const acceptAllReviewFiles = useEditorStore((s) => s.acceptAllReviewFiles);
+
+  const accept = review ? acceptReviewFile : acceptPendingDiff;
+  const reject = review ? rejectReviewFile : rejectPendingDiff;
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        rejectPendingDiff();
+        reject();
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault();
-        acceptPendingDiff();
+        accept();
       }
     };
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
-  }, [acceptPendingDiff, rejectPendingDiff]);
+  }, [accept, reject]);
+
+  const change = review ? review.changes[review.index] : null;
 
   return (
     <div
@@ -40,10 +52,25 @@ export function DiffToolbar() {
       }}
     >
       <span style={{ color: 'var(--color-text-muted)', marginRight: 4 }}>
-        Review changes
+        {change ? (
+          <>
+            <span style={{ color: 'var(--color-text-primary, inherit)' }}>
+              {change.name}
+            </span>
+            {change.isNew && <span style={{ opacity: 0.6 }}> (new)</span>}
+            {review!.changes.length > 1 && (
+              <span style={{ opacity: 0.6 }}>
+                {' '}
+                {review!.index + 1}/{review!.changes.length}
+              </span>
+            )}
+          </>
+        ) : (
+          'Review changes'
+        )}
       </span>
       <button
-        onClick={rejectPendingDiff}
+        onClick={reject}
         style={{
           background: 'transparent',
           border: '1px solid var(--color-border)',
@@ -67,7 +94,7 @@ export function DiffToolbar() {
         Reject <span style={{ opacity: 0.5 }}>Esc</span>
       </button>
       <button
-        onClick={acceptPendingDiff}
+        onClick={accept}
         style={{
           background: 'var(--color-success, #22c55e)',
           border: 'none',
@@ -85,6 +112,27 @@ export function DiffToolbar() {
       >
         Accept <span style={{ opacity: 0.7 }}>Ctrl+Enter</span>
       </button>
+      {review && review.changes.length - review.index > 1 && (
+        <button
+          onClick={acceptAllReviewFiles}
+          style={{
+            background: 'transparent',
+            border: '1px solid var(--color-success, #22c55e)',
+            color: 'var(--color-success, #22c55e)',
+            padding: '4px 12px',
+            borderRadius: 5,
+            cursor: 'pointer',
+            fontSize: 11,
+            fontFamily: 'monospace',
+            fontWeight: 600,
+            transition: 'opacity 0.15s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.8')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+        >
+          Accept all
+        </button>
+      )}
     </div>
   );
 }

@@ -56,11 +56,103 @@ describe('planFileChanges', () => {
     expect(changes).toEqual([]);
   });
 
-  it('search/replace targets the active file', () => {
+  it('search/replace without filename targets the active file', () => {
     const files = [file('sketch.js', 'before\nold\nafter')];
     const changes = planFileChanges(files, 'sketch.js', '<<<SEARCH\nold\n===\nnew\n>>>REPLACE');
     expect(changes).toEqual([
       { name: 'sketch.js', previousContent: 'before\nold\nafter', newContent: 'before\nnew\nafter', isNew: false },
+    ]);
+  });
+
+  it('search/replace with a // filename: prefix targets that file, not the active one', () => {
+    const files = [file('sketch.js', 'setup'), file('particle.js', 'let speed = 1;')];
+    const md = '// filename: particle.js\n<<<SEARCH\nlet speed = 1;\n===\nlet speed = 4;\n>>>REPLACE';
+    const changes = planFileChanges(files, 'sketch.js', md);
+    expect(changes).toEqual([
+      { name: 'particle.js', previousContent: 'let speed = 1;', newContent: 'let speed = 4;', isNew: false },
+    ]);
+  });
+
+  it('unnamed search/replace resolves by content when the active file does not match', () => {
+    const files = [file('sketch.js', 'setup'), file('palette.js', 'const hue = 200;')];
+    const md = '<<<SEARCH\nconst hue = 200;\n===\nconst hue = 20;\n>>>REPLACE';
+    const changes = planFileChanges(files, 'sketch.js', md);
+    expect(changes).toEqual([
+      { name: 'palette.js', previousContent: 'const hue = 200;', newContent: 'const hue = 20;', isNew: false },
+    ]);
+  });
+
+  it('groups blocks per file and applies each group', () => {
+    const files = [file('sketch.js', 'let n = 10;'), file('particle.js', 'let r = 2;')];
+    const md = [
+      '// filename: sketch.js\n<<<SEARCH\nlet n = 10;\n===\nlet n = 50;\n>>>REPLACE',
+      '// filename: particle.js\n<<<SEARCH\nlet r = 2;\n===\nlet r = 8;\n>>>REPLACE',
+    ].join('\n\n');
+    const changes = planFileChanges(files, 'sketch.js', md);
+    expect(changes.map((c) => [c.name, c.newContent])).toEqual([
+      ['sketch.js', 'let n = 50;'],
+      ['particle.js', 'let r = 8;'],
+    ]);
+  });
+
+  it('keeps the surviving group when another group fails to match', () => {
+    const files = [file('sketch.js', 'let n = 10;'), file('particle.js', 'let r = 2;')];
+    const md = [
+      '// filename: sketch.js\n<<<SEARCH\nnot in the file\n===\nx\n>>>REPLACE',
+      '// filename: particle.js\n<<<SEARCH\nlet r = 2;\n===\nlet r = 8;\n>>>REPLACE',
+    ].join('\n\n');
+    const changes = planFileChanges(files, 'sketch.js', md);
+    expect(changes).toEqual([
+      { name: 'particle.js', previousContent: 'let r = 2;', newContent: 'let r = 8;', isNew: false },
+    ]);
+  });
+
+  it('skips a block naming a nonexistent file (search/replace cannot create files)', () => {
+    const files = [file('sketch.js', 'setup')];
+    const md = '// filename: ghost.js\n<<<SEARCH\na\n===\nb\n>>>REPLACE';
+    expect(planFileChanges(files, 'sketch.js', md)).toEqual([]);
+  });
+
+  it('falls back to a full code block when no search/replace group applies', () => {
+    const files = [file('sketch.js', 'old code')];
+    const md = '<<<SEARCH\nmissing\n===\nx\n>>>REPLACE\n\n```js\nnew code\n```';
+    const changes = planFileChanges(files, 'sketch.js', md);
+    expect(changes).toEqual([
+      { name: 'sketch.js', previousContent: 'old code', newContent: 'new code', isNew: false },
+    ]);
+  });
+});
+
+describe('planFileChanges with a TypeScript entry (sketch.ts)', () => {
+  const tsFiles = [file('sketch.ts', 'function setup() {}')];
+
+  it('an unnamed code block targets sketch.ts, not a phantom sketch.js', () => {
+    const changes = planFileChanges(tsFiles, 'sketch.ts', '```ts\nfunction setup() { createCanvas(1,1); }\n```');
+    expect(changes).toHaveLength(1);
+    expect(changes[0].name).toBe('sketch.ts');
+    expect(changes[0].isNew).toBe(false);
+  });
+
+  it('a block headed // filename: sketch.js redirects to the real entry', () => {
+    const md = '```js\n// filename: sketch.js\nfunction setup() { redirected(); }\n```';
+    const changes = planFileChanges(tsFiles, 'sketch.ts', md);
+    expect(changes).toEqual([
+      { name: 'sketch.ts', previousContent: 'function setup() {}', newContent: 'function setup() { redirected(); }', isNew: false },
+    ]);
+  });
+
+  it('search/replace prefixed with the entry alias applies to the real entry', () => {
+    const md = '// filename: sketch.js\n<<<SEARCH\nfunction setup() {}\n===\nfunction setup() { patched(); }\n>>>REPLACE';
+    const changes = planFileChanges(tsFiles, 'sketch.ts', md);
+    expect(changes[0]).toMatchObject({ name: 'sketch.ts', newContent: 'function setup() { patched(); }' });
+  });
+
+  it('a sketch.ts [NEW FILE] header in a JS sketch overwrites sketch.js instead of duplicating the entry', () => {
+    const jsFiles = [file('sketch.js', 'old')];
+    const md = '```ts\n// filename: sketch.ts [NEW FILE]\nnew entry code\n```';
+    const changes = planFileChanges(jsFiles, 'sketch.js', md);
+    expect(changes).toEqual([
+      { name: 'sketch.js', previousContent: 'old', newContent: 'new entry code', isNew: false },
     ]);
   });
 });

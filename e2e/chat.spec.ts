@@ -82,6 +82,39 @@ test.describe('chat → diff review flow (LLM mocked at the network layer)', () 
     await expect(editorContent(page)).toContainText('rectMode(CENTER)');
   });
 
+  test('a multi-file suggestion opens a per-file review; Accept all applies everything', async ({ page }) => {
+    await page.goto('/');
+    await waitForApp(page);
+    await mockChatResponse(page, [
+      'Splitting the sketch into files:\n',
+      [
+        '```javascript',
+        '// filename: particle.js [NEW FILE]',
+        'class Particle {} // E2E_P_MARKER',
+        '```',
+        '```javascript',
+        '// filename: sketch.js',
+        'function setup() { new Particle(); } // E2E_S_MARKER',
+        '```',
+      ].join('\n'),
+    ]);
+
+    await sendChatMessage(page, 'split my sketch into files');
+
+    // Per-file review opens on the first change, counting through the set.
+    await expect(page.getByText('Reviewing particle.js (1/2)')).toBeVisible();
+    await expect(chatInput(page)).toBeDisabled();
+
+    await page.getByRole('button', { name: 'Accept all' }).click();
+
+    await expect(page.getByText('Reviewing particle.js (1/2)')).toHaveCount(0);
+    await expect(editorContent(page)).toContainText('E2E_P_MARKER');
+    await expect(chatInput(page)).toBeEnabled();
+    // Both files now exist as tabs (close buttons included).
+    await expect(page.getByRole('button', { name: 'sketch.js' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'particle.js' })).toBeVisible();
+  });
+
   test('a stream error surfaces as a warning message, not a crash', async ({ page }) => {
     await page.goto('/');
     await waitForApp(page);

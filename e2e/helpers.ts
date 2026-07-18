@@ -47,7 +47,9 @@ export async function loginAsAdmin(page: Page) {
   const modal = page.getByRole('dialog');
   await modal.locator('#login-username').fill(ADMIN_USER);
   await modal.locator('#login-password').fill(ADMIN_PASSWORD);
-  await modal.getByRole('button', { name: 'Sign In' }).click();
+  // exact: true — the "Sign in with Google…" button also matches the
+  // substring 'Sign In' when the GSI script loads before this click.
+  await modal.getByRole('button', { name: 'Sign In', exact: true }).click();
   await expect(page.locator('#login-username')).toHaveCount(0);
 }
 

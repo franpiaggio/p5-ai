@@ -5,11 +5,15 @@ import {
   splitFileSections,
   extractSearchReplaceBlocks,
   applySearchReplace,
+  type SearchReplaceBlock,
 } from './codeUtils';
-import { isAllowedFileName, createFileId, languageFromExtension } from '../constants/defaultFiles';
-
-/** The entry-point file p5 lifecycle functions live in; the default edit target. */
-export const ENTRY_FILE = 'sketch.js';
+import {
+  isAllowedFileName,
+  createFileId,
+  languageFromExtension,
+  isEntryFile,
+  findEntryFile,
+} from '../constants/defaultFiles';
 
 /** One file's resulting change from an assistant message. */
 export interface FileChange {
@@ -34,23 +38,52 @@ export function planFileChanges(
   content: string,
 ): FileChange[] {
   const byName = new Map(files.map((f) => [f.name, f.content]));
+  const entryName = findEntryFile(files)?.name ?? 'sketch.js';
 
-  // Search/replace: small edits, applied to the file you're viewing.
+  // Search/replace: small edits. Each block targets its `// filename:` prefix
+  // when present; otherwise the target is resolved by content — the file whose
+  // current text contains the SEARCH string (active file first, then sketch.js,
+  // then a unique match anywhere).
   const srBlocks = extractSearchReplaceBlocks(content);
   if (srBlocks) {
-    const prev = byName.get(activeFileName) ?? '';
-    try {
-      const next = applySearchReplace(prev, srBlocks);
-      return next !== prev
-        ? [{ name: activeFileName, previousContent: prev, newContent: next, isNew: false }]
-        : [];
-    } catch {
-      // A search block didn't match — fall back to a full code block if present.
-      const fb = extractFirstJsBlock(content);
-      return fb && fb !== prev
-        ? [{ name: activeFileName, previousContent: prev, newContent: fb, isNew: false }]
-        : [];
+    const resolveTarget = (block: SearchReplaceBlock): string => {
+      // Entry aliases redirect (a model may say `sketch.js` in a TS sketch).
+      if (block.fileName) return isEntryFile(block.fileName) ? entryName : block.fileName;
+      if ((byName.get(activeFileName) ?? '').includes(block.search)) return activeFileName;
+      if ((byName.get(entryName) ?? '').includes(block.search)) return entryName;
+      const holders = files.filter((f) => f.content.includes(block.search));
+      return holders.length === 1 ? holders[0].name : activeFileName;
+    };
+
+    const groups = new Map<string, SearchReplaceBlock[]>();
+    for (const block of srBlocks) {
+      const target = resolveTarget(block);
+      if (!byName.has(target)) continue; // search/replace can't create files
+      const group = groups.get(target);
+      if (group) group.push(block);
+      else groups.set(target, [block]);
     }
+
+    const srChanges: FileChange[] = [];
+    for (const [name, blocks] of groups) {
+      const prev = byName.get(name)!;
+      try {
+        const next = applySearchReplace(prev, blocks);
+        if (next !== prev) {
+          srChanges.push({ name, previousContent: prev, newContent: next, isNew: false });
+        }
+      } catch {
+        // This file's blocks didn't match — skip the group, keep the rest.
+      }
+    }
+    if (srChanges.length > 0) return srChanges;
+
+    // Nothing applied — fall back to a full code block if present.
+    const prev = byName.get(activeFileName) ?? '';
+    const fb = extractFirstJsBlock(content);
+    return fb && fb !== prev
+      ? [{ name: activeFileName, previousContent: prev, newContent: fb, isNew: false }]
+      : [];
   }
 
   // Full code blocks → per-file sections.
@@ -60,7 +93,9 @@ export function planFileChanges(
 
   const changes: FileChange[] = [];
   for (const s of sections) {
-    const name = s.name ?? ENTRY_FILE;
+    // Unnamed sections and entry aliases (`sketch.ts` in a JS sketch) target the
+    // actual entry file instead of creating a duplicate entry.
+    const name = !s.name || isEntryFile(s.name) ? entryName : s.name;
     const exists = byName.has(name);
     if (!exists && !isAllowedFileName(name)) continue; // invalid new filename
     const idx = changes.findIndex((c) => c.name === name);
@@ -99,10 +134,10 @@ export function applyChangesToFiles(files: SketchFile[], changes: FileChange[]):
   return result;
 }
 
-/** After applying changes, which file to focus: prefer sketch.js, else the first change. */
+/** After applying changes, which file to focus: prefer the entry file, else the first change. */
 export function focusAfterChanges(changes: FileChange[], fallback: string): string {
-  if (changes.some((c) => c.name === ENTRY_FILE)) return ENTRY_FILE;
-  return changes[0]?.name ?? fallback;
+  const entry = changes.find((c) => isEntryFile(c.name));
+  return entry?.name ?? changes[0]?.name ?? fallback;
 }
 
 /**

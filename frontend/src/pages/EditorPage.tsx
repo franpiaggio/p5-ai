@@ -9,7 +9,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import { useEditorStore } from '../store/editorStore';
 import { getExampleBySlug } from '../data/sketchExamples';
 import { getPublicSketch } from '../services/api';
-import { createDefaultFiles, filesFromNamed } from '../constants/defaultFiles';
+import { createDefaultFiles, filesFromNamed, findEntryFile } from '../constants/defaultFiles';
 
 export function EditorPage() {
   const isMobile = useIsMobile();
@@ -53,7 +53,9 @@ export function EditorPage() {
         showSuggestion: false,
         files: exampleFiles,
         lastSavedFiles: exampleFiles.map((f) => ({ ...f })),
-        activeFileName: 'sketch.js',
+        activeFileName: findEntryFile(exampleFiles)?.name ?? exampleFiles[0].name,
+        openFiles: exampleFiles.map((f) => f.name),
+        pendingFilesReview: null,
         libraries: exampleLibraries,
         lastSavedLibraries: [...exampleLibraries],
       });
@@ -91,7 +93,9 @@ export function EditorPage() {
           showSuggestion: false,
           files: sketchFiles,
           lastSavedFiles: sketchFiles.map((f) => ({ ...f })),
-          activeFileName: 'sketch.js',
+          activeFileName: findEntryFile(sketchFiles)?.name ?? sketchFiles[0].name,
+          openFiles: sketchFiles.map((f) => f.name),
+          pendingFilesReview: null,
           libraries: sketchLibraries,
           lastSavedLibraries: [...sketchLibraries],
           ...(sketch.codeHistory ? { codeHistory: sketch.codeHistory } : {}),

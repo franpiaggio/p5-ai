@@ -13,6 +13,7 @@ import { PreviewControls } from '../Preview/PreviewControls';
 export function MobileLayout() {
   const activeTab = useEditorStore((s) => s.activeTab);
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
+  const pendingFilesReview = useEditorStore((s) => s.pendingFilesReview);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const enterFullscreen = useCallback(() => {
@@ -91,7 +92,7 @@ export function MobileLayout() {
         {activeTab === 'history' && <HistoryPanel />}
       </div>
 
-      {pendingDiff && <MobileDiffBar />}
+      {(pendingDiff || pendingFilesReview) && <MobileDiffBar />}
       <MobileTabBar />
     </div>
   );

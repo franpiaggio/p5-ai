@@ -4,6 +4,9 @@ import {
   isAllowedFileName,
   languageFromExtension,
   filesFromNamed,
+  isEntryFile,
+  entryFileName,
+  findEntryFile,
 } from './defaultFiles';
 
 describe('isAllowedFileName', () => {
@@ -32,6 +35,32 @@ describe('createDefaultFiles', () => {
     expect(files[0].name).toBe('sketch.js');
     expect(files[0].content).toBe('function setup(){}');
     expect(files[0].language).toBe('javascript');
+  });
+
+  it('creates sketch.ts for TypeScript sketches', () => {
+    const files = createDefaultFiles('function setup(){}', 'typescript');
+    expect(files[0].name).toBe('sketch.ts');
+    expect(files[0].language).toBe('typescript');
+  });
+});
+
+describe('entry file helpers', () => {
+  it('isEntryFile matches only sketch.js / sketch.ts', () => {
+    expect(isEntryFile('sketch.js')).toBe(true);
+    expect(isEntryFile('sketch.ts')).toBe(true);
+    expect(isEntryFile('particle.js')).toBe(false);
+    expect(isEntryFile('mysketch.js')).toBe(false);
+  });
+
+  it('entryFileName maps the language to the extension', () => {
+    expect(entryFileName('javascript')).toBe('sketch.js');
+    expect(entryFileName('typescript')).toBe('sketch.ts');
+  });
+
+  it('findEntryFile prefers the entry, falls back to the first file', () => {
+    expect(findEntryFile([{ name: 'a.js' }, { name: 'sketch.ts' }])?.name).toBe('sketch.ts');
+    expect(findEntryFile([{ name: 'a.js' }, { name: 'b.js' }])?.name).toBe('a.js');
+    expect(findEntryFile([])).toBeUndefined();
   });
 });
 

@@ -10,6 +10,7 @@ import {
   updateImportPath,
   extractSearchReplaceBlocks,
   applySearchReplace,
+  applySearchReplaceLenient,
   stripSearchReplaceBlocks,
   diffSummary,
 } from './codeUtils';
@@ -46,6 +47,27 @@ describe('extractSearchReplaceBlocks', () => {
 
   it('ignores an incomplete (still-streaming) block', () => {
     expect(extractSearchReplaceBlocks('<<<SEARCH\nbackground(30);\n===\nbackgro')).toBeNull();
+  });
+
+  it('captures a // filename: line directly above the block', () => {
+    const md = `// filename: particle.js\n${block('old', 'new')}`;
+    expect(extractSearchReplaceBlocks(md)).toEqual([
+      { search: 'old', replace: 'new', fileName: 'particle.js' },
+    ]);
+  });
+
+  it('mixes named and unnamed blocks', () => {
+    const md = `// filename: utils.js\n${block('a', 'b')}\n\n${block('c', 'd')}`;
+    expect(extractSearchReplaceBlocks(md)).toEqual([
+      { search: 'a', replace: 'b', fileName: 'utils.js' },
+      { search: 'c', replace: 'd' },
+    ]);
+  });
+
+  it('does not attach a filename line separated by a blank line', () => {
+    const md = `// filename: utils.js\n\n${block('a', 'b')}`;
+    const blocks = extractSearchReplaceBlocks(md)!;
+    expect(blocks[0].fileName).toBeUndefined();
   });
 });
 
@@ -97,6 +119,47 @@ describe('applySearchReplace', () => {
     ]);
     expect(result).toBe('  if (x) {\n    doOther();\n  }');
   });
+
+  describe('cascading (fuzzy) matching', () => {
+    it('matches despite trailing-whitespace drift in the code', () => {
+      const drifted = 'function draw() {  \n  background(30);   \n}';
+      const result = applySearchReplace(drifted, [
+        { search: 'function draw() {\n  background(30);\n}', replace: 'function draw() {\n  background(0);\n}' },
+      ]);
+      expect(result).toBe('function draw() {\n  background(0);\n}');
+    });
+
+    it('matches despite indentation drift and re-indents the replacement', () => {
+      const code = 'if (x) {\n      doThing();\n}';
+      // Model over-indented the search (8 spaces); the file uses 6.
+      const result = applySearchReplace(code, [
+        { search: '        doThing();', replace: '        doOther();\n        andMore();' },
+      ]);
+      expect(result).toBe('if (x) {\n      doOther();\n      andMore();\n}');
+    });
+
+    it('rejects an ambiguous fuzzy match instead of guessing', () => {
+      const code = '{\n      y();\n}\n{\n  y();\n}';
+      expect(() =>
+        applySearchReplace(code, [{ search: '        y();', replace: 'z();' }]),
+      ).toThrow('ambiguous');
+    });
+
+    it('an exact match still wins over fuzzy ambiguity', () => {
+      const code = 'x = 1;\n  x = 1;';
+      // Exact tier matches the first occurrence; the fuzzy tiers never run.
+      expect(applySearchReplace(code, [{ search: 'x = 1;', replace: 'x = 2;' }])).toBe(
+        'x = 2;\n  x = 1;',
+      );
+    });
+
+    it('deletes lines when the replacement is empty (fuzzy tier)', () => {
+      const code = 'a();\n    b();\n    c();\nd();';
+      // 2-space search vs 4-space code: only the trimmed tier matches.
+      const result = applySearchReplace(code, [{ search: '  b();\n  c();', replace: '' }]);
+      expect(result).toBe('a();\nd();');
+    });
+  });
 });
 
 describe('stripSearchReplaceBlocks', () => {
@@ -112,6 +175,30 @@ describe('stripSearchReplaceBlocks', () => {
 
   it('leaves plain text untouched', () => {
     expect(stripSearchReplaceBlocks('No code here.')).toBe('No code here.');
+  });
+
+  it('removes the // filename: prefix line along with its block', () => {
+    const md = `Tweaking utils:\n\n// filename: utils.js\n${block('a', 'b')}\n\nDone.`;
+    expect(stripSearchReplaceBlocks(md)).toBe('Tweaking utils:\n\n\n\nDone.');
+  });
+
+  it('removes a dangling filename header whose block has not streamed yet', () => {
+    expect(stripSearchReplaceBlocks('Next change:\n// filename: parti')).toBe('Next change:');
+  });
+});
+
+describe('applySearchReplaceLenient', () => {
+  it('applies matching blocks and skips non-matching ones', () => {
+    const result = applySearchReplaceLenient('a\nb\nc', [
+      { search: 'b', replace: 'B' },
+      { search: 'zzz', replace: 'x' },
+      { search: 'c', replace: 'C' },
+    ]);
+    expect(result).toBe('a\nB\nC');
+  });
+
+  it('returns the code unchanged when nothing matches', () => {
+    expect(applySearchReplaceLenient('a', [{ search: 'z', replace: 'x' }])).toBe('a');
   });
 });
 
@@ -142,6 +229,15 @@ describe('diffSummary', () => {
 
   it('counts pure additions', () => {
     expect(diffSummary('a', 'a\nb')).toBe('+1 lines');
+  });
+
+  it('counts duplicate lines correctly (real diff, not set-based)', () => {
+    // Adding a second identical line: the set-based version reported no change.
+    expect(diffSummary('x();', 'x();\nx();')).toBe('+1 lines');
+  });
+
+  it('counts a moved line as one add and one remove', () => {
+    expect(diffSummary('a\nb\nc', 'b\nc\na')).toBe('+1 / -1 lines');
   });
 });
 

@@ -102,6 +102,29 @@ describe('isEsmUrl', () => {
   });
 });
 
+describe('sketch.ts as entry file', () => {
+  it('concatenation mode loads sketch.ts last', () => {
+    const files = [
+      file('palette.ts', 'function nodeColor(t){ return t; }'),
+      file('sketch.ts', 'function setup(){}'),
+    ];
+    const html = buildMultiFilePreviewHtml(files, []);
+    expect(html.indexOf('nodeColor')).toBeLessThan(html.indexOf('function setup(){}'));
+    expect(html).toContain('/* sketch.ts */');
+  });
+
+  it('module mode imports sketch.ts and bridges its lifecycle', () => {
+    const files = [
+      file('particle.ts', 'export class Particle {}'),
+      file('sketch.ts', "import { Particle } from './particle.ts';\nfunction setup(){}"),
+    ];
+    const html = buildMultiFilePreviewHtml(files, []);
+    expect(html).toContain("import 'sketch.ts';");
+    const decoded = decodeURIComponent(html);
+    expect(decoded).toContain("if (typeof setup !== 'undefined') window.setup = setup;");
+  });
+});
+
 describe('TypeScript file resolution in module mode', () => {
   const tsFiles = [
     file('particle.ts', 'export class Particle {}'),
