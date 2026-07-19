@@ -123,6 +123,88 @@ describe('planFileChanges', () => {
   });
 });
 
+describe('lazy-fragment guard (partial code block must not wipe the sketch)', () => {
+  const fullSketch = [
+    'let plankton = [];',
+    'function setup() {',
+    '  createCanvas(400, 400);',
+    '  for (let i = 0; i < 2000; i++) {',
+    '    plankton.push({',
+    '      x: random(width),',
+    '      size: random(2, 6),',
+    '      hue: random(160, 210),',
+    '    });',
+    '  }',
+    '}',
+    'function draw() {',
+    '  background(210, 60, 5);',
+    '}',
+  ].join('\n');
+  const files = [file('sketch.js', fullSketch)];
+
+  it('merges a fragment into the existing code instead of replacing the file', () => {
+    const fragment = [
+      '  for (let i = 0; i < 2000; i++) {',
+      '    plankton.push({',
+      '      x: random(width),',
+      '      size: random(1, 3),',
+      '      hue: random(160, 210),',
+      '    });',
+      '  }',
+    ].join('\n');
+    const changes = planFileChanges(files, 'sketch.js', `\`\`\`js\n${fragment}\n\`\`\``);
+    expect(changes).toHaveLength(1);
+    const next = changes[0].newContent;
+    expect(next).toContain('size: random(1, 3),');
+    expect(next).not.toContain('size: random(2, 6),');
+    // The rest of the sketch survives.
+    expect(next).toContain('function setup() {');
+    expect(next).toContain('function draw() {');
+    expect(next).toContain('let plankton = [];');
+  });
+
+  it('drops an unmergeable fragment rather than wiping the file', () => {
+    const changes = planFileChanges(
+      files,
+      'sketch.js',
+      '```js\nlet somethingElse = 1;\nconsole.log(somethingElse);\n```',
+    );
+    expect(changes).toEqual([]);
+  });
+
+  it('lets a genuine full rewrite (with the lifecycle) through untouched', () => {
+    const rewrite = 'function setup() {\n  createCanvas(1, 1);\n}\nfunction draw() {\n  background(0);\n}';
+    const changes = planFileChanges(files, 'sketch.js', `\`\`\`js\n${rewrite}\n\`\`\``);
+    expect(changes).toEqual([
+      { name: 'sketch.js', previousContent: fullSketch, newContent: rewrite, isNew: false },
+    ]);
+  });
+
+  it('guards the search/replace fallback path too', () => {
+    const md = [
+      '<<<SEARCH',
+      'not in the file at all',
+      '===',
+      'x',
+      '>>>REPLACE',
+      '',
+      '```js',
+      '  for (let i = 0; i < 2000; i++) {',
+      '    plankton.push({',
+      '      x: random(width),',
+      '      size: random(1, 3),',
+      '      hue: random(160, 210),',
+      '    });',
+      '  }',
+      '```',
+    ].join('\n');
+    const changes = planFileChanges(files, 'sketch.js', md);
+    expect(changes).toHaveLength(1);
+    expect(changes[0].newContent).toContain('function draw()');
+    expect(changes[0].newContent).toContain('size: random(1, 3),');
+  });
+});
+
 describe('planFileChanges with a TypeScript entry (sketch.ts)', () => {
   const tsFiles = [file('sketch.ts', 'function setup() {}')];
 

@@ -80,7 +80,10 @@ export function planFileChanges(
 
     // Nothing applied — fall back to a full code block if present.
     const prev = byName.get(activeFileName) ?? '';
-    const fb = extractFirstJsBlock(content);
+    let fb = extractFirstJsBlock(content);
+    if (fb && isPartialEntryRewrite(prev, fb)) {
+      fb = mergeFragment(prev, fb); // fragment, not a full file — merge or drop
+    }
     return fb && fb !== prev
       ? [{ name: activeFileName, previousContent: prev, newContent: fb, isNew: false }]
       : [];
@@ -98,21 +101,88 @@ export function planFileChanges(
     const name = !s.name || isEntryFile(s.name) ? entryName : s.name;
     const exists = byName.has(name);
     if (!exists && !isAllowedFileName(name)) continue; // invalid new filename
+
+    // "Lazy" fragment guard: some models answer a small edit with a code block
+    // holding only the changed region. Treating that as the whole file would
+    // wipe the sketch — detect it (the entry losing its p5 lifecycle) and merge
+    // the fragment into the existing code by anchoring; refuse the change when
+    // no safe anchoring exists.
+    let newContent = s.code;
+    if (exists && name === entryName && isPartialEntryRewrite(byName.get(name)!, s.code)) {
+      const merged = mergeFragment(byName.get(name)!, s.code);
+      if (merged === null) continue;
+      newContent = merged;
+    }
+
     const idx = changes.findIndex((c) => c.name === name);
     if (idx >= 0) {
       // Same file appears twice in one response — last write wins, keep original prev/isNew.
-      changes[idx] = { ...changes[idx], newContent: s.code };
+      changes[idx] = { ...changes[idx], newContent };
     } else {
       changes.push({
         name,
         previousContent: byName.get(name) ?? '',
-        newContent: s.code,
+        newContent,
         isNew: !exists,
       });
     }
   }
   // Drop no-op edits to existing files.
   return changes.filter((c) => c.isNew || c.newContent !== c.previousContent);
+}
+
+const SETUP_PATTERN = /(^|\s)function\s+setup\s*\(/;
+
+/** A suggested entry-file replacement without setup() — which every complete
+ * sketch has — is a fragment, not a full file. (draw() is deliberately not
+ * checked: a static sketch legitimately has only setup().) */
+export function isPartialEntryRewrite(prev: string, next: string): boolean {
+  return SETUP_PATTERN.test(prev) && !SETUP_PATTERN.test(next);
+}
+
+/**
+ * Best-effort merge of a partial-file suggestion into the existing code:
+ * fragment lines that appear exactly once in the file (trimmed) become anchors;
+ * if the anchors map onto the file in order, the spanned region is replaced by
+ * the fragment. Returns null when no safe anchoring exists.
+ */
+export function mergeFragment(prev: string, fragment: string): string | null {
+  const prevLines = prev.split('\n');
+  const fragLines = fragment.split('\n');
+
+  const occurrences = new Map<string, number[]>();
+  prevLines.forEach((line, i) => {
+    const key = line.trim();
+    const list = occurrences.get(key);
+    if (list) list.push(i);
+    else occurrences.set(key, [i]);
+  });
+
+  // Trivial lines ('}', ');', blanks) are useless as anchors.
+  const anchors: Array<{ frag: number; prev: number }> = [];
+  fragLines.forEach((line, i) => {
+    const key = line.trim();
+    if (key.length < 4) return;
+    const hits = occurrences.get(key);
+    if (hits && hits.length === 1) anchors.push({ frag: i, prev: hits[0] });
+  });
+  if (anchors.length < 2) return null;
+  for (let i = 1; i < anchors.length; i++) {
+    if (anchors[i].prev <= anchors[i - 1].prev) return null; // reordered — unsafe
+  }
+
+  const first = anchors[0];
+  const last = anchors[anchors.length - 1];
+  // Extend the region to cover the fragment's unanchored leading/trailing lines.
+  const start = first.prev - first.frag;
+  const end = last.prev + (fragLines.length - 1 - last.frag);
+  if (start < 0 || end >= prevLines.length) return null;
+
+  return [
+    ...prevLines.slice(0, start),
+    ...fragLines,
+    ...prevLines.slice(end + 1),
+  ].join('\n');
 }
 
 /** Apply changes to a files array, returning a new array (creating any new files). */
