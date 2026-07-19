@@ -1,7 +1,6 @@
 import type { SketchFile } from '../types';
 import {
   extractJsBlocks,
-  extractFirstJsBlock,
   splitFileSections,
   extractSearchReplaceBlocks,
   applySearchReplace,
@@ -27,9 +26,10 @@ export interface FileChange {
 /**
  * Compute the file changes an assistant message implies — pure, no store access.
  * Handles:
- *  - search/replace blocks (small edits to the active file)
+ *  - search/replace blocks (small edits, `// filename:` prefixed or resolved by content)
  *  - one code block per file, or several `// filename:` sections inside one block
- *  - default target `sketch.js` when a block has no filename header
+ *  - mixed responses (search/replace for one file + a code block for another):
+ *    both sources are unioned, search/replace winning when they hit the same file
  * Files that don't actually change (same content) are omitted. New files with an
  * invalid name are skipped.
  */
@@ -45,6 +45,7 @@ export function planFileChanges(
   // when present; otherwise the target is resolved by content — the file whose
   // current text contains the SEARCH string (active file first, then sketch.js,
   // then a unique match anywhere).
+  const srChanges: FileChange[] = [];
   const srBlocks = extractSearchReplaceBlocks(content);
   if (srBlocks) {
     const resolveTarget = (block: SearchReplaceBlock): string => {
@@ -65,7 +66,6 @@ export function planFileChanges(
       else groups.set(target, [block]);
     }
 
-    const srChanges: FileChange[] = [];
     for (const [name, blocks] of groups) {
       const prev = byName.get(name)!;
       try {
@@ -74,20 +74,10 @@ export function planFileChanges(
           srChanges.push({ name, previousContent: prev, newContent: next, isNew: false });
         }
       } catch {
-        // This file's blocks didn't match — skip the group, keep the rest.
+        // This file's blocks didn't match — skip the group, keep the rest
+        // (a code block below may still cover this file).
       }
     }
-    if (srChanges.length > 0) return srChanges;
-
-    // Nothing applied — fall back to a full code block if present.
-    const prev = byName.get(activeFileName) ?? '';
-    let fb = extractFirstJsBlock(content);
-    if (fb && looksLikeFragment(prev, fb, activeFileName === entryName)) {
-      fb = mergeFragment(prev, fb); // fragment, not a full file — merge or drop
-    }
-    return fb && fb !== prev
-      ? [{ name: activeFileName, previousContent: prev, newContent: fb, isNew: false }]
-      : [];
   }
 
   // Full code blocks → per-file sections.
@@ -95,7 +85,7 @@ export function planFileChanges(
     .flatMap((b) => splitFileSections(b))
     .filter((s) => s.code.trim().length > 0);
 
-  const changes: FileChange[] = [];
+  const blockChanges: FileChange[] = [];
   for (const s of sections) {
     // Unnamed sections and entry aliases (`sketch.ts` in a JS sketch) target the
     // actual entry file instead of creating a duplicate entry.
@@ -114,18 +104,25 @@ export function planFileChanges(
       newContent = merged;
     }
 
-    const idx = changes.findIndex((c) => c.name === name);
+    const idx = blockChanges.findIndex((c) => c.name === name);
     if (idx >= 0) {
       // Same file appears twice in one response — last write wins, keep original prev/isNew.
-      changes[idx] = { ...changes[idx], newContent };
+      blockChanges[idx] = { ...blockChanges[idx], newContent };
     } else {
-      changes.push({
+      blockChanges.push({
         name,
         previousContent: byName.get(name) ?? '',
         newContent,
         isNew: !exists,
       });
     }
+  }
+
+  // Union both sources; a search/replace patch beats a code block for the same
+  // file (the patch is the targeted edit — the block is often just context).
+  const changes = [...srChanges];
+  for (const c of blockChanges) {
+    if (!changes.some((existing) => existing.name === c.name)) changes.push(c);
   }
   // Drop no-op edits to existing files.
   return changes.filter((c) => c.isNew || c.newContent !== c.previousContent);

@@ -123,6 +123,55 @@ describe('planFileChanges', () => {
   });
 });
 
+describe('mixed responses (search/replace + code blocks in one message)', () => {
+  const sketch = 'function setup() {\n  createCanvas(1, 1);\n}\nfunction draw() {\n  background(30);\n}';
+  const particle = 'class Particle {\n  constructor() {\n    this.size = random(2, 6);\n  }\n}';
+  const files = [file('sketch.js', sketch), file('particle.js', particle)];
+
+  it('applies a search/replace to one file AND a code block to another', () => {
+    const md = [
+      '// filename: sketch.js',
+      '<<<SEARCH',
+      '  background(30);',
+      '===',
+      '  background(255, 0, 0);',
+      '>>>REPLACE',
+      '',
+      '```js',
+      '// filename: particle.js',
+      'class Particle {',
+      '  constructor() {',
+      '    this.size = random(6, 12);',
+      '  }',
+      '}',
+      '```',
+    ].join('\n');
+    const changes = planFileChanges(files, 'sketch.js', md);
+    expect(changes.map((c) => c.name).sort()).toEqual(['particle.js', 'sketch.js']);
+    expect(changes.find((c) => c.name === 'sketch.js')!.newContent).toContain('background(255, 0, 0);');
+    expect(changes.find((c) => c.name === 'particle.js')!.newContent).toContain('random(6, 12)');
+  });
+
+  it('search/replace wins over a code block for the same file', () => {
+    const md = [
+      '<<<SEARCH',
+      '  background(30);',
+      '===',
+      '  background(255, 0, 0);',
+      '>>>REPLACE',
+      '',
+      '```js',
+      'function setup() {\n  createCanvas(9, 9);\n}',
+      '```',
+    ].join('\n');
+    const changes = planFileChanges(files, 'sketch.js', md);
+    expect(changes).toHaveLength(1);
+    expect(changes[0].name).toBe('sketch.js');
+    expect(changes[0].newContent).toContain('background(255, 0, 0);');
+    expect(changes[0].newContent).not.toContain('createCanvas(9, 9)');
+  });
+});
+
 describe('lazy-fragment guard (partial code block must not wipe the sketch)', () => {
   const fullSketch = [
     'let plankton = [];',
