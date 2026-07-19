@@ -5,6 +5,7 @@ import {
   splitFileSections,
   extractSearchReplaceBlocks,
   applySearchReplace,
+  declaredSymbols,
   type SearchReplaceBlock,
 } from './codeUtils';
 import {
@@ -81,7 +82,7 @@ export function planFileChanges(
     // Nothing applied — fall back to a full code block if present.
     const prev = byName.get(activeFileName) ?? '';
     let fb = extractFirstJsBlock(content);
-    if (fb && isPartialEntryRewrite(prev, fb)) {
+    if (fb && looksLikeFragment(prev, fb, activeFileName === entryName)) {
       fb = mergeFragment(prev, fb); // fragment, not a full file — merge or drop
     }
     return fb && fb !== prev
@@ -104,11 +105,10 @@ export function planFileChanges(
 
     // "Lazy" fragment guard: some models answer a small edit with a code block
     // holding only the changed region. Treating that as the whole file would
-    // wipe the sketch — detect it (the entry losing its p5 lifecycle) and merge
-    // the fragment into the existing code by anchoring; refuse the change when
-    // no safe anchoring exists.
+    // wipe it — detect fragments and merge them into the existing code by
+    // anchoring; refuse the change when no safe anchoring exists.
     let newContent = s.code;
-    if (exists && name === entryName && isPartialEntryRewrite(byName.get(name)!, s.code)) {
+    if (exists && looksLikeFragment(byName.get(name)!, s.code, name === entryName)) {
       const merged = mergeFragment(byName.get(name)!, s.code);
       if (merged === null) continue;
       newContent = merged;
@@ -138,6 +138,25 @@ const SETUP_PATTERN = /(^|\s)function\s+setup\s*\(/;
  * checked: a static sketch legitimately has only setup().) */
 export function isPartialEntryRewrite(prev: string, next: string): boolean {
   return SETUP_PATTERN.test(prev) && !SETUP_PATTERN.test(next);
+}
+
+/**
+ * Heuristic: does `next` look like a partial excerpt of `prev` rather than a
+ * complete replacement file?
+ *  - any file: a complete file never starts on an indented line
+ *  - entry file: a complete sketch always declares setup()
+ *  - helper files: a much shorter block that re-declares none of the file's
+ *    top-level symbols is an excerpt (a rewrite/rename keeps a similar size)
+ */
+export function looksLikeFragment(prev: string, next: string, isEntry: boolean): boolean {
+  const firstLine = next.split('\n').find((l) => l.trim().length > 0);
+  if (firstLine && /^[ \t]/.test(firstLine)) return true;
+  if (isEntry) return isPartialEntryRewrite(prev, next);
+  const prevSymbols = declaredSymbols(prev);
+  if (prevSymbols.length === 0) return false;
+  if (next.length >= prev.length * 0.5) return false;
+  const nextSymbols = new Set(declaredSymbols(next));
+  return !prevSymbols.some((s) => nextSymbols.has(s));
 }
 
 /**

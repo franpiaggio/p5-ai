@@ -180,6 +180,70 @@ describe('lazy-fragment guard (partial code block must not wipe the sketch)', ()
     ]);
   });
 
+  it('protects helper files without setup() (e.g. a Particle class)', () => {
+    const particle = [
+      'class Particle {',
+      '  constructor() {',
+      '    this.x = random(width);',
+      '    this.vx = random(-1, 1);',
+      '  }',
+      '  update() {',
+      '    this.x += this.vx;',
+      '  }',
+      '  show() {',
+      '    circle(this.x, 50, 4);',
+      '  }',
+      '}',
+    ].join('\n');
+    const helperFiles = [file('sketch.js', 'function setup() {}'), file('particle.js', particle)];
+
+    // Indented method fragment (with unchanged context lines) → merged by
+    // anchors, class survives.
+    const fragment = [
+      '  update() {',
+      '    this.x += this.vx * 2;',
+      '  }',
+      '  show() {',
+      '    circle(this.x, 50, 4);',
+      '  }',
+    ].join('\n');
+    const changes = planFileChanges(
+      helperFiles,
+      'particle.js',
+      `\`\`\`js\n// filename: particle.js\n${fragment}\n\`\`\``,
+    );
+    expect(changes).toHaveLength(1);
+    expect(changes[0].newContent).toContain('class Particle {');
+    expect(changes[0].newContent).toContain('this.x += this.vx * 2;');
+    expect(changes[0].newContent).toContain('show() {');
+  });
+
+  it('drops a short helper-file excerpt that declares none of its symbols', () => {
+    const particle = 'class Particle {\n  constructor() {\n    this.x = 0;\n    this.y = 0;\n    this.vx = 1;\n  }\n}';
+    const helperFiles = [file('sketch.js', 'function setup() {}'), file('particle.js', particle)];
+    // Dedented excerpt, unmergeable (no unique anchor overlap) → dropped.
+    const changes = planFileChanges(
+      helperFiles,
+      'particle.js',
+      '```js\n// filename: particle.js\nupdate() {\n  this.z = 3;\n}\n```',
+    );
+    expect(changes).toEqual([]);
+  });
+
+  it('lets a legit helper rewrite of similar size through (e.g. a rename)', () => {
+    const particle = 'class Particle {\n  constructor() {\n    this.x = 0;\n  }\n}';
+    const helperFiles = [file('sketch.js', 'function setup() {}'), file('particle.js', particle)];
+    const rewrite = 'class Boid {\n  constructor() {\n    this.pos = 0;\n  }\n}';
+    const changes = planFileChanges(
+      helperFiles,
+      'particle.js',
+      `\`\`\`js\n// filename: particle.js\n${rewrite}\n\`\`\``,
+    );
+    expect(changes).toEqual([
+      { name: 'particle.js', previousContent: particle, newContent: rewrite, isNew: false },
+    ]);
+  });
+
   it('guards the search/replace fallback path too', () => {
     const md = [
       '<<<SEARCH',
