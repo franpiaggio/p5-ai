@@ -18,6 +18,11 @@ describe('API (e2e)', () => {
     process.env.DATABASE_PATH = ':memory:';
     process.env.JWT_SECRET = 'e2e-jwt-secret';
     process.env.ADMIN_PASSWORD = 'e2e-admin-password';
+    // Keep the suite hermetic: a real key (from the root .env) would make
+    // demo-provider requests hit the actual Groq API. Empty string (not
+    // delete): dotenv won't override an existing env var, but '' is falsy
+    // for the demo-key checks.
+    process.env.GROQ_API_KEY = '';
 
     // Import after env is set so ConfigModule picks up the test values.
     const { AppModule } =
@@ -69,6 +74,34 @@ describe('API (e2e)', () => {
       const tokenCookie = cookies.find((c: string) => c.startsWith('token='));
       expect(tokenCookie).toContain('HttpOnly');
       authCookie = tokenCookie!.split(';')[0];
+    });
+  });
+
+  describe('chat origin guard', () => {
+    it('rejects a chat request without an app Origin (curl/scripts)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/chat/models')
+        .send({ provider: 'openai', apiKey: 'sk-x' })
+        .expect(403);
+    });
+
+    it('rejects a foreign Origin', async () => {
+      await request(app.getHttpServer())
+        .post('/api/chat/models')
+        .set('Origin', 'https://evil.example')
+        .send({ provider: 'openai', apiKey: 'sk-x' })
+        .expect(403);
+    });
+
+    it('lets a request with the app Origin through to the controller', async () => {
+      // Passing the guard is what matters here; the unconfigured demo provider
+      // answers with its static fallback model list.
+      const res = await request(app.getHttpServer())
+        .post('/api/chat/models')
+        .set('Origin', 'http://localhost:5173')
+        .send({ provider: 'demo' })
+        .expect(201);
+      expect(res.body.models).toEqual(['llama-3.3-70b-versatile']);
     });
   });
 

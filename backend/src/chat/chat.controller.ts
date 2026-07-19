@@ -12,9 +12,12 @@ import type { Request, Response } from 'express';
 import { ChatService } from './chat.service';
 import { ChatRequestDto, ListModelsDto } from './dto/chat.dto';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard';
+import { OriginGuard } from '../common/origin.guard';
 
+// OriginGuard: chat can spend the server-side demo key, so it is app-only —
+// callers must present the app's Origin/Referer (plus the global throttling).
 @Controller('api/chat')
-@UseGuards(OptionalAuthGuard)
+@UseGuards(OriginGuard, OptionalAuthGuard)
 export class ChatController {
   constructor(private chatService: ChatService) {}
 

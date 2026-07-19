@@ -5,6 +5,7 @@ import { json } from 'express';
 import compression from 'compression';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import { allowedOrigins } from './common/origin.guard';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
@@ -39,10 +40,7 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: (process.env.CORS_ORIGIN ?? 'http://localhost:5173')
-      .split(',')
-      .map((o) => o.trim())
-      .filter(Boolean),
+    origin: allowedOrigins(),
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
