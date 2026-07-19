@@ -111,26 +111,10 @@ export function ChatPanel() {
       const chatLibraries = currentState.libraries.length > 0
         ? currentState.libraries.map((l) => ({ name: l.name, url: l.url }))
         : undefined;
-      for await (const chunk of streamChat({
-        message: userMessage,
-        code: currentState.code,
-        language: currentState.editorLanguage,
-        history: currentState.messages.slice(0, -1),
-        config: chatConfig,
-        ...(images?.length ? { images } : {}),
-        files: chatFiles,
-        libraries: chatLibraries,
-      }, abortController.signal)) {
-        if (firstChunk) {
-          firstChunk = false;
-          setIsStreaming(false);
-        }
-        assistantContent += chunk;
-
-        if (!hasSearchReplace && assistantContent.includes('<<<SEARCH')) {
-          hasSearchReplace = true;
-        }
-
+      // Parse the accumulated response and push it to the UI. Called throttled:
+      // chunks arrive every few milliseconds, and re-parsing the full text plus
+      // re-rendering the Monaco diff per token is O(n²) over the response.
+      const renderStreamUpdate = () => {
         const { chatContent, codeContent } = parseStreamContent(assistantContent);
         if (!hasSearchReplace && codeContent !== null) hasCodeFence = true;
 
@@ -167,6 +151,39 @@ export function ChatPanel() {
             ...(newStreamingCode !== null ? { streamingCode: newStreamingCode } : {}),
           };
         });
+      };
+
+      const RENDER_INTERVAL_MS = 80;
+      let lastRenderAt = 0;
+
+      for await (const chunk of streamChat({
+        message: userMessage,
+        code: currentState.code,
+        language: currentState.editorLanguage,
+        history: currentState.messages.slice(0, -1),
+        config: chatConfig,
+        ...(images?.length ? { images } : {}),
+        files: chatFiles,
+        libraries: chatLibraries,
+      }, abortController.signal)) {
+        if (firstChunk) {
+          firstChunk = false;
+          setIsStreaming(false);
+        }
+        assistantContent += chunk;
+
+        if (!hasSearchReplace && assistantContent.includes('<<<SEARCH')) {
+          hasSearchReplace = true;
+        }
+
+        // First chunk renders immediately (the bubble must appear at once);
+        // after that, at most one parse+render per interval. The final state
+        // is covered by the atomic post-stream update below.
+        const now = performance.now();
+        if (lastRenderAt === 0 || now - lastRenderAt >= RENDER_INTERVAL_MS) {
+          renderStreamUpdate();
+          lastRenderAt = now;
+        }
       }
 
       if (backendOnline !== true) setBackendOnline(true);

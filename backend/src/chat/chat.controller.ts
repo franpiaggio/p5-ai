@@ -9,6 +9,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
 import { ChatRequestDto, ListModelsDto } from './dto/chat.dto';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard';
@@ -42,6 +43,10 @@ export class ChatController {
     }
   }
 
+  // Tighter than the global limits: every request here is a full LLM call
+  // (and demo mode spends the server-side key). Human chat pacing fits well
+  // under 10/min.
+  @Throttle({ short: { limit: 10, ttl: 60_000 }, long: { limit: 100, ttl: 600_000 } })
   @Post()
   async chat(
     @Body() request: ChatRequestDto,
