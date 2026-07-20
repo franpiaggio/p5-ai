@@ -65,6 +65,7 @@ export interface SketchSummary {
   title: string;
   description?: string;
   thumbnail?: string | null;
+  isPublic?: boolean;
   createdAt: string;
   updatedAt: string;
 }

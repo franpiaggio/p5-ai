@@ -3,7 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { getSketch } from '../../services/api';
-import { useSketches, useCreateSketch, useDeleteSketch } from '../../hooks/useSketches';
+import { useSketches, useCreateSketch, useDeleteSketch, useUpdateSketch } from '../../hooks/useSketches';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 import { createDefaultFiles } from '../../constants/defaultFiles';
 
@@ -13,6 +13,7 @@ export function SketchesGrid() {
   const { data: sketches = [], isLoading: loading } = useSketches();
   const createSketchMut = useCreateSketch();
   const deleteSketchMut = useDeleteSketch();
+  const updateSketchMut = useUpdateSketch();
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
   // Id of the sketch pending an inline delete confirmation (replaces window.confirm).
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -63,6 +64,10 @@ export function SketchesGrid() {
   const confirmDelete = (id: string) => {
     deleteSketchMut.mutate(id);
     setConfirmDeleteId(null);
+  };
+
+  const toggleVisibility = (id: string, currentlyPublic: boolean) => {
+    updateSketchMut.mutate({ id, isPublic: !currentlyPublic });
   };
 
   const handleDuplicate = async (id: string) => {
@@ -211,9 +216,43 @@ export function SketchesGrid() {
                       {sketch.description}
                     </p>
                   )}
-                  <p className="text-[10px] font-mono text-text-muted/50 mt-2">
-                    {new Date(sketch.updatedAt).toLocaleDateString()}
-                  </p>
+                  <div className="flex items-center justify-between gap-2 mt-2">
+                    <p className="text-[10px] font-mono text-text-muted/50">
+                      {new Date(sketch.updatedAt).toLocaleDateString()}
+                    </p>
+                    {(() => {
+                      const isPublic = sketch.isPublic !== false;
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => toggleVisibility(sketch.id, isPublic)}
+                          disabled={updateSketchMut.isPending}
+                          className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-colors cursor-pointer disabled:opacity-50 ${
+                            isPublic
+                              ? 'text-info hover:bg-info/10'
+                              : 'text-text-muted/60 hover:bg-border/30'
+                          }`}
+                          title={
+                            isPublic
+                              ? 'Public — anyone with the link can view. Click to make private.'
+                              : 'Private — only you can open it. Click to make public.'
+                          }
+                          aria-label={isPublic ? 'Make private' : 'Make public'}
+                        >
+                          {isPublic ? (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                            </svg>
+                          )}
+                          {isPublic ? 'Public' : 'Private'}
+                        </button>
+                      );
+                    })()}
+                  </div>
                   <div className="flex gap-2 mt-3 pt-3 border-t border-border/20">
                     {confirmDeleteId === sketch.id ? (
                       <>

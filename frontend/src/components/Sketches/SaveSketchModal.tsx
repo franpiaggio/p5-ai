@@ -16,6 +16,7 @@ export function SaveSketchModal() {
   const createSketchMut = useCreateSketch();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,6 +24,7 @@ export function SaveSketchModal() {
     setIsSaveSketchOpen(false);
     setTitle('');
     setDescription('');
+    setIsPublic(true);
     setError('');
   }, [setIsSaveSketchOpen]);
 
@@ -49,6 +51,7 @@ export function SaveSketchModal() {
         code,
         description: description.trim() || undefined,
         thumbnail,
+        isPublic,
         files,
         libraries: libraries.length > 0 ? libraries : undefined,
       });
@@ -127,6 +130,23 @@ export function SaveSketchModal() {
               className="input-field resize-none"
             />
           </div>
+
+          <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              className="mt-0.5 accent-info cursor-pointer"
+            />
+            <span className="text-[11px] text-text-muted/80 leading-snug">
+              Public
+              <span className="block text-text-muted/50">
+                {isPublic
+                  ? 'Anyone with the link can view this sketch.'
+                  : 'Only you can open this sketch. You can change this later.'}
+              </span>
+            </span>
+          </label>
 
           {error && (
             <p className="text-[11px] text-error">{error}</p>

@@ -7,8 +7,9 @@ import { FileSidebar } from '../components/Editor/FileSidebar';
 import { LibrariesModal } from '../components/Libraries/LibrariesModal';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useEditorStore } from '../store/editorStore';
+import { useAuthStore } from '../store/authStore';
 import { getExampleBySlug } from '../data/sketchExamples';
-import { getPublicSketch } from '../services/api';
+import { getPublicSketch, getSketch } from '../services/api';
 import { createDefaultFiles, filesFromNamed, findEntryFile } from '../constants/defaultFiles';
 
 export function EditorPage() {
@@ -72,7 +73,13 @@ export function EditorPage() {
     if (!sketchId) return;
     // Skip if this sketch is already loaded (e.g. from persisted state)
     if (useEditorStore.getState().sketchId === sketchId) return;
-    getPublicSketch(sketchId)
+    // Owners load via the authed route (works for their private sketches too);
+    // if that fails (not logged in / not the owner) fall back to the public one.
+    const loggedIn = !!useAuthStore.getState().user;
+    const fetchSketch = loggedIn
+      ? getSketch(sketchId).catch(() => getPublicSketch(sketchId))
+      : getPublicSketch(sketchId);
+    fetchSketch
       .then((sketch) => {
         // Re-check: zustand persist may have rehydrated this sketch while fetch was in-flight
         if (useEditorStore.getState().sketchId === sketchId) return;

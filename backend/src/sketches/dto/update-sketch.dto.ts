@@ -2,6 +2,7 @@ import {
   IsString,
   IsOptional,
   IsArray,
+  IsBoolean,
   IsNumber,
   MaxLength,
   ValidateNested,
@@ -79,6 +80,10 @@ export class UpdateSketchDto {
   @IsString()
   @MaxLength(500_000)
   thumbnail?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean;
 
   @IsOptional()
   @IsArray()

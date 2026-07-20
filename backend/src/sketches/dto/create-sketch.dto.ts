@@ -2,6 +2,7 @@ import {
   IsString,
   IsOptional,
   IsArray,
+  IsBoolean,
   MaxLength,
   ValidateNested,
 } from 'class-validator';
@@ -52,6 +53,10 @@ export class CreateSketchDto {
   @IsString()
   @MaxLength(500_000)
   thumbnail?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isPublic?: boolean;
 
   @IsOptional()
   @IsArray()

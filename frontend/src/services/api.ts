@@ -130,6 +130,7 @@ export async function createSketch(data: {
   code: string;
   description?: string;
   thumbnail?: string | null;
+  isPublic?: boolean;
   files?: SketchFile[];
   libraries?: Library[];
 }): Promise<SketchFull> {
@@ -173,7 +174,7 @@ export async function getSketch(id: string): Promise<SketchFull> {
 
 export async function updateSketch(
   id: string,
-  data: { title?: string; code?: string; description?: string; thumbnail?: string | null; codeHistory?: unknown[]; files?: SketchFile[]; libraries?: Library[] },
+  data: { title?: string; code?: string; description?: string; thumbnail?: string | null; isPublic?: boolean; codeHistory?: unknown[]; files?: SketchFile[]; libraries?: Library[] },
 ): Promise<SketchFull> {
   const { thumbnail, ...rest } = data;
   const body = thumbnail ? { ...rest, thumbnail } : rest;

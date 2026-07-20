@@ -102,11 +102,29 @@ describe('SketchesService', () => {
   });
 
   describe('public/list projections', () => {
-    it('never exposes userId through the public endpoint selection', async () => {
-      repo.findOne.mockResolvedValue({ id: 'abc123', title: 't', code: 'c' });
+    it('never exposes userId or codeHistory through the public endpoint selection', async () => {
+      repo.findOne.mockResolvedValue({
+        id: 'abc123',
+        title: 't',
+        code: 'c',
+        isPublic: true,
+      });
       await service.findOnePublic('abc123');
       const select = repo.findOne.mock.calls[0][0].select as string[];
       expect(select).not.toContain('userId');
+      expect(select).not.toContain('codeHistory');
+    });
+
+    it('404s a private sketch on the public endpoint', async () => {
+      repo.findOne.mockResolvedValue({
+        id: 'abc123',
+        title: 't',
+        code: 'c',
+        isPublic: false,
+      });
+      await expect(service.findOnePublic('abc123')).rejects.toThrow(
+        'Sketch not found',
+      );
     });
 
     it("lists only the caller's sketches without full code payloads", async () => {

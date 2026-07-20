@@ -18,12 +18,18 @@ export class Sketch {
   @BeforeInsert()
   generateId() {
     if (!this.id) {
-      this.id = randomBytes(5).toString('hex');
+      this.id = randomBytes(16).toString('hex');
     }
   }
 
   @Column()
   title: string;
+
+  // Public sketches are readable by anyone via GET /sketches/public/:id.
+  // Defaults to true so existing rows (and new saves) stay shareable; the
+  // owner can turn a sketch private, which 404s the public route.
+  @Column({ default: true })
+  isPublic: boolean;
 
   @Column('text')
   code: string;

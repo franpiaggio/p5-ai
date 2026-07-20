@@ -157,13 +157,39 @@ describe('API (e2e)', () => {
       expect(res.body.code).toBe('function setup() {}');
     });
 
-    it('serves the public endpoint without auth and without owner info', async () => {
+    it('serves the public endpoint without auth (public by default) and without owner info or history', async () => {
       const res = await request(app.getHttpServer())
         .get(`/api/sketches/public/${sketchId}`)
         .expect(200);
 
       expect(res.body.code).toBe('function setup() {}');
       expect(res.body.userId).toBeUndefined();
+      expect(res.body.codeHistory).toBeUndefined();
+    });
+
+    it('404s the public endpoint once the owner marks the sketch private', async () => {
+      await request(app.getHttpServer())
+        .put(`/api/sketches/${sketchId}`)
+        .set('Cookie', authCookie)
+        .send({ isPublic: false })
+        .expect(200);
+
+      await request(app.getHttpServer())
+        .get(`/api/sketches/public/${sketchId}`)
+        .expect(404);
+
+      // Owner can still open it through the authed route.
+      await request(app.getHttpServer())
+        .get(`/api/sketches/${sketchId}`)
+        .set('Cookie', authCookie)
+        .expect(200);
+
+      // Restore public so later assertions are unaffected.
+      await request(app.getHttpServer())
+        .put(`/api/sketches/${sketchId}`)
+        .set('Cookie', authCookie)
+        .send({ isPublic: true })
+        .expect(200);
     });
 
     it('updates and deletes the sketch', async () => {

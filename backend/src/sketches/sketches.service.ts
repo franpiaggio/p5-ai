@@ -33,6 +33,7 @@ export class SketchesService {
         'title',
         'description',
         'thumbnail',
+        'isPublic',
         'createdAt',
         'updatedAt',
       ],
@@ -42,20 +43,23 @@ export class SketchesService {
   async findOnePublic(id: string): Promise<Partial<Sketch>> {
     const sketch = await this.sketchesRepository.findOne({
       where: { id },
+      // codeHistory is intentionally excluded: sharing a result shouldn't leak
+      // the author's full edit trail. Owners get it via the authed findOne.
       select: [
         'id',
         'title',
         'code',
         'description',
         'thumbnail',
-        'codeHistory',
+        'isPublic',
         'files',
         'libraries',
         'createdAt',
         'updatedAt',
       ],
     });
-    if (!sketch) throw new NotFoundException('Sketch not found');
+    // Private (or missing) sketches are indistinguishable from non-existent ones.
+    if (!sketch || !sketch.isPublic) throw new NotFoundException('Sketch not found');
     return sketch;
   }
 
