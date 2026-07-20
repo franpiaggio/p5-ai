@@ -36,6 +36,8 @@ export function EditorPage() {
         ? filesFromNamed(example.files)
         : createDefaultFiles(example.code);
       const exampleLibraries = example.libraries ?? [];
+      // Invalidate any chat response still in flight for the previous sketch.
+      useEditorStore.getState().beginSketchSession();
       useEditorStore.setState({
         code: example.code,
         lastSavedCode: example.code,
@@ -79,6 +81,7 @@ export function EditorPage() {
           ? sketch.files
           : createDefaultFiles(sketch.code);
         const sketchLibraries = sketch.libraries ?? [];
+        useEditorStore.getState().beginSketchSession();
         useEditorStore.setState({
           code: sketch.code,
           lastSavedCode: sketch.code,

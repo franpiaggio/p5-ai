@@ -69,6 +69,11 @@ interface EditorState {
   isSettingsOpen: boolean;
   isLoading: boolean;
   isStreaming: boolean;
+  /** Bumped whenever the editor swaps to a different sketch (load / new /
+   * duplicate / example). An in-flight chat request captures this value and
+   * discards its result if it no longer matches — otherwise a response that
+   * was requested for sketch A would land on sketch B. Never persisted. */
+  chatSessionId: number;
   codeHistory: CodeChange[];
   appliedBlocks: Record<string, true>;
   rejectedBlocks: Record<string, true>;
@@ -129,6 +134,9 @@ interface EditorState {
   setSketchTitle: (title: string) => void;
   setSketchMeta: (id: string | null, title: string) => void;
   newSketch: () => void;
+  /** State reset to apply whenever the editor swaps sketches: invalidates any
+   * in-flight chat response so it can't be applied to the newly opened sketch. */
+  beginSketchSession: () => void;
   setFixRequest: (request: string | null) => void;
   setAppTheme: (theme: AppThemeId) => void;
   setEditorLanguage: (language: EditorLanguage) => void;
@@ -255,6 +263,7 @@ export const useEditorStore = create<EditorState>()(
       isSettingsOpen: false,
       isLoading: false,
       isStreaming: false,
+      chatSessionId: 0,
       codeHistory: [],
       appliedBlocks: {},
       rejectedBlocks: {},
@@ -651,10 +660,25 @@ export const useEditorStore = create<EditorState>()(
         })),
       setLibraries: (libraries) => set({ libraries }),
       setFileSidebarOpen: (isFileSidebarOpen) => set({ isFileSidebarOpen }),
+      beginSketchSession: () =>
+        set((state) => ({
+          chatSessionId: state.chatSessionId + 1,
+          isLoading: false,
+          isStreaming: false,
+          streamingCode: null,
+          pendingDiff: null,
+          pendingFilesReview: null,
+          fixRequest: null,
+        })),
       newSketch: () =>
         set((state) => {
           const newFiles = createDefaultFiles(DEFAULT_CODE, state.editorLanguage);
           return {
+            chatSessionId: state.chatSessionId + 1,
+            isLoading: false,
+            isStreaming: false,
+            streamingCode: null,
+            fixRequest: null,
             code: DEFAULT_CODE,
             lastSavedCode: DEFAULT_CODE,
             sketchId: null,

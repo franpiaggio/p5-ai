@@ -39,7 +39,18 @@ export function ChatPanel() {
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
   const pendingFilesReview = useEditorStore((s) => s.pendingFilesReview);
   const showSuggestion = useEditorStore((s) => s.showSuggestion);
+  const chatSessionId = useEditorStore((s) => s.chatSessionId);
   const isMobile = useIsMobile();
+
+  // Opening another sketch cancels the request in flight: its answer was written
+  // for the sketch that just left the screen.
+  const sessionRef = useRef(chatSessionId);
+  useEffect(() => {
+    if (sessionRef.current === chatSessionId) return;
+    sessionRef.current = chatSessionId;
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, [chatSessionId]);
 
   // Backend health check on mount + retry every 10s when offline
   useEffect(() => {
@@ -91,6 +102,13 @@ export function ChatPanel() {
     const abortController = new AbortController();
     abortRef.current = abortController;
 
+    // Everything below belongs to the sketch that was open when the request
+    // started. If the user opens another sketch mid-flight, the store bumps
+    // chatSessionId and we drop the response instead of applying it to the
+    // sketch now on screen.
+    const sessionId = useEditorStore.getState().chatSessionId;
+    const isStale = () => useEditorStore.getState().chatSessionId !== sessionId;
+
     try {
       let assistantContent = '';
       let firstChunk = true;
@@ -115,6 +133,7 @@ export function ChatPanel() {
       // chunks arrive every few milliseconds, and re-parsing the full text plus
       // re-rendering the Monaco diff per token is O(n²) over the response.
       const renderStreamUpdate = () => {
+        if (isStale()) return;
         const { chatContent, codeContent } = parseStreamContent(assistantContent);
         if (!hasSearchReplace && codeContent !== null) hasCodeFence = true;
 
@@ -166,6 +185,10 @@ export function ChatPanel() {
         files: chatFiles,
         libraries: chatLibraries,
       }, abortController.signal)) {
+        if (isStale()) {
+          abortController.abort();
+          return;
+        }
         if (firstChunk) {
           firstChunk = false;
           setIsStreaming(false);
@@ -185,6 +208,10 @@ export function ChatPanel() {
           lastRenderAt = now;
         }
       }
+
+      // The user switched sketches while the answer was streaming — the reply
+      // was written against the old sketch, so drop it entirely.
+      if (isStale()) return;
 
       if (backendOnline !== true) setBackendOnline(true);
 
@@ -269,6 +296,8 @@ export function ChatPanel() {
         return { messages: newMessages, streamingCode: null };
       });
     } catch (error) {
+      // Aborted because the sketch changed — nothing to report on the new one.
+      if (isStale()) return;
       setIsStreaming(false);
       const errorMsg = error instanceof Error ? error.message : 'Failed to get response';
       const cleanError = errorMsg
@@ -287,9 +316,12 @@ export function ChatPanel() {
         return { messages: newMessages };
       });
     } finally {
-      abortRef.current = null;
-      setIsLoading(false);
-      setIsStreaming(false);
+      if (abortRef.current === abortController) abortRef.current = null;
+      // A stale run must not clobber the flags of the session that replaced it.
+      if (!isStale()) {
+        setIsLoading(false);
+        setIsStreaming(false);
+      }
     }
   }, [addMessage, setIsLoading, setIsStreaming, setIsSettingsOpen]);
 

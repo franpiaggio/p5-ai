@@ -30,6 +30,8 @@ export function SketchesGrid() {
         ? sketch.files
         : createDefaultFiles(sketch.code);
       const sketchLibraries = sketch.libraries ?? [];
+      // Invalidate any chat response still in flight for the previous sketch.
+      useEditorStore.getState().beginSketchSession();
       useEditorStore.setState({
         code: sketch.code,
         lastSavedCode: sketch.code,
@@ -78,6 +80,7 @@ export function SketchesGrid() {
         files: sketchFiles,
         libraries: sketchLibraries.length > 0 ? sketchLibraries : undefined,
       });
+      useEditorStore.getState().beginSketchSession();
       useEditorStore.setState({
         code: saved.code,
         lastSavedCode: saved.code,

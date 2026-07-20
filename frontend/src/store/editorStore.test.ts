@@ -235,6 +235,43 @@ describe('newSketch', () => {
     expect(after.codeHistory).toEqual([]);
     expect(after.llmConfig.apiKey).toBe('sk-x');
   });
+
+  it('invalidates the chat session so an in-flight reply is dropped', () => {
+    const before = useEditorStore.getState().chatSessionId;
+    useEditorStore.setState({ isLoading: true, isStreaming: true, streamingCode: 'partial' });
+
+    useEditorStore.getState().newSketch();
+
+    const after = useEditorStore.getState();
+    expect(after.chatSessionId).toBe(before + 1);
+    expect(after.isLoading).toBe(false);
+    expect(after.isStreaming).toBe(false);
+    expect(after.streamingCode).toBeNull();
+  });
+});
+
+describe('beginSketchSession', () => {
+  it('bumps the session id and clears in-flight chat state', () => {
+    const before = useEditorStore.getState().chatSessionId;
+    useEditorStore.setState({
+      isLoading: true,
+      isStreaming: true,
+      streamingCode: 'partial',
+      pendingDiff: { code: 'a', previousCode: 'b', messageId: 'm1', blockKey: 'k' },
+      fixRequest: 'fix it',
+    });
+
+    useEditorStore.getState().beginSketchSession();
+
+    const after = useEditorStore.getState();
+    expect(after.chatSessionId).toBe(before + 1);
+    expect(after.isLoading).toBe(false);
+    expect(after.isStreaming).toBe(false);
+    expect(after.streamingCode).toBeNull();
+    expect(after.pendingDiff).toBeNull();
+    expect(after.pendingFilesReview).toBeNull();
+    expect(after.fixRequest).toBeNull();
+  });
 });
 
 // --- Multi-file: file operations ---
