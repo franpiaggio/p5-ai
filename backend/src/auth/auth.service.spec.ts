@@ -84,4 +84,20 @@ describe('AuthService — account lockout', () => {
       'Too many failed attempts. Try again later.',
     );
   });
+
+  it('locks per (username, IP) so one IP cannot lock the account elsewhere', async () => {
+    // Attacker IP exhausts its attempts and gets locked.
+    for (let i = 0; i < 5; i++) {
+      await expect(service.login('admin', 'wrong', '10.0.0.1')).rejects.toThrow(
+        'Invalid username or password',
+      );
+    }
+    await expect(service.login('admin', 'wrong', '10.0.0.1')).rejects.toThrow(
+      'Too many failed attempts. Try again later.',
+    );
+    // The real admin, on a different IP, is unaffected and logs in fine.
+    await expect(service.login('admin', 'correct-horse', '192.168.1.5')).resolves.toMatchObject({
+      accessToken: 'signed-token',
+    });
+  });
 });

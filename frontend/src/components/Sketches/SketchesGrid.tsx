@@ -3,7 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { useEditorStore } from '../../store/editorStore';
 import { useAuthStore } from '../../store/authStore';
 import { getSketch } from '../../services/api';
-import { useSketches, useCreateSketch, useDeleteSketch, useUpdateSketch } from '../../hooks/useSketches';
+import { useSketches, useCreateSketch, useDeleteSketch, useToggleSketchVisibility } from '../../hooks/useSketches';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 import { createDefaultFiles } from '../../constants/defaultFiles';
 
@@ -13,7 +13,7 @@ export function SketchesGrid() {
   const { data: sketches = [], isLoading: loading } = useSketches();
   const createSketchMut = useCreateSketch();
   const deleteSketchMut = useDeleteSketch();
-  const updateSketchMut = useUpdateSketch();
+  const toggleVisibilityMut = useToggleSketchVisibility();
   const setSketchMeta = useEditorStore((s) => s.setSketchMeta);
   // Id of the sketch pending an inline delete confirmation (replaces window.confirm).
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -67,7 +67,7 @@ export function SketchesGrid() {
   };
 
   const toggleVisibility = (id: string, currentlyPublic: boolean) => {
-    updateSketchMut.mutate({ id, isPublic: !currentlyPublic });
+    toggleVisibilityMut.mutate({ id, isPublic: !currentlyPublic });
   };
 
   const handleDuplicate = async (id: string) => {
@@ -82,6 +82,9 @@ export function SketchesGrid() {
         code: sketch.code,
         description: sketch.description || undefined,
         thumbnail: sketch.thumbnail || undefined,
+        // Preserve the original's visibility so duplicating a private sketch
+        // doesn't silently produce a public copy (backend defaults to public).
+        isPublic: sketch.isPublic ?? false,
         files: sketchFiles,
         libraries: sketchLibraries.length > 0 ? sketchLibraries : undefined,
       });
@@ -226,8 +229,7 @@ export function SketchesGrid() {
                         <button
                           type="button"
                           onClick={() => toggleVisibility(sketch.id, isPublic)}
-                          disabled={updateSketchMut.isPending}
-                          className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-colors cursor-pointer disabled:opacity-50 ${
+                          className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
                             isPublic
                               ? 'text-info hover:bg-info/10'
                               : 'text-text-muted/60 hover:bg-border/30'

@@ -37,6 +37,32 @@ export function useUpdateSketch() {
   });
 }
 
+export function useToggleSketchVisibility() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isPublic }: { id: string; isPublic: boolean }) =>
+      updateSketch(id, { isPublic }),
+    // Optimistic: flip the card immediately so every sketch stays interactive
+    // (no shared pending flag), and roll back if the request fails.
+    onMutate: async ({ id, isPublic }) => {
+      await qc.cancelQueries({ queryKey: queryKeys.sketches });
+      const previous = qc.getQueryData<SketchSummary[]>(queryKeys.sketches);
+      qc.setQueryData<SketchSummary[]>(queryKeys.sketches, (old) =>
+        old?.map((s) => (s.id === id ? { ...s, isPublic } : s)),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(queryKeys.sketches, context.previous);
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.sketches });
+    },
+  });
+}
+
 export function useDeleteSketch() {
   const qc = useQueryClient();
   return useMutation({

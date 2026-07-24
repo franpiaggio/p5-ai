@@ -73,12 +73,15 @@ export function EditorPage() {
     if (!sketchId) return;
     // Skip if this sketch is already loaded (e.g. from persisted state)
     if (useEditorStore.getState().sketchId === sketchId) return;
-    // Owners load via the authed route (works for their private sketches too);
-    // if that fails (not logged in / not the owner) fall back to the public one.
+    // Public route first: it's a plain (unauthenticated) fetch, so viewing a
+    // shared/public sketch never triggers the global 401 handler (logout +
+    // login modal). Only fall back to the authed route when the public one 404s
+    // (a private sketch) and the viewer is logged in — where re-auth is expected.
     const loggedIn = !!useAuthStore.getState().user;
-    const fetchSketch = loggedIn
-      ? getSketch(sketchId).catch(() => getPublicSketch(sketchId))
-      : getPublicSketch(sketchId);
+    const fetchSketch = getPublicSketch(sketchId).catch(() => {
+      if (loggedIn) return getSketch(sketchId);
+      throw new Error('Sketch not available');
+    });
     fetchSketch
       .then((sketch) => {
         // Re-check: zustand persist may have rehydrated this sketch while fetch was in-flight

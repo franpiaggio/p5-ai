@@ -14,17 +14,20 @@ import { UsersService } from '../users/users.service';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60_000; // 15 minutes
+const MAX_TRACKED_KEYS = 10_000; // hard cap so the map can never grow unbounded
 
 @Injectable()
 export class AuthService implements OnModuleInit {
   private readonly logger = new Logger(AuthService.name);
   private googleClient: OAuth2Client;
 
-  // Per-username failed-login tracking for account lockout. In-memory, so it is
-  // per-instance — fine for the single-process deployment; a multi-instance
-  // setup would need a shared store (Redis). Trade-off: an attacker can lock a
-  // known username by spamming wrong passwords, acceptable for this app's tiny
-  // account set and preferable to leaving admin brute-forceable.
+  // Failed-login tracking for account lockout, keyed by (username, client IP).
+  // Scoping to the IP means an attacker can only lock the account *as seen from
+  // their own IP* — they cannot lock out the real admin signing in elsewhere —
+  // while still slowing a single-source brute force (the per-IP @Throttle caps
+  // distributed attempts). In-memory, so per-instance: fine for the single
+  // process here; a multi-instance setup would need a shared store (Redis).
+  // Entries are pruned on write and hard-capped so the map cannot grow forever.
   private readonly failedLogins = new Map<
     string,
     { count: number; lastFailureAt: number; lockedUntil: number }
@@ -69,8 +72,8 @@ export class AuthService implements OnModuleInit {
     this.logger.log('Seeded admin user from ADMIN_PASSWORD env var');
   }
 
-  async login(username: string, password: string) {
-    const key = username.toLowerCase();
+  async login(username: string, password: string, ip = 'unknown') {
+    const key = `${username.toLowerCase()}::${ip}`;
     this.assertNotLocked(key);
 
     const user = await this.usersService.findByUsername(username);
@@ -100,6 +103,7 @@ export class AuthService implements OnModuleInit {
 
   private recordFailure(key: string) {
     const now = Date.now();
+    this.pruneExpired(now);
     const entry = this.failedLogins.get(key);
     // Keep counting within a rolling window; a long-idle key starts fresh.
     const withinWindow = !!entry && now - entry.lastFailureAt < LOCKOUT_MS;
@@ -109,6 +113,24 @@ export class AuthService implements OnModuleInit {
       lastFailureAt: now,
       lockedUntil: count >= MAX_FAILED_ATTEMPTS ? now + LOCKOUT_MS : 0,
     });
+  }
+
+  // Drop keys whose lockout has elapsed and that are outside the counting
+  // window, then hard-cap the map by evicting the oldest entries. Keeps the
+  // structure bounded regardless of how many distinct usernames/IPs are tried.
+  private pruneExpired(now: number) {
+    for (const [k, entry] of this.failedLogins) {
+      if (entry.lockedUntil <= now && now - entry.lastFailureAt >= LOCKOUT_MS) {
+        this.failedLogins.delete(k);
+      }
+    }
+    if (this.failedLogins.size >= MAX_TRACKED_KEYS) {
+      const byAge = [...this.failedLogins.entries()].sort(
+        (a, b) => a[1].lastFailureAt - b[1].lastFailureAt,
+      );
+      const toDrop = this.failedLogins.size - MAX_TRACKED_KEYS + 1;
+      for (let i = 0; i < toDrop; i++) this.failedLogins.delete(byAge[i][0]);
+    }
   }
 
   async googleLogin(credential: string) {
