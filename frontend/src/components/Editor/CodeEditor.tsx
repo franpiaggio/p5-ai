@@ -158,9 +158,8 @@ export function CodeEditor() {
     // sketch transpiles correctly, not just the one on screen.
     const setTranspiler = useEditorStore.getState().setTranspiler;
     setTranspiler(async (code: string) => {
-      try {
+      const attempt = async (): Promise<string | undefined> => {
         const worker = await monaco.languages.typescript.getTypeScriptWorker();
-        // Auto-generated model uri (no explicit scheme) so the TS worker resolves it.
         const model = monaco.editor.createModel(code, 'typescript');
         try {
           const client = await worker(model.uri);
@@ -170,6 +169,19 @@ export function CodeEditor() {
         } finally {
           model.dispose();
         }
+      };
+      // During diff review the main editor unmounts and the TS worker briefly
+      // stops answering, so a fresh getEmitOutput can hang. Race each attempt
+      // against a timeout and retry until the worker is back (it recovers within
+      // ~1s); without this, TS sketches render a black canvas while reviewing.
+      const timeout = (ms: number) =>
+        new Promise<undefined>((r) => setTimeout(() => r(undefined), ms));
+      try {
+        for (let i = 0; i < 6; i++) {
+          const out = await Promise.race([attempt(), timeout(500)]);
+          if (typeof out === 'string') return out;
+        }
+        return code;
       } catch {
         return code;
       }
