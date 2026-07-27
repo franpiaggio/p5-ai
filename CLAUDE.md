@@ -23,7 +23,7 @@ pnpm dev
 
 # Run individually
 pnpm --dir frontend dev      # Vite dev server on :5173
-pnpm --dir backend start:dev  # NestJS with --watch on :3000
+pnpm --dir backend start:dev  # NestJS with --watch on :3001
 ```
 
 ### Build
@@ -120,7 +120,7 @@ file; the last tab can't close).
 
 ### API Routing
 
-Frontend Vite proxy forwards `/api/*` to backend at `:3000`. Backend routes:
+Frontend Vite proxy forwards `/api/*` to backend at `:3001`. Backend routes:
 - `POST /api/chat` — Stream chat (SSE)
 - `POST /api/chat/models` — List models for a provider
 - `POST /api/auth/login`, `POST /api/auth/google`, `POST /api/auth/logout`
@@ -135,4 +135,4 @@ Config via `.env` at project root or `backend/.env` (root takes priority). Loade
 - `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GROQ_API_KEY`, `ADMIN_PASSWORD`
 - `DATABASE_PATH` (default `./data/p5editor.sqlite`)
 - `CORS_ORIGIN` (default `http://localhost:5173`, supports comma-separated values)
-- `PORT` (default `3000`)
+- `PORT` (default `3001`)

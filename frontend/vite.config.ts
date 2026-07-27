@@ -10,7 +10,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         // Overridable so e2e runs can point at a dedicated backend instance.
-        target: process.env.BACKEND_PROXY_TARGET || 'http://localhost:3000',
+        target: process.env.BACKEND_PROXY_TARGET || 'http://localhost:3001',
         changeOrigin: true,
       },
     },

@@ -258,7 +258,7 @@ export async function* streamChat(request: ChatRequest, signal?: AbortSignal): A
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return;
-    throw new Error('Cannot connect to backend. Is it running on localhost:3000?');
+    throw new Error('Cannot connect to backend. Is it running on localhost:3001?');
   }
 
   if (!response.ok) {
