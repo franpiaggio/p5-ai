@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useEditorStore } from './editorStore';
+import { queryClient, queryKeys } from '../hooks/queryClient';
 
 export interface AuthUser {
   id: string;
@@ -33,7 +34,13 @@ export const useAuthStore = create<AuthState>()(
       isLoginOpen: false,
       pendingSaveAfterLogin: false,
 
-      setAuth: (user) => set({ user }),
+      setAuth: (user) => {
+        // The sketches list is cached under a user-agnostic query key, so a
+        // login must drop any list fetched for a previously logged-in user
+        // in this tab (e.g. after switching accounts without a full reload).
+        queryClient.removeQueries({ queryKey: queryKeys.sketches });
+        set({ user });
+      },
       logout: () => {
         // Clear API keys from editor store on logout
         const editorStore = useEditorStore.getState();
@@ -42,6 +49,9 @@ export const useAuthStore = create<AuthState>()(
         for (const provider of Object.keys(editorStore.providerKeys)) {
           editorStore.clearProviderKey(provider as 'openai' | 'anthropic' | 'deepseek' | 'demo');
         }
+        // Drop the cached sketches list so the next user doesn't see a stale
+        // (or briefly flashed) copy of the previous user's sketches.
+        queryClient.removeQueries({ queryKey: queryKeys.sketches });
         set({ user: null });
       },
       setIsSaveSketchOpen: (isSaveSketchOpen) => set({ isSaveSketchOpen }),
