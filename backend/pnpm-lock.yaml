@@ -32,6 +32,9 @@ importers:
       '@nestjs/typeorm':
         specifier: ^11.0.0
         version: 11.0.0(@nestjs/common@11.1.13(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.13)(reflect-metadata@0.2.2)(rxjs@7.8.2)(typeorm@0.3.28(better-sqlite3@12.6.2)(ts-node@10.9.2(@types/node@22.19.10)(typescript@5.9.3)))
+      '@opencode-ai/sdk':
+        specifier: ^1.18.10
+        version: 1.18.10
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
@@ -810,6 +813,9 @@ packages:
     resolution: {integrity: sha512-GXD3wy50qYbxCJ652bDrDzgMr3NFEkIS374+IgFQKkCvk9yiYcLvX2XDYr7UyQxf4wK0e+yqDYRubZ0DtOxnmQ==}
     engines: {node: ^14.18.0 || >=16.10.0, npm: '>=5.10.0'}
     hasBin: true
+
+  '@opencode-ai/sdk@1.18.10':
+    resolution: {integrity: sha512-K+glWbBp5pfGepZ/6EHvuXY3IpVG2qgsEqF4z9mOiUQUrs6KWN72Vdp15Qsl2TCDbemgHWXKQKgbX3b8PSK2hg==}
 
   '@paralleldrive/cuid2@2.3.1':
     resolution: {integrity: sha512-XO7cAxhnTZl0Yggq6jOgjiOHhbgcO4NqFqwSmQpjK3b6TEE6Uj/jfSk6wzYyemh3+I0sHirKSetjQwn5cZktFw==}
@@ -4321,6 +4327,10 @@ snapshots:
   '@nuxt/opencollective@0.4.1':
     dependencies:
       consola: 3.4.2
+
+  '@opencode-ai/sdk@1.18.10':
+    dependencies:
+      cross-spawn: 7.0.6
 
   '@paralleldrive/cuid2@2.3.1':
     dependencies:

@@ -13,6 +13,7 @@ import type { SketchExample } from '../../data/sketchExamples';
 import { createDefaultFiles, filesFromNamed, findEntryFile } from '../../constants/defaultFiles';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { providerNeedsApiKey } from '../../hooks/useModelList';
 import { useAuthStore } from '../../store/authStore';
 import type { ImageAttachment } from '../../types';
 import { parseStreamContent } from '../../utils/streamParsing';
@@ -85,7 +86,7 @@ export function ChatPanel() {
 
     const authUser = useAuthStore.getState().user;
     const serverCanResolve = store.storeApiKeys && !!authUser;
-    if (store.llmConfig.provider !== 'demo' && !store.llmConfig.apiKey && !serverCanResolve) {
+    if (providerNeedsApiKey(store.llmConfig.provider) && !store.llmConfig.apiKey && !serverCanResolve) {
       setIsSettingsOpen(true);
       return;
     }
@@ -410,7 +411,7 @@ export function ChatPanel() {
   const lastMessage = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMessage?.role === 'assistant' && !lastMessage.content;
   const serverCanResolve = storeApiKeys && !!user;
-  const missingApiKey = llmConfig.provider !== 'demo' && !llmConfig.apiKey && !serverCanResolve;
+  const missingApiKey = providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey && !serverCanResolve;
   const chatDisabled = backendOnline === false || backendOnline === null || missingApiKey || !!pendingDiff || !!pendingFilesReview;
 
   return (

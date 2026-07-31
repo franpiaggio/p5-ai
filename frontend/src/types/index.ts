@@ -39,7 +39,7 @@ export interface EditorError {
 }
 
 export interface LLMConfig {
-  provider: 'demo' | 'openai' | 'anthropic' | 'deepseek';
+  provider: 'demo' | 'openai' | 'anthropic' | 'deepseek' | 'opencode';
   model: string;
   apiKey: string;
 }

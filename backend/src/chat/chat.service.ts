@@ -3,6 +3,7 @@ import { OpenAIProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { GroqProvider } from './providers/groq.provider';
 import { DeepSeekProvider } from './providers/deepseek.provider';
+import { OpencodeProvider } from './providers/opencode.provider';
 import { UsersService } from '../users/users.service';
 import { ChatRequestDto, ImageAttachmentDto } from './dto/chat.dto';
 import type { LLMMessage, LLMProvider } from './providers/llm.interface';
@@ -148,6 +149,7 @@ export class ChatService {
     private anthropicProvider: AnthropicProvider,
     private groqProvider: GroqProvider,
     private deepseekProvider: DeepSeekProvider,
+    private opencodeProvider: OpencodeProvider,
     private usersService: UsersService,
   ) {}
 
@@ -156,7 +158,8 @@ export class ChatService {
     bodyApiKey?: string,
     userId?: string,
   ): Promise<string> {
-    if (provider === 'demo') return '';
+    // opencode manages provider auth on its own server — no key to resolve here.
+    if (provider === 'demo' || provider === 'opencode') return '';
     if (bodyApiKey) return bodyApiKey;
     if (userId) {
       const key = await this.usersService.getProviderKey(userId, provider);
@@ -367,6 +370,7 @@ export class ChatService {
       openai: this.openaiProvider,
       anthropic: this.anthropicProvider,
       deepseek: this.deepseekProvider,
+      opencode: this.opencodeProvider,
     };
 
     const provider = providers[request.config.provider];
@@ -391,6 +395,8 @@ export class ChatService {
         return this.anthropicProvider.listModels(apiKey);
       case 'deepseek':
         return this.deepseekProvider.listModels(apiKey);
+      case 'opencode':
+        return this.opencodeProvider.listModels();
       case 'demo': {
         const groqKey = process.env.GROQ_API_KEY;
         if (!groqKey) return ['llama-3.3-70b-versatile'];

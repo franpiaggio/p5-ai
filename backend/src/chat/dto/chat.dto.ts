@@ -43,8 +43,8 @@ export class MessageDto {
 }
 
 export class LLMConfigDto {
-  @IsIn(['openai', 'anthropic', 'deepseek', 'demo'])
-  provider: 'openai' | 'anthropic' | 'deepseek' | 'demo';
+  @IsIn(['openai', 'anthropic', 'deepseek', 'demo', 'opencode'])
+  provider: 'openai' | 'anthropic' | 'deepseek' | 'demo' | 'opencode';
 
   @IsString()
   @MaxLength(200)

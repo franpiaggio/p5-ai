@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
-import { useModelList, MODELS, PROVIDER_LABELS } from '../../hooks/useModelList';
+import { useModelList, MODELS, PROVIDER_LABELS, providerNeedsApiKey } from '../../hooks/useModelList';
 import { useProviderKeysQuery, useSaveProviderKey, useClearProviderKey } from '../../hooks/useProviderKeys';
 import { updatePreferences } from '../../services/api';
 import { APP_THEMES } from '../Editor/editorConfig';
@@ -53,6 +53,14 @@ export function SettingsModal() {
     });
   }, [isSettingsOpen]);
 
+  // Backfill the model once a live list (e.g. opencode's catalog) finishes
+  // loading after the draft was initialized with no model selected yet.
+  useEffect(() => {
+    if (draft && !draft.model && models.length > 0) {
+      setDraft((prev) => (prev ? { ...prev, model: models[0] } : prev));
+    }
+  }, [draft, models]);
+
   const handleSave = useCallback(async () => {
     if (!draft) return;
     setSaving(true);
@@ -83,7 +91,7 @@ export function SettingsModal() {
       // Save only user-changed keys to backend (never re-save masked indicators)
       if (user && draft.storeApiKeys) {
         for (const [provider, key] of Object.entries(draft.keys)) {
-          if (key && provider !== 'demo' && key !== draft.initialKeys[provider as keyof ProviderKeys]) {
+          if (key && providerNeedsApiKey(provider) && key !== draft.initialKeys[provider as keyof ProviderKeys]) {
             saveProviderKeyMut.mutate({ provider, apiKey: key });
           }
         }
@@ -108,6 +116,8 @@ export function SettingsModal() {
   if (!isSettingsOpen || !draft) return null;
 
   const isDemo = draft.provider === 'demo';
+  const isOpencode = draft.provider === 'opencode';
+  const isKeyless = !providerNeedsApiKey(draft.provider);
   const currentKey = draft.keys[draft.provider] ?? '';
   const storedKeyMask = draft.storeApiKeys && !draft.pendingDeletes.includes(draft.provider) ? remoteKeys?.[draft.provider] : undefined;
   const disabled = saving || loadingModels;
@@ -204,7 +214,13 @@ export function SettingsModal() {
             </p>
           )}
 
-          {!isDemo && (
+          {isOpencode && (
+            <p className="text-[10px] text-info/60 bg-info/5 border border-info/15 rounded-lg px-3 py-2">
+              Uses a local <code>opencode serve</code> instance. No API key needed — opencode manages provider auth itself.
+            </p>
+          )}
+
+          {!isKeyless && (
             <div>
               <label htmlFor="settings-api-key" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
                 API Key
@@ -278,7 +294,7 @@ export function SettingsModal() {
             </div>
           )}
 
-          {!isDemo && user && (
+          {!isKeyless && user && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"

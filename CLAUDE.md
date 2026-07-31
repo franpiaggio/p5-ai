@@ -109,7 +109,7 @@ file; the last tab can't close).
 
 **NestJS modules**:
 - `chat/` — Core LLM streaming. `chat.service.ts` builds system prompt, clamps history (20 msgs / 250KB), validates images (PNG/JPEG magic bytes, 4MB each, 8MB total, max 12). Controller streams SSE with 2-min timeout. No user login required, but app-only: `OriginGuard` (`common/origin.guard.ts`) rejects requests whose Origin/Referer isn't in `CORS_ORIGIN` — protects the server-side demo key from direct scripts (spoofable by a determined client; throttling covers the rest).
-- `chat/providers/` — LLM provider implementations behind `LLMProvider` interface: `openai.provider.ts`, `anthropic.provider.ts`, `groq.provider.ts`
+- `chat/providers/` — LLM provider implementations behind `LLMProvider` interface: `openai.provider.ts`, `anthropic.provider.ts`, `groq.provider.ts`, `deepseek.provider.ts`, `opencode.provider.ts` (talks to a local `opencode serve` instance instead of a hosted API — no API key; models are addressed as `providerID/modelID` from opencode's own catalog)
 - `auth/` — Google OAuth + local username/password login, JWT in httpOnly cookie, admin user seeded from `ADMIN_PASSWORD` env
 - `users/` — User entity with encrypted API key storage (`common/crypto.util.ts`)
 - `sketches/` — CRUD with user ownership enforcement, code history stored as `simple-json`
@@ -136,3 +136,4 @@ Config via `.env` at project root or `backend/.env` (root takes priority). Loade
 - `DATABASE_PATH` (default `./data/p5editor.sqlite`)
 - `CORS_ORIGIN` (default `http://localhost:5173`, supports comma-separated values)
 - `PORT` (default `3001`)
+- `OPENCODE_BASE_URL` (default `http://127.0.0.1:4096`) — local dev only, points the `opencode` provider at a running `opencode serve` instance

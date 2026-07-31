@@ -51,6 +51,7 @@ describe('ChatService', () => {
   let anthropic: { stream: jest.Mock; listModels: jest.Mock };
   let groq: { stream: jest.Mock; listModels: jest.Mock };
   let deepseek: { stream: jest.Mock; listModels: jest.Mock };
+  let opencode: { stream: jest.Mock; listModels: jest.Mock };
   let usersService: { getProviderKey: jest.Mock };
   let service: ChatService;
 
@@ -67,12 +68,14 @@ describe('ChatService', () => {
     anthropic = mockProvider();
     groq = mockProvider();
     deepseek = mockProvider();
+    opencode = mockProvider();
     usersService = { getProviderKey: jest.fn().mockResolvedValue(null) };
     service = new ChatService(
       openai as never,
       anthropic as never,
       groq as never,
       deepseek as never,
+      opencode as never,
       usersService as never,
     );
   });
@@ -85,6 +88,13 @@ describe('ChatService', () => {
     it('returns empty string for demo provider without touching the DB', async () => {
       await expect(
         service.resolveApiKey('demo', 'ignored', 'user-1'),
+      ).resolves.toBe('');
+      expect(usersService.getProviderKey).not.toHaveBeenCalled();
+    });
+
+    it('returns empty string for opencode provider without touching the DB', async () => {
+      await expect(
+        service.resolveApiKey('opencode', 'ignored', 'user-1'),
       ).resolves.toBe('');
       expect(usersService.getProviderKey).not.toHaveBeenCalled();
     });
@@ -232,8 +242,16 @@ describe('ChatService', () => {
 
     it('replaces code in older assistant messages, keeps the newest one and user messages intact', async () => {
       const history = [
-        message({ id: 'u1', role: 'user', content: `mine does this:\n${fenced}` }),
-        message({ id: 'a1', role: 'assistant', content: `Here you go:\n${fenced}` }),
+        message({
+          id: 'u1',
+          role: 'user',
+          content: `mine does this:\n${fenced}`,
+        }),
+        message({
+          id: 'a1',
+          role: 'assistant',
+          content: `Here you go:\n${fenced}`,
+        }),
         message({ id: 'u2', role: 'user', content: 'now make it red' }),
         message({ id: 'a2', role: 'assistant', content: `Sure:\n${fenced}` }),
       ];
@@ -265,7 +283,11 @@ describe('ChatService', () => {
 
     it('leaves code-free history untouched', async () => {
       const history = [
-        message({ id: 'a1', role: 'assistant', content: 'it uses perlin noise' }),
+        message({
+          id: 'a1',
+          role: 'assistant',
+          content: 'it uses perlin noise',
+        }),
         message({ id: 'a2', role: 'assistant', content: 'yes' }),
       ];
 
