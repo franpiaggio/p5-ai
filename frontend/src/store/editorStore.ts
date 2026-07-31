@@ -13,6 +13,7 @@ import {
   findEntryFile,
 } from '../constants/defaultFiles';
 import type { FileChange } from '../utils/fileEdits';
+import { mergeFilesToSingle } from '../utils/fileMode';
 
 export type EditorLanguage = 'javascript' | 'typescript';
 
@@ -104,6 +105,10 @@ interface EditorState {
   /** File names shown as editor tabs, in tab order. Closing a tab never deletes the file. */
   openFiles: string[];
   pendingFilesReview: PendingFilesReview | null;
+  /** Opt-in to a multi-file sketch. Sketches are single-file by default; this
+   * flag only matters while the sketch still has one file — beyond that the
+   * file count itself is the opt-in (see `isMultiFileSketch`). */
+  multiFileEnabled: boolean;
   lastSavedFiles: SketchFile[];
   isFileSidebarOpen: boolean;
   libraries: Library[];
@@ -157,6 +162,9 @@ interface EditorState {
   acceptAllReviewFiles: () => void;
   setFileContent: (name: string, content: string) => void;
   setFiles: (files: SketchFile[]) => void;
+  /** Turn multi-file mode on, or off — turning it off merges every file back
+   * into the entry file. */
+  setMultiFileEnabled: (enabled: boolean) => void;
   addLibrary: (lib: Library) => void;
   removeLibrary: (url: string) => void;
   setLibraries: (libs: Library[]) => void;
@@ -289,6 +297,7 @@ export const useEditorStore = create<EditorState>()(
       activeFileName: 'sketch.js',
       openFiles: ['sketch.js'],
       pendingFilesReview: null,
+      multiFileEnabled: false,
       lastSavedFiles: createDefaultFiles(DEFAULT_CODE),
       isFileSidebarOpen: false,
       libraries: [] as Library[],
@@ -521,6 +530,8 @@ export const useEditorStore = create<EditorState>()(
             activeFileName: name,
             code: '',
             openFiles: [...state.openFiles, name],
+            // Creating a file by hand is an explicit opt-in to multi-file.
+            multiFileEnabled: true,
           };
         }),
       deleteFile: (name) =>
@@ -529,12 +540,15 @@ export const useEditorStore = create<EditorState>()(
           const files = state.files.filter((f) => f.name !== name);
           if (files.length === state.files.length) return state;
           const openFiles = state.openFiles.filter((n) => n !== name);
+          // Back down to the entry file alone → back to a single-file sketch.
+          const multiFileEnabled = files.length > 1 && state.multiFileEnabled;
           if (state.activeFileName !== name) {
-            return { files, openFiles };
+            return { files, openFiles, multiFileEnabled };
           }
           const switchFile = findEntryFile(files) ?? files[0];
           return {
             files,
+            multiFileEnabled,
             activeFileName: switchFile.name,
             code: switchFile.content,
             openFiles: openFiles.includes(switchFile.name)
@@ -649,6 +663,27 @@ export const useEditorStore = create<EditorState>()(
             openFiles: kept.includes(activeFileName) ? kept : [...kept, activeFileName],
           };
         }),
+      setMultiFileEnabled: (enabled) =>
+        set((state) => {
+          if (enabled) return { multiFileEnabled: true };
+          // Switching back to single file folds every helper into the entry
+          // file. Blocked mid-review: those files are still being accepted.
+          if (state.pendingFilesReview) return state;
+          const files = mergeFilesToSingle(state.files);
+          const entry = files[0];
+          if (!entry) return { multiFileEnabled: false };
+          return {
+            multiFileEnabled: false,
+            files,
+            activeFileName: entry.name,
+            code: entry.content,
+            openFiles: [entry.name],
+            pendingDiff: null,
+            previewCode: null,
+            isRunning: true,
+            runTrigger: state.runTrigger + 1,
+          };
+        }),
       addLibrary: (lib) =>
         set((state) => {
           if (state.libraries.some((l) => l.url === lib.url)) return state;
@@ -669,6 +704,9 @@ export const useEditorStore = create<EditorState>()(
           pendingDiff: null,
           pendingFilesReview: null,
           fixRequest: null,
+          // The incoming sketch decides its own layout: a multi-file one opts in
+          // through its file count, a single-file one starts single.
+          multiFileEnabled: false,
         })),
       newSketch: () =>
         set((state) => {
@@ -700,6 +738,7 @@ export const useEditorStore = create<EditorState>()(
             activeFileName: newFiles[0].name,
             openFiles: [newFiles[0].name],
             pendingFilesReview: null,
+            multiFileEnabled: false,
             lastSavedFiles: newFiles.map((f) => ({ ...f })),
             libraries: [],
             lastSavedLibraries: [],
@@ -730,6 +769,7 @@ export const useEditorStore = create<EditorState>()(
         storeApiKeys: state.storeApiKeys,
         files: state.files,
         lastSavedFiles: state.lastSavedFiles,
+        multiFileEnabled: state.multiFileEnabled,
         activeFileName: state.activeFileName,
         openFiles: state.openFiles,
         isFileSidebarOpen: state.isFileSidebarOpen,
@@ -819,3 +859,12 @@ export const useEditorStore = create<EditorState>()(
     }
   )
 );
+
+/** Effective layout of the sketch on screen: multi-file once the user opted in
+ * or once more than one file exists. */
+export function isMultiFileSketch(state: {
+  files: SketchFile[];
+  multiFileEnabled: boolean;
+}): boolean {
+  return state.multiFileEnabled || state.files.length > 1;
+}

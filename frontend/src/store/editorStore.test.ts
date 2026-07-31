@@ -555,3 +555,60 @@ describe('multi-file review (accept / reject / accept all)', () => {
     expect(s.appliedBlocks['msg-1:k1']).toBe(true);
   });
 });
+
+describe('single-file / multi-file mode', () => {
+  it('starts single-file', () => {
+    expect(store().multiFileEnabled).toBe(false);
+  });
+
+  it('adding a file by hand opts the sketch into multi-file', () => {
+    store().addFile('particle.js');
+    expect(store().multiFileEnabled).toBe(true);
+  });
+
+  it('turning the mode off merges every file into the entry', () => {
+    seedFiles([
+      f('sketch.js', "import { P } from './particle.js';\nfunction setup(){ new P(); }"),
+      f('particle.js', 'export class P {}'),
+    ]);
+    useEditorStore.setState({ multiFileEnabled: true, openFiles: ['sketch.js', 'particle.js'] });
+
+    store().setMultiFileEnabled(false);
+
+    expect(names()).toEqual(['sketch.js']);
+    expect(store().openFiles).toEqual(['sketch.js']);
+    expect(store().multiFileEnabled).toBe(false);
+    expect(store().code).toBe(contentOf('sketch.js'));
+    expect(store().code).toContain('class P {}');
+    expect(store().code).not.toContain('import');
+    expect(store().code.indexOf('class P')).toBeLessThan(store().code.indexOf('new P()'));
+  });
+
+  it('refuses to merge while a per-file review is pending', () => {
+    seedFiles([f('sketch.js', 'a'), f('particle.js', 'b')]);
+    useEditorStore.setState({
+      multiFileEnabled: true,
+      pendingFilesReview: {
+        changes: [{ name: 'particle.js', previousContent: '', newContent: 'b', isNew: true }],
+        index: 0,
+        accepted: 0,
+        messageId: 'm1',
+        blockKeys: [],
+      },
+    });
+
+    store().setMultiFileEnabled(false);
+
+    expect(names()).toEqual(['sketch.js', 'particle.js']);
+    expect(store().multiFileEnabled).toBe(true);
+  });
+
+  it('deleting the last helper file drops back to single-file mode', () => {
+    seedFiles([f('sketch.js', 'a'), f('particle.js', 'b')]);
+    useEditorStore.setState({ multiFileEnabled: true });
+
+    store().deleteFile('particle.js');
+
+    expect(store().multiFileEnabled).toBe(false);
+  });
+});

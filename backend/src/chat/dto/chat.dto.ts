@@ -1,6 +1,7 @@
 import {
   IsString,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsOptional,
   IsNumber,
@@ -119,6 +120,13 @@ export class ChatRequestDto {
   @Type(() => ChatLibraryDto)
   @ArrayMaxSize(20)
   libraries?: ChatLibraryDto[];
+
+  /** Whether the assistant may spread this sketch over several files. Sketches
+   * are single-file by default; the client opts in (explicit user request,
+   * an already multi-file sketch, or code large enough to warrant a split). */
+  @IsOptional()
+  @IsBoolean()
+  allowMultiFile?: boolean;
 }
 
 export class ListModelsDto {

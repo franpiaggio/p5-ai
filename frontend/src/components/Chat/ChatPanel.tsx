@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
 import { simpleHash, extractJsBlocks, extractSearchReplaceBlocks, applySearchReplaceLenient, stripSearchReplaceBlocks, diffSummary } from '../../utils/codeUtils';
 import { planFileChanges, applyChangesToFiles, presentationFor } from '../../utils/fileEdits';
+import { allowsMultiFile } from '../../utils/fileMode';
 import { streamChat, checkBackendHealth } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';
@@ -127,6 +128,15 @@ export function ChatPanel() {
         ? currentState.llmConfig
         : { provider: currentState.llmConfig.provider, model: currentState.llmConfig.model };
       const chatFiles = currentState.files.map((f) => ({ name: f.name, content: f.content }));
+      // Sketches stay in one file unless this turn earns multi-file: the user
+      // enabled it, the sketch already has several files, they asked for a split,
+      // or the code outgrew a single file. Sent to the model (it gets the matching
+      // layout rules) and enforced locally when the answer is applied.
+      const allowMultiFile = allowsMultiFile({
+        files: currentState.files,
+        message: userMessage,
+        enabled: currentState.multiFileEnabled,
+      });
       const chatLibraries = currentState.libraries.length > 0
         ? currentState.libraries.map((l) => ({ name: l.name, url: l.url }))
         : undefined;
@@ -185,6 +195,7 @@ export function ChatPanel() {
         ...(images?.length ? { images } : {}),
         files: chatFiles,
         libraries: chatLibraries,
+        allowMultiFile,
       }, abortController.signal)) {
         if (isStale()) {
           abortController.abort();
@@ -232,8 +243,11 @@ export function ChatPanel() {
 
         // Compute the file changes this response implies (pure).
         const changes = assistantContent
-          ? planFileChanges(state.files, state.activeFileName, assistantContent)
+          ? planFileChanges(state.files, state.activeFileName, assistantContent, { allowMultiFile })
           : [];
+        // A response that legitimately added files puts the sketch in multi-file
+        // mode for good, so follow-ups keep targeting those files.
+        const nowMultiFile = state.multiFileEnabled || changes.some((c) => c.isNew);
 
         // If stripping code left the message empty, show a brief note.
         if (!finalChatContent.trim() && changes.length > 0) {
@@ -276,6 +290,7 @@ export function ChatPanel() {
             messages: newMessages,
             streamingCode: null,
             files,
+            multiFileEnabled: nowMultiFile,
             code: firstFile.content,
             activeFileName: firstFile.name,
             openFiles,
@@ -371,6 +386,7 @@ export function ChatPanel() {
         lastSavedCode: example.code,
         files: exampleFiles,
         lastSavedFiles: exampleFiles.map((f) => ({ ...f })),
+        multiFileEnabled: exampleFiles.length > 1,
         activeFileName: findEntryFile(exampleFiles)?.name ?? exampleFiles[0].name,
         openFiles: exampleFiles.map((f) => f.name),
         libraries: exampleLibraries,

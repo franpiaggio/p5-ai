@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { useEditorStore } from '../../store/editorStore';
-import { isAllowedFileName, isEntryFile } from '../../constants/defaultFiles';
+import { useEditorStore, isMultiFileSketch } from '../../store/editorStore';
+import { isAllowedFileName, isEntryFile, findEntryFile } from '../../constants/defaultFiles';
 import { filesReferencing } from '../../utils/codeUtils';
 import { useEscapeClose } from '../../hooks/useEscapeClose';
 
@@ -12,6 +12,9 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
   const deleteFile = useEditorStore((s) => s.deleteFile);
   const renameFile = useEditorStore((s) => s.renameFile);
   const libraries = useEditorStore((s) => s.libraries);
+  const multiFile = useEditorStore(isMultiFileSketch);
+  const setMultiFileEnabled = useEditorStore((s) => s.setMultiFileEnabled);
+  const isReviewing = useEditorStore((s) => !!s.pendingFilesReview);
 
   const [isAdding, setIsAdding] = useState(false);
   const [newFileName, setNewFileName] = useState('');
@@ -19,6 +22,8 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
   const [renameValue, setRenameValue] = useState('');
   // Name of the file pending an inline delete confirmation (replaces immediate delete).
   const [confirmDeleteName, setConfirmDeleteName] = useState<string | null>(null);
+  // Merging several files back into one is destructive — confirm it first.
+  const [confirmMerge, setConfirmMerge] = useState(false);
   const addInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -62,7 +67,20 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
     else setConfirmDeleteName(name);
   };
 
+  // Multi-file is opt-in: on turns it on for the assistant too, off folds every
+  // helper file back into the entry file.
+  const toggleMultiFile = () => {
+    if (isReviewing) return;
+    if (!multiFile) {
+      setMultiFileEnabled(true);
+      return;
+    }
+    if (files.length > 1) setConfirmMerge(true);
+    else setMultiFileEnabled(false);
+  };
+
   useEscapeClose(!!confirmDeleteName, () => setConfirmDeleteName(null));
+  useEscapeClose(confirmMerge, () => setConfirmMerge(false));
 
   const pendingFile = confirmDeleteName
     ? files.find((f) => f.name === confirmDeleteName)
@@ -169,6 +187,42 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
         )}
       </div>
 
+      {/* Sketch layout: single file by default, multi-file on request */}
+      <div className="border-t border-border/30 px-3 py-2">
+        <button
+          onClick={toggleMultiFile}
+          disabled={isReviewing}
+          role="switch"
+          aria-checked={multiFile}
+          className="w-full flex items-center justify-between gap-2 text-[11px] font-mono text-text-muted hover:text-text-primary transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+          title={
+            isReviewing
+              ? 'Finish reviewing the pending changes first'
+              : multiFile
+                ? 'Merge everything back into one file'
+                : 'Let the assistant split this sketch across files'
+          }
+        >
+          <span>Multi-file</span>
+          <span
+            className={`relative w-7 h-4 rounded-full transition-colors shrink-0 ${
+              multiFile ? 'bg-info/70' : 'bg-border/60'
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 w-3 h-3 rounded-full bg-surface-raised transition-all ${
+                multiFile ? 'left-3.5' : 'left-0.5'
+              }`}
+            />
+          </span>
+        </button>
+        {!multiFile && (
+          <p className="mt-1 text-[9px] leading-snug text-text-muted/50">
+            The assistant keeps everything in {findEntryFile(files)?.name ?? 'sketch.js'}.
+          </p>
+        )}
+      </div>
+
       {/* Libraries section */}
       <div className="border-t border-border/30">
         <button
@@ -188,6 +242,37 @@ export function FileSidebar({ onOpenLibraries }: { onOpenLibraries: () => void }
           )}
         </button>
       </div>
+
+      {/* Merge-to-single-file confirmation */}
+      {confirmMerge && (
+        <div
+          className="modal-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget) setConfirmMerge(false); }}
+        >
+          <div className="modal-panel max-w-sm" role="dialog" aria-modal="true" aria-labelledby="merge-files-title">
+            <h2 id="merge-files-title" className="text-sm font-semibold text-text-primary">
+              Merge into a single file
+            </h2>
+            <p className="mt-3 text-[12px] text-text-muted">
+              The {files.length} files of this sketch become one{' '}
+              <span className="font-mono text-text-primary">{findEntryFile(files)?.name ?? 'sketch.js'}</span>,
+              in the order the preview loads them. Imports between them are removed.
+            </p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setConfirmMerge(false)} className="btn-ghost btn-sm">
+                Cancel
+              </button>
+              <button
+                onClick={() => { setMultiFileEnabled(false); setConfirmMerge(false); }}
+                className="btn-primary btn-sm"
+                autoFocus
+              >
+                Merge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       {pendingFile && (

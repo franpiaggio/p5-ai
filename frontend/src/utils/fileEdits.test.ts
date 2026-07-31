@@ -13,6 +13,10 @@ function file(name: string, content: string): SketchFile {
 
 const baseFiles = [file('sketch.js', 'function setup() {}')];
 
+/** Most cases below describe multi-file planning; single-file coalescing has
+ * its own block at the end. */
+const multi = { allowMultiFile: true };
+
 describe('planFileChanges', () => {
   it('no code → no changes', () => {
     expect(planFileChanges(baseFiles, 'sketch.js', 'just a question?')).toEqual([]);
@@ -32,7 +36,7 @@ describe('planFileChanges', () => {
   });
 
   it('new file via [NEW FILE] header', () => {
-    const changes = planFileChanges(baseFiles, 'sketch.js', '```js\n// filename: utils.js [NEW FILE]\nfunction helper() {}\n```');
+    const changes = planFileChanges(baseFiles, 'sketch.js', '```js\n// filename: utils.js [NEW FILE]\nfunction helper() {}\n```', multi);
     expect(changes).toEqual([
       { name: 'utils.js', previousContent: '', newContent: 'function helper() {}', isNew: true },
     ]);
@@ -40,14 +44,14 @@ describe('planFileChanges', () => {
 
   it('two separate fenced blocks → two changes', () => {
     const md = '```js\n// filename: particle.js [NEW FILE]\nclass Particle {}\n```\n```js\n// filename: sketch.js\nfunction setup() { new Particle(); }\n```';
-    const changes = planFileChanges(baseFiles, 'sketch.js', md);
+    const changes = planFileChanges(baseFiles, 'sketch.js', md, multi);
     expect(changes.map((c) => c.name)).toEqual(['particle.js', 'sketch.js']);
     expect(changes.find((c) => c.name === 'particle.js')!.isNew).toBe(true);
   });
 
   it('several files inside one fenced block', () => {
     const md = '```js\n// filename: a.js [NEW FILE]\nconst A=1;\n// filename: b.js [NEW FILE]\nconst B=2;\n```';
-    const changes = planFileChanges(baseFiles, 'sketch.js', md);
+    const changes = planFileChanges(baseFiles, 'sketch.js', md, multi);
     expect(changes.map((c) => c.name)).toEqual(['a.js', 'b.js']);
   });
 
@@ -409,5 +413,78 @@ describe('focusAfterChanges', () => {
 
   it('uses the fallback when there are no changes', () => {
     expect(focusAfterChanges([], 'sketch.js')).toBe('sketch.js');
+  });
+});
+
+describe('single-file mode (default): new files fold into the entry', () => {
+  const entry = 'function setup() {\n  createCanvas(1, 1);\n}';
+
+  it('a [NEW FILE] block is inlined above the entry code instead of creating a file', () => {
+    const files = [file('sketch.js', entry)];
+    const md = '```js\n// filename: particle.js [NEW FILE]\nclass Particle {}\n```';
+    const changes = planFileChanges(files, 'sketch.js', md);
+
+    expect(changes).toHaveLength(1);
+    expect(changes[0]).toMatchObject({ name: 'sketch.js', isNew: false, previousContent: entry });
+    expect(changes[0].newContent).toBe(
+      '// particle.js\nclass Particle {}\n\n// sketch.js\nfunction setup() {\n  createCanvas(1, 1);\n}\n',
+    );
+  });
+
+  it('merges a new file with the entry rewrite from the same response', () => {
+    const files = [file('sketch.js', entry)];
+    const md = [
+      '```js',
+      '// filename: particle.js [NEW FILE]',
+      'class Particle {}',
+      '```',
+      '```js',
+      '// filename: sketch.js',
+      'function setup() { new Particle(); }',
+      '```',
+    ].join('\n');
+    const changes = planFileChanges(files, 'sketch.js', md);
+
+    expect(changes.map((c) => c.name)).toEqual(['sketch.js']);
+    expect(changes[0].newContent).toContain('class Particle {}');
+    expect(changes[0].newContent.indexOf('class Particle'))
+      .toBeLessThan(changes[0].newContent.indexOf('new Particle()'));
+  });
+
+  it('drops the imports that tied the split files together', () => {
+    const files = [file('sketch.js', entry)];
+    const md = [
+      '```js',
+      '// filename: particle.js [NEW FILE]',
+      'export class Particle {}',
+      '```',
+      '```js',
+      '// filename: sketch.js',
+      "import { Particle } from './particle.js';",
+      'function setup() { new Particle(); }',
+      '```',
+    ].join('\n');
+    const changes = planFileChanges(files, 'sketch.js', md);
+
+    expect(changes[0].newContent).not.toContain('import');
+    expect(changes[0].newContent).toContain('class Particle {}');
+    expect(changes[0].newContent).not.toContain('export class');
+  });
+
+  it('leaves an ordinary single-file edit untouched', () => {
+    const files = [file('sketch.js', entry)];
+    const changes = planFileChanges(files, 'sketch.js', '```js\nfunction setup() { createCanvas(9, 9); }\n```');
+    expect(changes).toEqual([
+      { name: 'sketch.js', previousContent: entry, newContent: 'function setup() { createCanvas(9, 9); }', isNew: false },
+    ]);
+  });
+
+  it('with allowMultiFile the same response really does create the file', () => {
+    const files = [file('sketch.js', entry)];
+    const md = '```js\n// filename: particle.js [NEW FILE]\nclass Particle {}\n```';
+    const changes = planFileChanges(files, 'sketch.js', md, multi);
+    expect(changes).toEqual([
+      { name: 'particle.js', previousContent: '', newContent: 'class Particle {}', isNew: true },
+    ]);
   });
 });

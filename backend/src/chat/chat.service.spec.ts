@@ -178,6 +178,17 @@ describe('ChatService', () => {
       expect(opts.prediction).toContain('// filename: particle.js\nclass P {}');
     });
 
+    it('shows a one-file sketch as plain code, without multi-file headers', async () => {
+      const req = request({
+        files: [{ name: 'sketch.js', content: 'function setup() {}' }],
+      });
+      await consume(service.streamChat(req));
+
+      const codeContext = sentMessages()[1].content;
+      expect(codeContext).toContain('single file — sketch.js');
+      expect(codeContext).not.toContain('// filename:');
+    });
+
     it('attaches images to the current message and history messages', async () => {
       const historyImage = png();
       const currentImage = jpeg();
@@ -191,6 +202,24 @@ describe('ChatService', () => {
       const msgs = sentMessages();
       expect(msgs[2].images).toEqual([historyImage]);
       expect(msgs[msgs.length - 1].images).toEqual([currentImage]);
+    });
+
+    it('sends the single-file layout rules by default', async () => {
+      await consume(service.streamChat(request()));
+
+      const systemPrompt = sentMessages()[0].content;
+      expect(systemPrompt).toContain('FILE LAYOUT — SINGLE FILE');
+      expect(systemPrompt).not.toContain('FILE LAYOUT — MULTI-FILE');
+      expect(systemPrompt).toContain('NEVER use `[NEW FILE]`');
+    });
+
+    it('sends the multi-file layout rules once the client opts in', async () => {
+      await consume(service.streamChat(request({ allowMultiFile: true })));
+
+      const systemPrompt = sentMessages()[0].content;
+      expect(systemPrompt).toContain('FILE LAYOUT — MULTI-FILE');
+      expect(systemPrompt).not.toContain('FILE LAYOUT — SINGLE FILE');
+      expect(systemPrompt).toContain('[NEW FILE]');
     });
 
     it('rejects unknown providers', async () => {

@@ -82,6 +82,35 @@ test.describe('chat → diff review flow (LLM mocked at the network layer)', () 
     await expect(editorContent(page)).toContainText('rectMode(CENTER)');
   });
 
+  test('an unrequested file split folds back into sketch.js', async ({ page }) => {
+    await page.goto('/');
+    await waitForApp(page);
+    await mockChatResponse(page, [
+      'Adding a particle system:\n',
+      [
+        '```javascript',
+        '// filename: particle.js [NEW FILE]',
+        'class Particle {} // E2E_SINGLE_P_MARKER',
+        '```',
+        '```javascript',
+        '// filename: sketch.js',
+        'function setup() { new Particle(); } // E2E_SINGLE_S_MARKER',
+        '```',
+      ].join('\n'),
+    ]);
+
+    // No split was asked for, so the sketch stays single-file: one reviewable
+    // diff on sketch.js, with the class inlined into it.
+    await sendChatMessage(page, 'add some particles');
+
+    await expect(page.getByText('Review changes in the editor')).toBeVisible();
+    await page.getByRole('button', { name: 'Accept', exact: true }).click();
+
+    await expect(editorContent(page)).toContainText('E2E_SINGLE_P_MARKER');
+    await expect(editorContent(page)).toContainText('E2E_SINGLE_S_MARKER');
+    await expect(page.getByRole('button', { name: 'particle.js' })).toHaveCount(0);
+  });
+
   test('a multi-file suggestion opens a per-file review; Accept all applies everything', async ({ page }) => {
     await page.goto('/');
     await waitForApp(page);

@@ -8,7 +8,7 @@ import { UsersService } from '../users/users.service';
 import { ChatRequestDto, ImageAttachmentDto } from './dto/chat.dto';
 import type { LLMMessage, LLMProvider } from './providers/llm.interface';
 
-const SYSTEM_PROMPT = `You are an expert creative coding assistant specializing in p5.js and generative art.
+const SYSTEM_PROMPT_BASE = `You are an expert creative coding assistant specializing in p5.js and generative art.
 
 ## RESPONSE FORMAT
 
@@ -102,8 +102,22 @@ You have TWO response formats. Choose based on how much code changes:
 - Explain concepts, describe what specific parts of the code do, or answer questions in plain text
 - Only include a \`\`\`javascript or \`\`\`typescript code block when the user is requesting new code, modifications, or a fix
 
-## MULTI-FILE SKETCHES
-The user may have multiple JS/TS files. When provided, all files are shown with headers like \`// filename: utils.js\`.
+## CDN Libraries
+The user may have CDN libraries loaded (e.g. p5.sound, ml5.js). These are listed when provided. You can reference their APIs in your code. If the user needs a library that isn't loaded, mention they should add it via the Libraries panel.`;
+
+/** File-layout rules for the default mode: everything stays in one file. */
+const FILE_LAYOUT_SINGLE = `## FILE LAYOUT — SINGLE FILE (this sketch)
+This sketch is a SINGLE file (\`sketch.js\`, or \`sketch.ts\` in TypeScript sketches). Keep it that way.
+- Put ALL code — classes, helper functions, constants, palettes — in that one file.
+- Emit exactly ONE code block per response (or search/replace blocks for that same file).
+- NEVER emit \`// filename:\` headers, NEVER use \`[NEW FILE]\`, NEVER propose extra files.
+- Do NOT use \`import\` / \`export\`: everything shares one global scope, so a class or function defined anywhere in the file is available everywhere.
+- Order inside the file: classes and helpers first, then \`setup()\` / \`draw()\` and the other p5 hooks.
+- If the user explicitly asks to split the sketch into several files, keep this reply in one file and tell them to turn on multi-file mode in the Files panel first.`;
+
+/** File-layout rules once the user (or sketch size) has opted into multi-file. */
+const FILE_LAYOUT_MULTI = `## FILE LAYOUT — MULTI-FILE (enabled for this sketch)
+The sketch may span several JS/TS files. When provided, all files are shown with headers like \`// filename: utils.js\`.
 
 ### Targeting files in responses
 - To modify a specific file, start the code block with a comment: \`// filename: utils.js\`
@@ -111,17 +125,20 @@ The user may have multiple JS/TS files. When provided, all files are shown with 
 - A code block with no filename comment targets the entry file (\`sketch.js\`, or \`sketch.ts\` in TypeScript sketches)
 - For search/replace blocks, put \`// filename: utils.js\` on its own line directly ABOVE \`<<<SEARCH\`. ALWAYS include it when the sketch has more than one file. A block without it is applied to the file whose current content contains the SEARCH text.
 
-### Splitting work across files
-- When generating a substantial NEW sketch (multiple classes, systems, or clearly separable concerns), split it into multiple files instead of one large \`sketch.js\`.
-- Emit ONE code block per file, each starting with its \`// filename:\` header (use \`[NEW FILE]\` for files that don't exist yet).
-- Keep the entry file (\`sketch.js\` / \`sketch.ts\`) as the one that holds \`setup()\`/\`draw()\`. Put helper classes/functions in their own files (e.g. \`particle.js\`, \`palette.js\`). Match the sketch's existing extension for new files.
+### Keep the file count as low as possible
+- Fewer files is better. Edit the files that already exist instead of adding new ones.
+- Only create a file when the user asked for it, or when the entry file has grown genuinely unwieldy (400+ lines) and a whole system can move out cleanly. Never create a file for a handful of lines.
+- The entry file (\`sketch.js\` / \`sketch.ts\`) always holds \`setup()\`/\`draw()\`. Helper classes/systems go in their own file (e.g. \`particle.js\`, \`palette.js\`). Match the sketch's existing extension for new files.
 - Files run as globals in load order (the entry file last), so a class/function defined in one file is available in the others — no imports needed.
-- Don't over-split: only break out files when it genuinely improves clarity (roughly one file per class or cohesive system). A small sketch stays in \`sketch.js\`.
+- A routine edit (colors, values, a small fix) never changes the file layout: patch the file that owns that code and nothing else.`;
 
-### CDN Libraries
-The user may have CDN libraries loaded (e.g. p5.sound, ml5.js). These are listed when provided. You can reference their APIs in your code. If the user needs a library that isn't loaded, mention they should add it via the Libraries panel.
-
-The user's current code is provided for context.`;
+/** The sketch's file layout is decided by the client (see `allowMultiFile`), so
+ * the layout rules are swapped into the prompt per request instead of listing
+ * both modes and hoping the model picks the right one. */
+export function buildSystemPrompt(allowMultiFile: boolean): string {
+  const layout = allowMultiFile ? FILE_LAYOUT_MULTI : FILE_LAYOUT_SINGLE;
+  return `${SYSTEM_PROMPT_BASE}\n\n${layout}\n\nThe user's current code is provided for context.`;
+}
 
 const DEMO_MODEL = 'llama-3.3-70b-versatile';
 
@@ -316,18 +333,18 @@ export class ChatService {
     const codeFence =
       request.language === 'javascript' ? 'javascript' : 'typescript';
 
-    // Build code context: multi-file or single file
-    const codeBody =
-      request.files && request.files.length > 0
-        ? request.files
-            .map((f) => `// filename: ${f.name}\n${f.content}`)
-            .join('\n\n')
-        : request.code;
+    // Build code context. A one-file sketch is shown as plain code — the
+    // `// filename:` headers are multi-file syntax and repeating them for a
+    // lone sketch.js invites the model to answer with more files.
+    const files = request.files ?? [];
+    const isMultiFile = files.length > 1;
+    const codeBody = isMultiFile
+      ? files.map((f) => `// filename: ${f.name}\n${f.content}`).join('\n\n')
+      : (files[0]?.content ?? request.code);
     const codeBlock = `\`\`\`${codeFence}\n${codeBody}\n\`\`\``;
-    let codeContext =
-      request.files && request.files.length > 0
-        ? `Current p5.js sketch files:\n${codeBlock}`
-        : `Current p5.js code:\n${codeBlock}`;
+    let codeContext = isMultiFile
+      ? `Current p5.js sketch files:\n${codeBlock}`
+      : `Current p5.js code (single file — ${files[0]?.name ?? 'sketch.js'}):\n${codeBlock}`;
 
     if (request.libraries && request.libraries.length > 0) {
       const libList = request.libraries
@@ -337,7 +354,7 @@ export class ChatService {
     }
 
     const messages: LLMMessage[] = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: buildSystemPrompt(!!request.allowMultiFile) },
       { role: 'user', content: codeContext },
     ];
 

@@ -14,6 +14,7 @@ import {
   isEntryFile,
   findEntryFile,
 } from '../constants/defaultFiles';
+import { joinFileSources } from './fileMode';
 
 /** One file's resulting change from an assistant message. */
 export interface FileChange {
@@ -32,11 +33,16 @@ export interface FileChange {
  *    both sources are unioned, search/replace winning when they hit the same file
  * Files that don't actually change (same content) are omitted. New files with an
  * invalid name are skipped.
+ *
+ * With `allowMultiFile: false` (the default sketch mode) the sketch is kept to a
+ * single file: files the assistant tried to create are folded into the entry
+ * file instead — see `coalesceIntoEntry`.
  */
 export function planFileChanges(
   files: SketchFile[],
   activeFileName: string,
   content: string,
+  options: { allowMultiFile?: boolean } = {},
 ): FileChange[] {
   const byName = new Map(files.map((f) => [f.name, f.content]));
   const entryName = findEntryFile(files)?.name ?? 'sketch.js';
@@ -125,7 +131,41 @@ export function planFileChanges(
     if (!changes.some((existing) => existing.name === c.name)) changes.push(c);
   }
   // Drop no-op edits to existing files.
-  return changes.filter((c) => c.isNew || c.newContent !== c.previousContent);
+  const kept = changes.filter((c) => c.isNew || c.newContent !== c.previousContent);
+
+  if (options.allowMultiFile) return kept;
+  return coalesceIntoEntry(kept, entryName, byName.get(entryName) ?? '');
+}
+
+/**
+ * Single-file mode: fold any file the assistant tried to create into the entry
+ * file rather than growing the sketch. New sources are inlined above the entry's
+ * code — the order the preview loads them in — and the module syntax that tied
+ * them together is stripped, so the merged file runs exactly as the split one
+ * would have. Edits to files that already exist are left alone.
+ */
+export function coalesceIntoEntry(
+  changes: FileChange[],
+  entryName: string,
+  entryContent: string,
+): FileChange[] {
+  const created = changes.filter((c) => c.isNew);
+  if (created.length === 0) return changes;
+
+  const entryChange = changes.find((c) => !c.isNew && c.name === entryName);
+  const others = changes.filter((c) => !c.isNew && c.name !== entryName);
+
+  const merged: FileChange = {
+    name: entryName,
+    previousContent: entryChange?.previousContent ?? entryContent,
+    newContent: joinFileSources([
+      ...created.map((c) => ({ name: c.name, content: c.newContent })),
+      { name: entryName, content: entryChange?.newContent ?? entryContent },
+    ]),
+    isNew: false,
+  };
+
+  return [merged, ...others].filter((c) => c.newContent !== c.previousContent);
 }
 
 const SETUP_PATTERN = /(^|\s)function\s+setup\s*\(/;

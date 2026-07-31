@@ -95,6 +95,16 @@ file; the last tab can't close).
   URLs, relative specifiers rewritten to bare, a bridge re-exposes `setup`/`draw` to
   `window` for p5 global mode). Otherwise files are **concatenated** as global
   `<script>`s with `sketch.js` last.
+- **Single file by default** (`utils/fileMode.ts`, pure + unit-tested): a sketch stays
+  in one file unless multi-file is earned. `allowsMultiFile({files, message, enabled})`
+  is true when the user toggled it on (`multiFileEnabled` in the store, Files sidebar),
+  the sketch already has several files, the message asks for a split
+  (`requestsMultiFile`, EN + ES), or the code passed `MULTI_FILE_LINE_THRESHOLD` (400
+  lines). The flag is sent to the backend as `allowMultiFile` (it swaps the layout rules
+  in the system prompt) **and** enforced client-side: with it false, `planFileChanges`
+  folds any file the model tried to create into the entry file
+  (`coalesceIntoEntry` → `joinFileSources`, helpers first, module syntax stripped).
+  Turning the toggle off merges the sketch back down (`mergeFilesToSingle`).
 - **AI edits** (`utils/fileEdits.ts`, pure + unit-tested): `planFileChanges` turns an
   assistant message into per-file changes (search/replace with optional `// filename:`
   prefixes, one block per file, or several `// filename:` sections in one block).
@@ -108,7 +118,9 @@ file; the last tab can't close).
 ### Backend (`backend/src/`)
 
 **NestJS modules**:
-- `chat/` — Core LLM streaming. `chat.service.ts` builds system prompt, clamps history (20 msgs / 250KB), validates images (PNG/JPEG magic bytes, 4MB each, 8MB total, max 12). Controller streams SSE with 2-min timeout. No user login required, but app-only: `OriginGuard` (`common/origin.guard.ts`) rejects requests whose Origin/Referer isn't in `CORS_ORIGIN` — protects the server-side demo key from direct scripts (spoofable by a determined client; throttling covers the rest).
+- `chat/` — Core LLM streaming. `chat.service.ts` builds the system prompt
+  (`buildSystemPrompt(allowMultiFile)` swaps in single-file or multi-file layout rules —
+  the client decides, see `utils/fileMode.ts`), clamps history (20 msgs / 250KB), validates images (PNG/JPEG magic bytes, 4MB each, 8MB total, max 12). Controller streams SSE with 2-min timeout. No user login required, but app-only: `OriginGuard` (`common/origin.guard.ts`) rejects requests whose Origin/Referer isn't in `CORS_ORIGIN` — protects the server-side demo key from direct scripts (spoofable by a determined client; throttling covers the rest).
 - `chat/providers/` — LLM provider implementations behind `LLMProvider` interface: `openai.provider.ts`, `anthropic.provider.ts`, `groq.provider.ts`, `deepseek.provider.ts`, `opencode.provider.ts` (talks to a local `opencode serve` instance instead of a hosted API — no API key; models are addressed as `providerID/modelID` from opencode's own catalog)
 - `auth/` — Google OAuth + local username/password login, JWT in httpOnly cookie, admin user seeded from `ADMIN_PASSWORD` env
 - `users/` — User entity with encrypted API key storage (`common/crypto.util.ts`)

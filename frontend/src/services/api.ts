@@ -238,6 +238,9 @@ export interface ChatRequest {
   images?: ImageAttachment[];
   files?: { name: string; content: string }[];
   libraries?: { name: string; url: string }[];
+  /** Lets the assistant answer with several files. Off by default — sketches are
+   * single-file unless the user opted in or the sketch outgrew one file. */
+  allowMultiFile?: boolean;
 }
 
 export async function* streamChat(request: ChatRequest, signal?: AbortSignal): AsyncGenerator<string> {
