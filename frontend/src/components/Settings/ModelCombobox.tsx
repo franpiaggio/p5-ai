@@ -1,0 +1,180 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+
+interface ModelComboboxProps {
+  id?: string;
+  value: string;
+  onChange: (model: string) => void;
+  models: string[];
+  loading?: boolean;
+  disabled?: boolean;
+}
+
+/**
+ * Searchable model picker. Type to filter the provider's catalog, arrow keys +
+ * Enter to select, and any typed value can be committed with Enter so custom /
+ * not-yet-listed model IDs still work.
+ */
+export function ModelCombobox({
+  id,
+  value,
+  onChange,
+  models,
+  loading,
+  disabled,
+}: ModelComboboxProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    // Just-opened (query still equals the current value) shows the whole list.
+    if (!open || !q || q === value.toLowerCase()) return models;
+    return models.filter((m) => m.toLowerCase().includes(q));
+  }, [models, query, open, value]);
+
+  // Close on outside click (keeps option clicks working — see onMouseDown below).
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  // Keep the highlighted option scrolled into view.
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    const el = listRef.current.children[active] as HTMLElement | undefined;
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [active, open]);
+
+  const openList = () => {
+    if (disabled) return;
+    setQuery(value);
+    const idx = models.indexOf(value);
+    setActive(idx >= 0 ? idx : 0);
+    setOpen(true);
+  };
+
+  const commit = (model: string) => {
+    const next = model.trim();
+    if (next) onChange(next);
+    setOpen(false);
+    inputRef.current?.blur();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!open) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        e.preventDefault();
+        openList();
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActive((i) => Math.min(i + 1, filtered.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActive((i) => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      commit(filtered[active] ?? query);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
+    }
+  };
+
+  const display = open ? query : value;
+
+  return (
+    <div ref={rootRef} className="relative">
+      <input
+        id={id}
+        ref={inputRef}
+        type="text"
+        role="combobox"
+        aria-expanded={open}
+        aria-autocomplete="list"
+        autoComplete="off"
+        spellCheck={false}
+        disabled={disabled}
+        value={display}
+        placeholder="Search models…"
+        onFocus={openList}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setActive(0);
+          if (!open) setOpen(true);
+        }}
+        onKeyDown={handleKeyDown}
+        className="input-field pr-8 disabled:opacity-50 disabled:cursor-not-allowed"
+      />
+      <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted/50">
+        {loading ? (
+          <span className="inline-block w-3.5 h-3.5 border-2 border-info/30 border-t-info rounded-full animate-spin" />
+        ) : (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </span>
+
+      {open && (
+        <ul
+          ref={listRef}
+          role="listbox"
+          className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-border/50 bg-raised shadow-lg py-1"
+        >
+          {filtered.length === 0 ? (
+            <li className="px-3 py-2 text-[11px] text-text-muted/50">
+              {loading ? 'Loading models…' : 'No models match — press Enter to use as-is'}
+            </li>
+          ) : (
+            filtered.map((model, i) => {
+              const isSelected = model === value;
+              const isActive = i === active;
+              const isFree = model.endsWith(':free');
+              return (
+                <li key={model} role="option" aria-selected={isSelected}>
+                  <button
+                    type="button"
+                    // Prevent the input's blur so the click lands as a select.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseEnter={() => setActive(i)}
+                    onClick={() => commit(model)}
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[13px] cursor-pointer ${
+                      isActive ? 'bg-accent/15 text-text-primary' : 'text-text-muted'
+                    }`}
+                  >
+                    <span className="truncate flex items-center gap-1.5">
+                      {isSelected && (
+                        <svg className="w-3.5 h-3.5 shrink-0 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                      <span className={`truncate ${isSelected ? '' : 'pl-5'}`}>{model}</span>
+                    </span>
+                    {isFree && (
+                      <span className="shrink-0 rounded bg-success/15 text-success/80 text-[9px] font-medium px-1.5 py-0.5 uppercase tracking-wide">
+                        Free
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}

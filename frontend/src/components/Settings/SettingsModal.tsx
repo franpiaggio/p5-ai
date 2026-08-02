@@ -3,6 +3,7 @@ import { useEditorStore } from '../../store/editorStore';
 import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
 import { useModelList, MODELS, PROVIDER_LABELS, providerNeedsApiKey } from '../../hooks/useModelList';
+import { ModelCombobox } from './ModelCombobox';
 import { useProviderKeysQuery, useSaveProviderKey, useClearProviderKey } from '../../hooks/useProviderKeys';
 import { updatePreferences, startOpenRouterConnect } from '../../services/api';
 import { APP_THEMES } from '../Editor/editorConfig';
@@ -30,7 +31,10 @@ export function SettingsModal() {
   const saveProviderKeyMut = useSaveProviderKey();
   const clearProviderKeyMut = useClearProviderKey();
 
-  const { models, loadingModels } = useModelList(draft?.provider ?? 'demo');
+  const { models, loadingModels } = useModelList(
+    draft?.provider ?? 'demo',
+    draft ? (draft.keys[draft.provider] ?? '') : '',
+  );
 
   const shouldFetchKeys = isSettingsOpen && !!user && !!draft?.storeApiKeys;
   const { data: remoteKeys } = useProviderKeysQuery(shouldFetchKeys);
@@ -122,7 +126,10 @@ export function SettingsModal() {
   const currentKey = draft.keys[draft.provider] ?? '';
   const storedKeyMask = draft.storeApiKeys && !draft.pendingDeletes.includes(draft.provider) ? remoteKeys?.[draft.provider] : undefined;
   const openRouterConnected = !!storedKeyMask || !!draft.keys.openrouter;
-  const disabled = saving || loadingModels;
+  // Only a save-in-flight locks the form. Model loading is surfaced inline on the
+  // combobox (spinner) instead of disabling everything, since every provider now
+  // fetches its catalog live.
+  const disabled = saving;
 
   const updateDraft = (partial: Partial<Draft>) => setDraft((prev) => prev ? { ...prev, ...partial } : prev);
 
@@ -353,19 +360,14 @@ export function SettingsModal() {
             <label htmlFor="settings-model" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
               Model {loadingModels && <span className="text-accent/50">loading...</span>}
             </label>
-            <select
+            <ModelCombobox
               id="settings-model"
               value={draft.model}
-              onChange={(e) => updateDraft({ model: e.target.value })}
-              className="input-field"
-            >
-              {models.map((model) => (
-                <option key={model} value={model}>{model}</option>
-              ))}
-              {!models.includes(draft.model) && (
-                <option value={draft.model}>{draft.model}</option>
-              )}
-            </select>
+              onChange={(model) => updateDraft({ model })}
+              models={models}
+              loading={loadingModels}
+              disabled={disabled}
+            />
           </div>
         </fieldset>
 
