@@ -210,6 +210,26 @@ describe('ChatService', () => {
       expect(msgs[msgs.length - 1].images).toEqual([currentImage]);
     });
 
+    it('rejects a new image for a non-vision model', async () => {
+      const req = request({
+        config: { provider: 'openai', model: 'gpt-3.5-turbo', apiKey: 'sk' },
+        images: [png()],
+      });
+      await expect(consume(service.streamChat(req))).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(openai.stream).not.toHaveBeenCalled();
+    });
+
+    it('lets an image through to a vision-capable model', async () => {
+      const req = request({
+        config: { provider: 'openai', model: 'gpt-4o', apiKey: 'sk' },
+        images: [png()],
+      });
+      await consume(service.streamChat(req));
+      expect(openai.stream).toHaveBeenCalled();
+    });
+
     it('sends the single-file layout rules by default', async () => {
       await consume(service.streamChat(request()));
 
@@ -484,6 +504,30 @@ describe('ChatService', () => {
       );
       expect(groq.stream).not.toHaveBeenCalled();
       expect(openai.stream).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listModels vision resolution', () => {
+    it('fills vision from the name heuristic when the provider omits it', async () => {
+      openai.listModels.mockResolvedValue([
+        { id: 'gpt-4o' },
+        { id: 'gpt-3.5-turbo' },
+      ]);
+      await expect(service.listModels('openai', 'sk')).resolves.toEqual([
+        { id: 'gpt-4o', vision: true },
+        { id: 'gpt-3.5-turbo', vision: false },
+      ]);
+    });
+
+    it("keeps OpenRouter's live vision flag over the heuristic", async () => {
+      // A model the name heuristic would call text-only, but OpenRouter reports
+      // as multimodal — the live flag must win.
+      openrouter.listModels.mockResolvedValue([
+        { id: 'some-vendor/mystery-model', vision: true },
+      ]);
+      await expect(service.listModels('openrouter', 'sk')).resolves.toEqual([
+        { id: 'some-vendor/mystery-model', vision: true },
+      ]);
     });
   });
 });

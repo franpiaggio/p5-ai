@@ -69,11 +69,15 @@ export function SettingsModal() {
   // typed themselves (not a known fallback default) is left untouched.
   useEffect(() => {
     if (!draft || loadingModels || models.length === 0) return;
-    const inList = models.includes(draft.model);
-    const isFallbackDefault = (MODELS[draft.provider] ?? []).includes(draft.model);
+    const inList = models.some((m) => m.id === draft.model);
+    const isFallbackDefault = (MODELS[draft.provider] ?? []).some(
+      (m) => m.id === draft.model,
+    );
     if (!draft.model || (!inList && isFallbackDefault)) {
       setDraft((prev) =>
-        prev && !models.includes(prev.model) ? { ...prev, model: models[0] } : prev,
+        prev && !models.some((m) => m.id === prev.model)
+          ? { ...prev, model: models[0].id }
+          : prev,
       );
     }
   }, [draft, models, loadingModels]);
@@ -149,7 +153,7 @@ export function SettingsModal() {
   const handleProviderChange = (provider: LLMConfig['provider']) => {
     updateDraft({
       provider,
-      model: MODELS[provider]?.[0] ?? '',
+      model: MODELS[provider]?.[0]?.id ?? '',
     });
   };
 

@@ -44,6 +44,13 @@ export interface LLMConfig {
   apiKey: string;
 }
 
+/** A model id plus whether it accepts image input, as returned by
+ * `POST /api/chat/models`. */
+export interface ModelInfo {
+  id: string;
+  vision: boolean;
+}
+
 export interface CodeChange {
   id: string;
   messageId: string;

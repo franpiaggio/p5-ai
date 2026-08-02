@@ -169,9 +169,9 @@ describe('AuthService — OpenRouter connect (OAuth PKCE)', () => {
       json: () => Promise.resolve({}),
     } as unknown as Response);
 
-    await expect(
-      service.connectOpenRouter('user-1', 'x', 'y'),
-    ).rejects.toThrow('OpenRouter rejected');
+    await expect(service.connectOpenRouter('user-1', 'x', 'y')).rejects.toThrow(
+      'OpenRouter rejected',
+    );
     expect(usersService.saveProviderKey).not.toHaveBeenCalled();
   });
 
@@ -181,9 +181,9 @@ describe('AuthService — OpenRouter connect (OAuth PKCE)', () => {
       json: () => Promise.resolve({}),
     } as unknown as Response);
 
-    await expect(
-      service.connectOpenRouter('user-1', 'x', 'y'),
-    ).rejects.toThrow('did not return');
+    await expect(service.connectOpenRouter('user-1', 'x', 'y')).rejects.toThrow(
+      'did not return',
+    );
     expect(usersService.saveProviderKey).not.toHaveBeenCalled();
   });
 });

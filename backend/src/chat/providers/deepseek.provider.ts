@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import type { LLMProvider, LLMMessage } from './llm.interface';
+import type { LLMProvider, LLMMessage, ModelInfo } from './llm.interface';
 
 @Injectable()
 export class DeepSeekProvider implements LLMProvider {
@@ -42,7 +42,7 @@ export class DeepSeekProvider implements LLMProvider {
     }
   }
 
-  async listModels(apiKey: string): Promise<string[]> {
+  async listModels(apiKey: string): Promise<ModelInfo[]> {
     const client = new OpenAI({
       apiKey,
       baseURL: 'https://api.deepseek.com',
@@ -53,7 +53,7 @@ export class DeepSeekProvider implements LLMProvider {
       for await (const model of list) {
         models.push(model.id);
       }
-      return models.sort();
+      return models.sort().map((id) => ({ id }));
     } catch (error) {
       if (error instanceof OpenAI.APIError) {
         const message = this.formatError(error);

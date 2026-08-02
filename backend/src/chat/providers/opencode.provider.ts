@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { OpencodeClient } from '@opencode-ai/sdk';
-import type { LLMProvider, LLMMessage } from './llm.interface';
+import type { LLMProvider, LLMMessage, ModelInfo } from './llm.interface';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:4096';
 
@@ -222,7 +222,7 @@ export class OpencodeProvider implements LLMProvider {
     if (promptError) throw promptError;
   }
 
-  async listModels(): Promise<string[]> {
+  async listModels(): Promise<ModelInfo[]> {
     const client = await this.client();
     const result = await this.call(() => client.config.providers());
     if (result.error || !result.data) {
@@ -234,6 +234,8 @@ export class OpencodeProvider implements LLMProvider {
         models.push(`${provider.id}/${modelID}`);
       }
     }
-    return models.sort();
+    // Images aren't forwarded to opencode, so every model is text-only here
+    // (vision defaults to false in ChatService for this provider).
+    return models.sort().map((id) => ({ id }));
   }
 }

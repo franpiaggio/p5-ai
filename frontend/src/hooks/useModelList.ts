@@ -1,30 +1,42 @@
 import { useEffect, useState } from 'react';
 import { fetchModels } from '../services/api';
+import type { ModelInfo } from '../types';
 
 // Curated fallback shortlists — shown only until the live catalog loads (and for
 // key-based providers, only before a key is available). The live list from the
 // provider's own `/models` endpoint always overrides these, so they never go
 // stale in practice; they just give the picker something sensible pre-key.
-export const MODELS: Record<string, string[]> = {
-  demo: ['llama-3.3-70b-versatile'],
-  openai: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4o', 'gpt-4o-mini'],
-  anthropic: [
-    'claude-opus-4-20250514',
-    'claude-sonnet-4-20250514',
-    'claude-3-5-sonnet-20241022',
-    'claude-3-haiku-20240307',
+// `vision` flags mirror the backend's per-model detection so the image button
+// gates correctly even before the live catalog resolves.
+export const MODELS: Record<string, ModelInfo[]> = {
+  demo: [{ id: 'llama-3.3-70b-versatile', vision: false }],
+  openai: [
+    { id: 'gpt-4.1', vision: true },
+    { id: 'gpt-4.1-mini', vision: true },
+    { id: 'gpt-4.1-nano', vision: true },
+    { id: 'gpt-4o', vision: true },
+    { id: 'gpt-4o-mini', vision: true },
   ],
-  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  anthropic: [
+    { id: 'claude-opus-4-20250514', vision: true },
+    { id: 'claude-sonnet-4-20250514', vision: true },
+    { id: 'claude-3-5-sonnet-20241022', vision: true },
+    { id: 'claude-3-haiku-20240307', vision: true },
+  ],
+  deepseek: [
+    { id: 'deepseek-chat', vision: false },
+    { id: 'deepseek-reasoner', vision: false },
+  ],
   // Populated live from the local `opencode serve` catalog.
   opencode: [],
   // Free tiers first. The live catalog (300+ models) overrides this once the
   // account is connected.
   openrouter: [
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'deepseek/deepseek-chat-v3-0324:free',
-    'google/gemini-2.0-flash-exp:free',
-    'openai/gpt-4o-mini',
-    'anthropic/claude-sonnet-4',
+    { id: 'meta-llama/llama-3.3-70b-instruct:free', vision: false },
+    { id: 'deepseek/deepseek-chat-v3-0324:free', vision: false },
+    { id: 'google/gemini-2.0-flash-exp:free', vision: true },
+    { id: 'openai/gpt-4o-mini', vision: true },
+    { id: 'anthropic/claude-sonnet-4', vision: true },
   ],
 };
 
@@ -54,7 +66,7 @@ export function providerNeedsApiKey(provider: string): boolean {
  * Typing an API key char-by-char is debounced so we don't hammer the endpoint.
  */
 export function useModelList(provider: string, apiKey?: string) {
-  const [liveModels, setLiveModels] = useState<string[]>([]);
+  const [liveModels, setLiveModels] = useState<ModelInfo[]>([]);
   // Which (provider, hasKey) combination the current `liveModels` reflect, so
   // "loading" and "ready" can be derived instead of set synchronously.
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
@@ -91,8 +103,17 @@ export function useModelList(provider: string, apiKey?: string) {
 
 /** Surface free (`:free`) models at the top — OpenRouter's catalog is 300+ entries
  * and the free tiers are what most people want to try first. */
-function sortFreeFirst(models: string[]): string[] {
-  const free = models.filter((m) => m.endsWith(':free'));
-  const paid = models.filter((m) => !m.endsWith(':free'));
+function sortFreeFirst(models: ModelInfo[]): ModelInfo[] {
+  const free = models.filter((m) => m.id.endsWith(':free'));
+  const paid = models.filter((m) => !m.id.endsWith(':free'));
   return [...free, ...paid];
+}
+
+/** Look up the vision capability of a specific model within a provider's list,
+ * falling back to the curated shortlist when the live catalog isn't loaded. */
+export function modelSupportsVision(
+  models: ModelInfo[],
+  modelId: string,
+): boolean {
+  return models.find((m) => m.id === modelId)?.vision ?? false;
 }

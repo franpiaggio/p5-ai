@@ -198,3 +198,52 @@ test.describe('chat → diff review flow (LLM mocked at the network layer)', () 
     await expect(chatInput(page)).toBeEnabled();
   });
 });
+
+test.describe('image attach button gates on the model vision capability', () => {
+  const ATTACH = 'Attach image (PNG/JPEG, max 4MB)';
+
+  // Seed the persisted store so the app boots on OpenAI + the given model.
+  const seedModel = (page: import('@playwright/test').Page, model: string) =>
+    page.addInitScript((m) => {
+      localStorage.setItem(
+        'p5-ai-editor',
+        JSON.stringify({
+          state: { llmConfig: { provider: 'openai', model: m, apiKey: '' } },
+          version: 0,
+        }),
+      );
+    }, model);
+
+  // Stub the model catalog so the vision flag is fully under test control.
+  const mockModels = (
+    page: import('@playwright/test').Page,
+    models: { id: string; vision: boolean }[],
+  ) =>
+    page.route('**/api/chat/models', (route) =>
+      route.fulfill({
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ models }),
+      }),
+    );
+
+  test('shows the attach button when the selected model reports vision', async ({ page }) => {
+    await mockModels(page, [{ id: 'gpt-4o', vision: true }]);
+    await seedModel(page, 'gpt-4o');
+    await page.goto('/');
+    await waitForApp(page);
+
+    await expect(page.getByTitle(ATTACH)).toBeVisible();
+  });
+
+  test('hides the attach button when the same model reports no vision', async ({ page }) => {
+    // Same model id, vision:false — proves the gate is driven by the flag,
+    // not by a hardcoded provider.
+    await mockModels(page, [{ id: 'gpt-4o', vision: false }]);
+    await seedModel(page, 'gpt-4o');
+    await page.goto('/');
+    await waitForApp(page);
+
+    await expect(page.getByTitle(ATTACH)).toHaveCount(0);
+  });
+});

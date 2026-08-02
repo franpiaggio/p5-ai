@@ -1,4 +1,4 @@
-import type { LLMConfig, Message, ImageAttachment, SketchSummary, SketchFull, SketchFile, Library } from '../types';
+import type { LLMConfig, Message, ImageAttachment, ModelInfo, SketchSummary, SketchFull, SketchFile, Library } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -261,7 +261,7 @@ export async function deleteSketch(id: string): Promise<void> {
 export async function fetchModels(
   provider: string,
   apiKey?: string,
-): Promise<string[]> {
+): Promise<ModelInfo[]> {
   const response = await fetch(`${API_BASE}/chat/models`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -270,7 +270,11 @@ export async function fetchModels(
   });
   if (!response.ok) return [];
   const data = await response.json();
-  return data.models ?? [];
+  // Tolerate the older string[] shape as well as the {id, vision} objects.
+  return (data.models ?? []).map(
+    (m: string | ModelInfo): ModelInfo =>
+      typeof m === 'string' ? { id: m, vision: false } : m,
+  );
 }
 
 // --- Health ---

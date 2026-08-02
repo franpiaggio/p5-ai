@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import type { LLMProvider, LLMMessage } from './llm.interface';
+import type { LLMProvider, LLMMessage, ModelInfo } from './llm.interface';
 
 @Injectable()
 export class GroqProvider implements LLMProvider {
@@ -55,7 +55,7 @@ export class GroqProvider implements LLMProvider {
     }
   }
 
-  async listModels(apiKey: string): Promise<string[]> {
+  async listModels(apiKey: string): Promise<ModelInfo[]> {
     const client = new OpenAI({
       apiKey,
       baseURL: 'https://api.groq.com/openai/v1',
@@ -66,7 +66,7 @@ export class GroqProvider implements LLMProvider {
       for await (const model of list) {
         models.push(model.id);
       }
-      return models.sort();
+      return models.sort().map((id) => ({ id }));
     } catch (error) {
       if (error instanceof OpenAI.APIError) {
         const msg = error.message.toLowerCase();

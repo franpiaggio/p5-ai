@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import type { LLMProvider, LLMMessage } from './llm.interface';
+import type { LLMProvider, LLMMessage, ModelInfo } from './llm.interface';
 
 const GEMINI_BASE_URL =
   'https://generativelanguage.googleapis.com/v1beta/openai/';
@@ -63,7 +63,7 @@ export class GeminiProvider implements LLMProvider {
     }
   }
 
-  async listModels(apiKey: string): Promise<string[]> {
+  async listModels(apiKey: string): Promise<ModelInfo[]> {
     const client = new OpenAI({ apiKey, baseURL: GEMINI_BASE_URL });
     try {
       const list = await client.models.list();
@@ -71,7 +71,7 @@ export class GeminiProvider implements LLMProvider {
       for await (const model of list) {
         models.push(model.id);
       }
-      return models.sort();
+      return models.sort().map((id) => ({ id }));
     } catch (error) {
       if (error instanceof OpenAI.APIError) {
         throw new Error(`Gemini API: ${error.message}`);

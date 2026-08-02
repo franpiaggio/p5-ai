@@ -15,6 +15,14 @@ export interface LLMStreamOptions {
   prediction?: string;
 }
 
+export interface ModelInfo {
+  id: string;
+  /** True if the model accepts image input. Providers that report modalities
+   * (OpenRouter) set this explicitly; the rest leave it undefined and
+   * `ChatService.listModels` fills it in via the name heuristic. */
+  vision?: boolean;
+}
+
 export interface LLMProvider {
   stream(
     messages: LLMMessage[],
@@ -23,5 +31,5 @@ export interface LLMProvider {
     options?: LLMStreamOptions,
   ): AsyncGenerator<string>;
 
-  listModels(apiKey: string): Promise<string[]>;
+  listModels(apiKey: string): Promise<ModelInfo[]>;
 }

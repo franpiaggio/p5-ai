@@ -4,6 +4,7 @@ import type {
   LLMProvider,
   LLMMessage,
   LLMStreamOptions,
+  ModelInfo,
 } from './llm.interface';
 
 const MAX_COMPLETION_TOKENS = 16_384;
@@ -76,7 +77,7 @@ export class OpenAIProvider implements LLMProvider {
     }
   }
 
-  async listModels(apiKey: string): Promise<string[]> {
+  async listModels(apiKey: string): Promise<ModelInfo[]> {
     const client = new OpenAI({ apiKey });
     try {
       const list = await client.models.list();
@@ -86,7 +87,8 @@ export class OpenAIProvider implements LLMProvider {
           models.push(model.id);
         }
       }
-      return models.sort();
+      // vision is resolved by ChatService via the name heuristic.
+      return models.sort().map((id) => ({ id }));
     } catch (error) {
       if (error instanceof OpenAI.APIError) {
         const message = this.formatError(error);

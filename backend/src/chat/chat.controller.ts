@@ -13,6 +13,7 @@ import type { Request, Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { ChatService } from './chat.service';
 import { ChatRequestDto, ListModelsDto } from './dto/chat.dto';
+import type { ModelInfo } from './providers/llm.interface';
 import { OptionalAuthGuard } from '../auth/optional-auth.guard';
 import { OriginGuard } from '../common/origin.guard';
 import { UsageService } from '../usage/usage.service';
@@ -34,7 +35,7 @@ export class ChatController {
   async listModels(
     @Body() body: ListModelsDto,
     @Req() req: Request,
-  ): Promise<{ models: string[] }> {
+  ): Promise<{ models: ModelInfo[] }> {
     try {
       const userId = (req as AuthedRequest).user?.sub;
       const apiKey = await this.chatService.resolveApiKey(

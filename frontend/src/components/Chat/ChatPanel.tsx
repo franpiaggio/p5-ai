@@ -15,7 +15,7 @@ import type { SketchExample } from '../../data/sketchExamples';
 import { createDefaultFiles, filesFromNamed, findEntryFile } from '../../constants/defaultFiles';
 import { guardUnsaved } from '../../utils/unsavedGuard';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { providerNeedsApiKey } from '../../hooks/useModelList';
+import { providerNeedsApiKey, useModelList, modelSupportsVision } from '../../hooks/useModelList';
 import { useAuthStore } from '../../store/authStore';
 import type { ImageAttachment } from '../../types';
 import { parseStreamContent } from '../../utils/streamParsing';
@@ -456,6 +456,13 @@ export function ChatPanel() {
   const serverCanResolve = storeApiKeys && !!user;
   const missingApiKey = providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey && !serverCanResolve;
   // Demo free usage is out for today — block sending and steer to sign-in / a key.
+  // Image attach is gated per-model: the picker's catalog carries a `vision`
+  // flag (live from the provider for OpenRouter, name-detected server-side for
+  // the rest), so we show the attach button only for the selected model. Falls
+  // back to the curated shortlist's flags before the live catalog resolves.
+  const { models: availableModels } = useModelList(llmConfig.provider, llmConfig.apiKey);
+  const modelAcceptsImages = modelSupportsVision(availableModels, llmConfig.model);
+
   const demoQuotaExhausted = isDemo && !!usage && usage.remaining === 0;
   const chatDisabled = backendOnline === false || backendOnline === null || missingApiKey || demoQuotaExhausted;
   // During diff review the input stays enabled so keyboard focus can remain in
@@ -469,7 +476,7 @@ export function ChatPanel() {
       isLoading={isLoading}
       disabled={chatDisabled}
       blockSend={reviewPending}
-      showAttach={llmConfig.provider === 'anthropic'}
+      showAttach={modelAcceptsImages}
     >
       {backendOnline === null && (
         <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-border/10 border border-border/20 flex items-center gap-2">

@@ -102,7 +102,9 @@ describe('API (e2e)', () => {
         .set('Origin', 'http://localhost:5173')
         .send({ provider: 'demo' })
         .expect(201);
-      expect(res.body.models).toEqual(['llama-3.3-70b-versatile']);
+      expect(res.body.models).toEqual([
+        { id: 'llama-3.3-70b-versatile', vision: false },
+      ]);
     });
   });
 

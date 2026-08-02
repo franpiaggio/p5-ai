@@ -8,7 +8,12 @@ import { OpencodeProvider } from './providers/opencode.provider';
 import { OpenRouterProvider } from './providers/openrouter.provider';
 import { UsersService } from '../users/users.service';
 import { ChatRequestDto, ImageAttachmentDto } from './dto/chat.dto';
-import type { LLMMessage, LLMProvider } from './providers/llm.interface';
+import type {
+  LLMMessage,
+  LLMProvider,
+  ModelInfo,
+} from './providers/llm.interface';
+import { canAcceptImages, supportsVisionByName } from './model-capabilities';
 
 const SYSTEM_PROMPT_BASE = `You are an expert creative coding assistant specializing in p5.js and generative art.
 
@@ -406,6 +411,20 @@ export class ChatService {
     const history = this.clampHistory(this.stripHistoryCode(request.history));
     this.enforceImageBudgets({ ...request, history });
 
+    // Never silently drop an attached image: reject up front if the chosen
+    // model/provider can't take image input. (The client hides the attach
+    // button for these, so this only fires if the model changed after
+    // attaching.) Only the current turn's images are guarded — stale history
+    // images are dropped by the text-only providers themselves.
+    if (
+      request.images?.length &&
+      !canAcceptImages(request.config.provider, request.config.model)
+    ) {
+      throw new BadRequestException(
+        "This model doesn't support image input. Remove the image or switch to a vision-capable model.",
+      );
+    }
+
     const codeFence =
       request.language === 'javascript' ? 'javascript' : 'typescript';
 
@@ -475,7 +494,21 @@ export class ChatService {
     );
   }
 
-  async listModels(provider: string, apiKey: string): Promise<string[]> {
+  async listModels(provider: string, apiKey: string): Promise<ModelInfo[]> {
+    const raw = await this.rawListModels(provider, apiKey);
+    // Fill in vision for providers that don't report it (everyone but
+    // OpenRouter) from the model-name heuristic, so every model carries an
+    // explicit flag the client can gate the image button on.
+    return raw.map((m) => ({
+      id: m.id,
+      vision: m.vision ?? supportsVisionByName(provider, m.id),
+    }));
+  }
+
+  private async rawListModels(
+    provider: string,
+    apiKey: string,
+  ): Promise<ModelInfo[]> {
     switch (provider) {
       case 'openai':
         return this.openaiProvider.listModels(apiKey);
@@ -492,7 +525,7 @@ export class ChatService {
         if (groqKey) return this.groqProvider.listModels(groqKey);
         const geminiKey = process.env.GEMINI_API_KEY;
         if (geminiKey) return this.geminiProvider.listModels(geminiKey);
-        return [DEMO_MODEL];
+        return [{ id: DEMO_MODEL }];
       }
       default:
         return [];

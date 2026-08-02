@@ -84,7 +84,7 @@ function App() {
         let model = 'openai/gpt-4o-mini';
         try {
           const models = await fetchModels('openrouter');
-          model = models.find((m) => m.endsWith(':free')) ?? models[0] ?? model;
+          model = models.find((m) => m.id.endsWith(':free'))?.id ?? models[0]?.id ?? model;
         } catch {
           // keep the fallback
         }

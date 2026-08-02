@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { ModelInfo } from '../../types';
 
 interface ModelComboboxProps {
   id?: string;
   value: string;
   onChange: (model: string) => void;
-  models: string[];
+  models: ModelInfo[];
   loading?: boolean;
   disabled?: boolean;
 }
@@ -33,7 +34,7 @@ export function ModelCombobox({
     const q = query.trim().toLowerCase();
     // Just-opened (query still equals the current value) shows the whole list.
     if (!open || !q || q === value.toLowerCase()) return models;
-    return models.filter((m) => m.toLowerCase().includes(q));
+    return models.filter((m) => m.id.toLowerCase().includes(q));
   }, [models, query, open, value]);
 
   // Close on outside click (keeps option clicks working — see onMouseDown below).
@@ -58,7 +59,7 @@ export function ModelCombobox({
   const openList = () => {
     if (disabled) return;
     setQuery(value);
-    const idx = models.indexOf(value);
+    const idx = models.findIndex((m) => m.id === value);
     setActive(idx >= 0 ? idx : 0);
     setOpen(true);
   };
@@ -86,7 +87,7 @@ export function ModelCombobox({
       setActive((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      commit(filtered[active] ?? query);
+      commit(filtered[active]?.id ?? query);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       setOpen(false);
@@ -140,17 +141,17 @@ export function ModelCombobox({
             </li>
           ) : (
             filtered.map((model, i) => {
-              const isSelected = model === value;
+              const isSelected = model.id === value;
               const isActive = i === active;
-              const isFree = model.endsWith(':free');
+              const isFree = model.id.endsWith(':free');
               return (
-                <li key={model} role="option" aria-selected={isSelected}>
+                <li key={model.id} role="option" aria-selected={isSelected}>
                   <button
                     type="button"
                     // Prevent the input's blur so the click lands as a select.
                     onMouseDown={(e) => e.preventDefault()}
                     onMouseEnter={() => setActive(i)}
-                    onClick={() => commit(model)}
+                    onClick={() => commit(model.id)}
                     className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-[13px] cursor-pointer ${
                       isActive ? 'bg-accent/15 text-text-primary' : 'text-text-muted'
                     }`}
@@ -161,13 +162,26 @@ export function ModelCombobox({
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                         </svg>
                       )}
-                      <span className={`truncate ${isSelected ? '' : 'pl-5'}`}>{model}</span>
+                      <span className={`truncate ${isSelected ? '' : 'pl-5'}`}>{model.id}</span>
                     </span>
-                    {isFree && (
-                      <span className="shrink-0 rounded bg-success/15 text-success/80 text-[9px] font-medium px-1.5 py-0.5 uppercase tracking-wide">
-                        Free
-                      </span>
-                    )}
+                    <span className="flex shrink-0 items-center gap-1">
+                      {model.vision && (
+                        <span
+                          title="Accepts image input"
+                          className="flex items-center rounded bg-info/15 text-info/80 text-[9px] font-medium px-1.5 py-0.5 uppercase tracking-wide"
+                        >
+                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1 1 0 010-.644C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178a1 1 0 010 .644C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </span>
+                      )}
+                      {isFree && (
+                        <span className="rounded bg-success/15 text-success/80 text-[9px] font-medium px-1.5 py-0.5 uppercase tracking-wide">
+                          Free
+                        </span>
+                      )}
+                    </span>
                   </button>
                 </li>
               );

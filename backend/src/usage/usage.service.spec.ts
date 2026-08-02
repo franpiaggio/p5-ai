@@ -20,7 +20,11 @@ describe('UsageService', () => {
       findOne: jest.fn().mockImplementation(({ where }) =>
         Promise.resolve(
           counts.has(where.subject)
-            ? { subject: where.subject, day: where.day, count: counts.get(where.subject) }
+            ? {
+                subject: where.subject,
+                day: where.day,
+                count: counts.get(where.subject),
+              }
             : null,
         ),
       ),

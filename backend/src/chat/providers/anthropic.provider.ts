@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
-import type { LLMProvider, LLMMessage } from './llm.interface';
+import type { LLMProvider, LLMMessage, ModelInfo } from './llm.interface';
 
 @Injectable()
 export class AnthropicProvider implements LLMProvider {
@@ -79,11 +79,15 @@ export class AnthropicProvider implements LLMProvider {
     }
   }
 
-  async listModels(apiKey: string): Promise<string[]> {
+  async listModels(apiKey: string): Promise<ModelInfo[]> {
     const client = new Anthropic({ apiKey });
     try {
       const list = await client.models.list({ limit: 100 });
-      return list.data.map((m) => m.id).sort();
+      // vision is resolved by ChatService via the name heuristic.
+      return list.data
+        .map((m) => m.id)
+        .sort()
+        .map((id) => ({ id }));
     } catch (error) {
       if (error instanceof Anthropic.APIError) {
         const message = this.formatError(error);
