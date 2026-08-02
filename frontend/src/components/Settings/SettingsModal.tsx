@@ -31,9 +31,15 @@ export function SettingsModal() {
   const saveProviderKeyMut = useSaveProviderKey();
   const clearProviderKeyMut = useClearProviderKey();
 
+  // A key stored on the server is represented in the draft as a mask ("...abcd"
+  // or "****"), not the real secret. Never forward a mask as the API key — pass
+  // nothing so the backend resolves the real stored key from the user's account.
+  const rawProviderKey = draft ? (draft.keys[draft.provider] ?? '') : '';
+  const providerKeyForFetch =
+    rawProviderKey.startsWith('...') || rawProviderKey === '****' ? '' : rawProviderKey;
   const { models, loadingModels } = useModelList(
     draft?.provider ?? 'demo',
-    draft ? (draft.keys[draft.provider] ?? '') : '',
+    providerKeyForFetch,
   );
 
   const shouldFetchKeys = isSettingsOpen && !!user && !!draft?.storeApiKeys;
@@ -57,13 +63,20 @@ export function SettingsModal() {
     });
   }, [isSettingsOpen]);
 
-  // Backfill the model once a live list (e.g. opencode's catalog) finishes
-  // loading after the draft was initialized with no model selected yet.
+  // Once the live catalog finishes loading, make sure a valid model is selected:
+  // fill an empty selection, and replace a curated fallback default that the live
+  // list doesn't actually offer (e.g. a since-retired model ID). A model the user
+  // typed themselves (not a known fallback default) is left untouched.
   useEffect(() => {
-    if (draft && !draft.model && models.length > 0) {
-      setDraft((prev) => (prev ? { ...prev, model: models[0] } : prev));
+    if (!draft || loadingModels || models.length === 0) return;
+    const inList = models.includes(draft.model);
+    const isFallbackDefault = (MODELS[draft.provider] ?? []).includes(draft.model);
+    if (!draft.model || (!inList && isFallbackDefault)) {
+      setDraft((prev) =>
+        prev && !models.includes(prev.model) ? { ...prev, model: models[0] } : prev,
+      );
     }
-  }, [draft, models]);
+  }, [draft, models, loadingModels]);
 
   const handleSave = useCallback(async () => {
     if (!draft) return;
