@@ -14,7 +14,7 @@ import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { UsersService } from './users.service';
 
-const VALID_PROVIDERS = ['openai', 'anthropic', 'deepseek'];
+const VALID_PROVIDERS = ['openai', 'anthropic', 'deepseek', 'openrouter'];
 
 @Controller('api/users')
 @UseGuards(AuthGuard)

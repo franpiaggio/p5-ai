@@ -3,7 +3,8 @@ import { useEditorStore } from '../../store/editorStore';
 import { simpleHash, extractJsBlocks, extractSearchReplaceBlocks, applySearchReplaceLenient, stripSearchReplaceBlocks, diffSummary } from '../../utils/codeUtils';
 import { planFileChanges, applyChangesToFiles, presentationFor } from '../../utils/fileEdits';
 import { allowsMultiFile } from '../../utils/fileMode';
-import { streamChat, checkBackendHealth } from '../../services/api';
+import { streamChat, checkBackendHealth, getChatUsage, ApiError } from '../../services/api';
+import type { ChatUsage } from '../../services/api';
 import { TypingIndicator } from './TypingIndicator';
 import { MessageBubble } from './MessageBubble';
 import { ChatInput } from './ChatInput';
@@ -26,6 +27,7 @@ export function ChatPanel() {
   const mountedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+  const [usage, setUsage] = useState<ChatUsage | null>(null);
 
   const messages = useEditorStore((s) => s.messages);
   const addMessage = useEditorStore((s) => s.addMessage);
@@ -87,6 +89,8 @@ export function ChatPanel() {
 
     const authUser = useAuthStore.getState().user;
     const serverCanResolve = store.storeApiKeys && !!authUser;
+    // Demo runs on the server's shared keys — no login needed (anonymous gets a
+    // small per-IP daily quota; signing in raises it). BYOK still needs a key.
     if (providerNeedsApiKey(store.llmConfig.provider) && !store.llmConfig.apiKey && !serverCanResolve) {
       setIsSettingsOpen(true);
       return;
@@ -315,6 +319,10 @@ export function ChatPanel() {
       // Aborted because the sketch changed — nothing to report on the new one.
       if (isStale()) return;
       setIsStreaming(false);
+      // Free usage requires login (or the session expired mid-request): prompt it.
+      if (error instanceof ApiError && error.status === 401) {
+        useAuthStore.getState().setIsLoginOpen(true);
+      }
       const errorMsg = error instanceof Error ? error.message : 'Failed to get response';
       const cleanError = errorMsg
         .replace(/^\d{3}\s*/, '')
@@ -337,6 +345,10 @@ export function ChatPanel() {
       if (!isStale()) {
         setIsLoading(false);
         setIsStreaming(false);
+      }
+      // Refresh the free-usage counter after a demo turn (a message was spent).
+      if (useEditorStore.getState().llmConfig.provider === 'demo') {
+        getChatUsage().then(setUsage).catch(() => {});
       }
     }
   }, [addMessage, setIsLoading, setIsStreaming, setIsSettingsOpen]);
@@ -424,17 +436,39 @@ export function ChatPanel() {
 
   const user = useAuthStore((s) => s.user);
   const storeApiKeys = useEditorStore((s) => s.storeApiKeys);
+
+  // Keep the free-usage counter fresh while the user is on demo mode. Re-runs on
+  // login/logout so the banner flips between "sign in" and the remaining count.
+  const isDemo = llmConfig.provider === 'demo';
+  useEffect(() => {
+    if (!isDemo || backendOnline !== true) return;
+    let cancelled = false;
+    getChatUsage().then((u) => {
+      if (!cancelled) setUsage(u);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isDemo, backendOnline, user]);
+
   const lastMessage = messages[messages.length - 1];
   const showTypingIndicator = isStreaming && lastMessage?.role === 'assistant' && !lastMessage.content;
   const serverCanResolve = storeApiKeys && !!user;
   const missingApiKey = providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey && !serverCanResolve;
-  const chatDisabled = backendOnline === false || backendOnline === null || missingApiKey || !!pendingDiff || !!pendingFilesReview;
+  // Demo free usage is out for today — block sending and steer to sign-in / a key.
+  const demoQuotaExhausted = isDemo && !!usage && usage.remaining === 0;
+  const chatDisabled = backendOnline === false || backendOnline === null || missingApiKey || demoQuotaExhausted;
+  // During diff review the input stays enabled so keyboard focus can remain in
+  // it (Enter accepts / Escape rejects, see DiffToolbar) — but sending is
+  // blocked until the pending change is resolved.
+  const reviewPending = !!pendingDiff || !!pendingFilesReview;
 
   return (
     <ChatInput
       onSend={sendMessage}
       isLoading={isLoading}
       disabled={chatDisabled}
+      blockSend={reviewPending}
       showAttach={llmConfig.provider === 'anthropic'}
     >
       {backendOnline === null && (
@@ -469,6 +503,60 @@ export function ChatPanel() {
             </button>
           </p>
         </div>
+      )}
+      {backendOnline === true && isDemo && usage && (
+        usage.remaining === 0 ? (
+          <div className="mx-3 mt-3 px-3 py-2 rounded-md bg-warning/10 border border-warning/20 flex items-center gap-2">
+            <svg className="w-3.5 h-3.5 text-warning/70 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.74-2.99l-6.93-12a2 2 0 00-3.48 0l-6.93 12A2 2 0 005.07 19z" />
+            </svg>
+            <p className="text-text-muted/70 text-[11px]">
+              You've used all {usage.limit} free messages today (resets at midnight UTC).{' '}
+              {usage.anonymous ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => useAuthStore.getState().setIsLoginOpen(true)}
+                    className="text-info hover:text-info/80 underline underline-offset-2 cursor-pointer"
+                  >
+                    Sign in
+                  </button>{' '}
+                  for more, or add your API key in Settings.
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsSettingsOpen(true)}
+                    className="text-info hover:text-info/80 underline underline-offset-2 cursor-pointer"
+                  >
+                    Add your API key
+                  </button>{' '}
+                  for unlimited use.
+                </>
+              )}
+            </p>
+          </div>
+        ) : (
+          <div className="mx-3 mt-3 px-3 py-1.5 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent/60 shrink-0" />
+            <p className="text-text-muted/50 text-[11px]">
+              {usage.remaining} of {usage.limit} free messages left today
+              {usage.anonymous && (
+                <>
+                  {' · '}
+                  <button
+                    type="button"
+                    onClick={() => useAuthStore.getState().setIsLoginOpen(true)}
+                    className="text-info/70 hover:text-info underline underline-offset-2 cursor-pointer"
+                  >
+                    sign in for more
+                  </button>
+                </>
+              )}
+            </p>
+          </div>
+        )
       )}
       <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 flex flex-col">
         <div className="flex-1 flex flex-col space-y-2">

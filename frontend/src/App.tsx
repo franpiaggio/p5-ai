@@ -6,7 +6,16 @@ import { LoginModal } from './components/Auth/LoginModal';
 import { useEditorStore } from './store/editorStore';
 import { useAuthStore } from './store/authStore';
 import { UnsavedChangesDialog } from './components/UnsavedChangesDialog';
-import { getProfile, getProviderKeys, setUnauthorizedHandler } from './services/api';
+import {
+  getProfile,
+  getProviderKeys,
+  setUnauthorizedHandler,
+  connectOpenRouter,
+  takeOpenRouterVerifier,
+  updatePreferences,
+  fetchModels,
+} from './services/api';
+import { queryClient, queryKeys } from './hooks/queryClient';
 import type { LLMConfig } from './types';
 
 function App() {
@@ -47,6 +56,42 @@ function App() {
         });
       })
       .catch(() => {}); // 401 already handled globally; ignore transient errors
+  }, []);
+
+  // Finish the OpenRouter OAuth flow when we land back with a `?code=`. OpenRouter
+  // strips any query we set on the callback URL, so the return trip is identified
+  // by the PKCE verifier we stashed before redirecting (present only during a
+  // connect). Exchange the code for a user-scoped key (stored server-side), then
+  // switch the editor to OpenRouter. Enabling "store keys" lets the backend
+  // resolve the connected key on every chat request. Runs once on mount.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const verifier = code ? takeOpenRouterVerifier() : null;
+    if (!code || !verifier) return;
+    const cleanUrl = window.location.pathname;
+    const finish = () => window.history.replaceState({}, '', cleanUrl);
+
+    connectOpenRouter(code, verifier)
+      .then(async () => {
+        const store = useEditorStore.getState();
+        store.setStoreApiKeys(true);
+        updatePreferences({ storeApiKeys: true }).catch(() => {});
+        queryClient.invalidateQueries({ queryKey: queryKeys.providerKeys });
+        // Pick a real model from OpenRouter's live catalog, preferring a free
+        // tier — hardcoded IDs go stale and 404. Fall back to a paid default only
+        // if the catalog can't be read.
+        let model = 'openai/gpt-4o-mini';
+        try {
+          const models = await fetchModels('openrouter');
+          model = models.find((m) => m.endsWith(':free')) ?? models[0] ?? model;
+        } catch {
+          // keep the fallback
+        }
+        useEditorStore.getState().setLLMConfig({ provider: 'openrouter', model });
+      })
+      .catch(() => {})
+      .finally(finish);
   }, []);
 
   // Auto-restore API keys: fetch server preference and keys on mount/login

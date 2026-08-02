@@ -2,6 +2,7 @@ import {
   Injectable,
   Inject,
   UnauthorizedException,
+  BadRequestException,
   OnModuleInit,
   Logger,
   forwardRef,
@@ -46,6 +47,46 @@ export class AuthService implements OnModuleInit {
 
   async onModuleInit() {
     await this.seedAdminUser();
+  }
+
+  /**
+   * Complete the OpenRouter OAuth PKCE flow: exchange the authorization `code`
+   * (plus the client's `codeVerifier`) for a user-scoped OpenRouter API key and
+   * store it encrypted against the user. Requests then spend the user's own
+   * OpenRouter balance — never the operator's.
+   */
+  async connectOpenRouter(
+    userId: string,
+    code: string,
+    codeVerifier: string,
+  ): Promise<void> {
+    let response: globalThis.Response;
+    try {
+      response = await fetch('https://openrouter.ai/api/v1/auth/keys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          code_verifier: codeVerifier,
+          code_challenge_method: 'S256',
+        }),
+      });
+    } catch {
+      throw new BadRequestException('Could not reach OpenRouter to connect.');
+    }
+
+    if (!response.ok) {
+      throw new BadRequestException(
+        'OpenRouter rejected the connection. Please try connecting again.',
+      );
+    }
+
+    const data = (await response.json()) as { key?: string };
+    if (!data.key) {
+      throw new BadRequestException('OpenRouter did not return an API key.');
+    }
+
+    await this.usersService.saveProviderKey(userId, 'openrouter', data.key);
   }
 
   private async seedAdminUser() {

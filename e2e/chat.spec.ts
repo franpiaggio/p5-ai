@@ -23,9 +23,13 @@ const FULL_CODE_RESPONSE = [
 ];
 
 test.describe('chat → diff review flow (LLM mocked at the network layer)', () => {
-  test('a full-code suggestion streams in and Accept applies it', async ({ page }) => {
+  // Demo chat works anonymously (per-IP free quota), so no login needed here.
+  test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await waitForApp(page);
+  });
+
+  test('a full-code suggestion streams in and Accept applies it', async ({ page }) => {
     await mockChatResponse(page, FULL_CODE_RESPONSE);
 
     await sendChatMessage(page, 'rewrite my sketch');
@@ -41,8 +45,6 @@ test.describe('chat → diff review flow (LLM mocked at the network layer)', () 
   });
 
   test('Reject restores the previous code', async ({ page }) => {
-    await page.goto('/');
-    await waitForApp(page);
     await mockChatResponse(page, FULL_CODE_RESPONSE);
 
     await sendChatMessage(page, 'rewrite my sketch');
@@ -55,9 +57,47 @@ test.describe('chat → diff review flow (LLM mocked at the network layer)', () 
     await expect(chatInput(page)).toBeEnabled();
   });
 
+  test('Enter accepts the diff without the chat input losing focus', async ({ page }) => {
+    await mockChatResponse(page, FULL_CODE_RESPONSE);
+
+    // Send from the keyboard so focus stays in the input the whole time.
+    const input = chatInput(page);
+    await expect(input).toBeEnabled({ timeout: 15_000 });
+    await input.fill('rewrite my sketch');
+    await input.press('Enter');
+
+    await expect(page.getByText('Review changes in the editor')).toBeVisible();
+    await expect(input).toBeFocused();
+
+    await page.keyboard.press('Enter'); // accept, focus never leaves the input
+
+    await expect(page.getByText('Review changes in the editor')).toHaveCount(0);
+    await expect(editorContent(page)).toContainText('E2E_CHAT_MARKER');
+    await expect(input).toBeFocused();
+    await expect(input).toBeEnabled();
+  });
+
+  test('Escape rejects the diff without the chat input losing focus', async ({ page }) => {
+    await mockChatResponse(page, FULL_CODE_RESPONSE);
+
+    const input = chatInput(page);
+    await expect(input).toBeEnabled({ timeout: 15_000 });
+    await input.fill('rewrite my sketch');
+    await input.press('Enter');
+
+    await expect(page.getByText('Review changes in the editor')).toBeVisible();
+    await expect(input).toBeFocused();
+
+    await page.keyboard.press('Escape'); // reject, focus never leaves the input
+
+    await expect(page.getByText('Review changes in the editor')).toHaveCount(0);
+    await expect(editorContent(page)).toContainText('rectMode(CENTER)');
+    await expect(editorContent(page)).not.toContainText('E2E_CHAT_MARKER');
+    await expect(input).toBeFocused();
+    await expect(input).toBeEnabled();
+  });
+
   test('search/replace blocks patch the current code', async ({ page }) => {
-    await page.goto('/');
-    await waitForApp(page);
     await mockChatResponse(page, [
       'Tweaking the background color.\n',
       [
@@ -83,8 +123,6 @@ test.describe('chat → diff review flow (LLM mocked at the network layer)', () 
   });
 
   test('an unrequested file split folds back into sketch.js', async ({ page }) => {
-    await page.goto('/');
-    await waitForApp(page);
     await mockChatResponse(page, [
       'Adding a particle system:\n',
       [
@@ -112,8 +150,6 @@ test.describe('chat → diff review flow (LLM mocked at the network layer)', () 
   });
 
   test('a multi-file suggestion opens a per-file review; Accept all applies everything', async ({ page }) => {
-    await page.goto('/');
-    await waitForApp(page);
     await mockChatResponse(page, [
       'Splitting the sketch into files:\n',
       [
@@ -132,7 +168,10 @@ test.describe('chat → diff review flow (LLM mocked at the network layer)', () 
 
     // Per-file review opens on the first change, counting through the set.
     await expect(page.getByText('Reviewing particle.js (1/2)')).toBeVisible();
-    await expect(chatInput(page)).toBeDisabled();
+    // The input stays enabled during review (so keyboard focus can remain in
+    // it) but sending is blocked — the Send button is disabled.
+    await expect(chatInput(page)).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled();
 
     await page.getByRole('button', { name: 'Accept all' }).click();
 
@@ -145,8 +184,6 @@ test.describe('chat → diff review flow (LLM mocked at the network layer)', () 
   });
 
   test('a stream error surfaces as a warning message, not a crash', async ({ page }) => {
-    await page.goto('/');
-    await waitForApp(page);
     await page.route('**/api/chat', (route) =>
       route.fulfill({
         status: 200,

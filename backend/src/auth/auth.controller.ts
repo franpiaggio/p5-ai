@@ -1,9 +1,12 @@
-import { Controller, Post, Body, Res, Ip } from '@nestjs/common';
+import { Controller, Post, Body, Res, Ip, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { LoginDto } from './dto/login.dto';
+import { OpenRouterConnectDto } from './dto/openrouter-connect.dto';
+import { AuthGuard } from './auth.guard';
+import { CurrentUser } from './decorators/current-user.decorator';
 
 // Tight per-IP cap on the password endpoint: brute-forcing the admin account is
 // the main threat. Active in production, where the global ThrottlerGuard is
@@ -34,6 +37,22 @@ export class AuthController {
     );
     this.setAuthCookie(res, result.accessToken);
     res.json(result);
+  }
+
+  // Finishes the OpenRouter OAuth "connect account" flow. Auth-required: the
+  // resulting user-scoped key is stored against the logged-in user.
+  @UseGuards(AuthGuard)
+  @Post('openrouter/connect')
+  async connectOpenRouter(
+    @CurrentUser() user: { sub: string },
+    @Body() body: OpenRouterConnectDto,
+  ) {
+    await this.authService.connectOpenRouter(
+      user.sub,
+      body.code,
+      body.codeVerifier,
+    );
+    return { ok: true };
   }
 
   @Post('logout')

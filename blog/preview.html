@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Blog preview</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1420;
+    --surface: #171e2e;
+    --border: #2a3550;
+    --text: #dde3ef;
+    --muted: #8b96ad;
+    --accent: #e85d75;
+    --info: #7aa2f7;
+    --code-bg: #131a29;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #faf9f7;
+      --surface: #ffffff;
+      --border: #e3e0da;
+      --text: #24292f;
+      --muted: #6b7280;
+      --accent: #c9294a;
+      --info: #2f5fd0;
+      --code-bg: #f3f1ed;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 17px/1.75 "Charter", "Georgia", "Iowan Old Style", serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  main {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+  }
+  h1, h2, h3 {
+    font-family: -apple-system, "Segoe UI", "Inter", sans-serif;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+  }
+  h1 { font-size: 2.3rem; margin: 0 0 0.5rem; }
+  h2 {
+    font-size: 1.45rem;
+    margin: 3rem 0 1rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+  h3 { font-size: 1.15rem; margin: 2rem 0 0.75rem; }
+  p { margin: 0 0 1.25rem; }
+  a { color: var(--info); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  em { color: var(--muted); }
+  strong { color: var(--text); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 3rem 0; }
+  blockquote {
+    margin: 1.5rem 0;
+    padding: 0.75rem 1.25rem;
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 0 var(--radius) var(--radius) 0;
+    color: var(--muted);
+    font-size: 0.95em;
+  }
+  blockquote p { margin: 0; }
+  code {
+    font: 0.82em/1.6 "SF Mono", "JetBrains Mono", "Fira Code", monospace;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 0.1em 0.35em;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.1rem 1.3rem;
+    overflow-x: auto;
+    margin: 1.5rem 0;
+  }
+  pre code { background: none; border: none; padding: 0; font-size: 0.8rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    font-family: -apple-system, "Segoe UI", "Inter", sans-serif;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th { background: var(--surface); font-weight: 600; }
+  ul, ol { padding-left: 1.4rem; margin: 0 0 1.25rem; }
+  li { margin-bottom: 0.4rem; }
+  /* Screenshots break out of the text column so UI text stays readable;
+     captures are 2x-retina of a 1280px viewport, so cap the display width at
+     half the file width. Click opens the full-size file. */
+  img {
+    max-width: min(64rem, calc(100vw - 2.5rem), calc(var(--natural-w, 9999) * 0.5px));
+    height: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: block;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 1.75rem 0;
+    cursor: zoom-in;
+  }
+  .mermaid {
+    display: flex;
+    justify-content: center;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem 1rem;
+    margin: 1.75rem 0;
+    overflow-x: auto;
+  }
+  .error {
+    padding: 2rem;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    font-family: monospace;
+  }
+  .meta {
+    font-family: -apple-system, "Segoe UI", "Inter", sans-serif;
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-bottom: 3rem;
+  }
+</style>
+</head>
+<body>
+<main id="content"><p class="meta">Loading…</p></main>
+<script>
+  const DEFAULT_POST = '1.2-building-a-cursor-like-editor-for-p5js-illustrated';
+  const post = new URLSearchParams(location.search).get('post') || DEFAULT_POST;
+  const dark = !window.matchMedia('(prefers-color-scheme: light)').matches;
+
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: dark ? 'dark' : 'neutral',
+    themeVariables: { fontFamily: 'ui-sans-serif, system-ui, sans-serif', fontSize: '16px' },
+  });
+
+  fetch(post + '.md')
+    .then((r) => {
+      if (!r.ok) throw new Error(`${r.status} — could not load ${post}.md`);
+      return r.text();
+    })
+    .then(async (md) => {
+      // Route ```mermaid fences to <div class="mermaid"> instead of <pre>.
+      const renderer = new marked.Renderer();
+      const defaultCode = renderer.code.bind(renderer);
+      renderer.code = (code, lang) =>
+        lang === 'mermaid'
+          ? `<div class="mermaid">${code.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`
+          : defaultCode(code, lang);
+
+      const el = document.getElementById('content');
+      el.innerHTML = marked.parse(md, { renderer });
+      document.title = el.querySelector('h1')?.textContent ?? 'Blog preview';
+      // Screenshots: display retina captures at half their file width and
+      // let a click open the full-size image in a new tab.
+      el.querySelectorAll('img').forEach((img) => {
+        const cap = () => img.style.setProperty('--natural-w', img.naturalWidth);
+        if (img.complete) cap();
+        else img.addEventListener('load', cap);
+        const link = document.createElement('a');
+        link.href = img.src;
+        link.target = '_blank';
+        img.replaceWith(link);
+        link.appendChild(img);
+      });
+      await mermaid.run({ querySelector: '.mermaid' });
+    })
+    .catch((e) => {
+      document.getElementById('content').innerHTML =
+        `<div class="error">${e.message}<br><br>Serve this folder over http (e.g. <code>npx serve blog</code>) — fetch does not work from file://</div>`;
+    });
+</script>
+</body>
+</html>

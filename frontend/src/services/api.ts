@@ -74,6 +74,65 @@ export async function logoutApi(): Promise<void> {
   });
 }
 
+// --- OpenRouter OAuth ("connect account", PKCE) ---
+
+const OPENROUTER_VERIFIER_KEY = 'p5-ai-openrouter-verifier';
+
+function base64UrlEncode(bytes: ArrayBuffer): string {
+  let binary = '';
+  for (const byte of new Uint8Array(bytes)) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * Kick off the OpenRouter OAuth flow: generate a PKCE verifier/challenge, stash
+ * the verifier for the return trip, and redirect the browser to OpenRouter. On
+ * the callback the app finishes the exchange (see `takeOpenRouterVerifier` +
+ * `connectOpenRouter`). This navigates away from the app.
+ */
+export async function startOpenRouterConnect(): Promise<void> {
+  const verifier = base64UrlEncode(
+    crypto.getRandomValues(new Uint8Array(32)).buffer,
+  );
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(verifier),
+  );
+  const challenge = base64UrlEncode(digest);
+  sessionStorage.setItem(OPENROUTER_VERIFIER_KEY, verifier);
+
+  // OpenRouter appends `?code=...` to the callback and drops any query we add,
+  // so we identify the return trip by the stored verifier, not a custom param.
+  const callback = `${window.location.origin}/`;
+  const url =
+    `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callback)}` +
+    `&code_challenge=${challenge}&code_challenge_method=S256`;
+  window.location.href = url;
+}
+
+/** Read and clear the stored PKCE verifier (single use). */
+export function takeOpenRouterVerifier(): string | null {
+  const verifier = sessionStorage.getItem(OPENROUTER_VERIFIER_KEY);
+  if (verifier) sessionStorage.removeItem(OPENROUTER_VERIFIER_KEY);
+  return verifier;
+}
+
+/** Exchange the OAuth code for a user-scoped key (stored encrypted server-side). */
+export async function connectOpenRouter(
+  code: string,
+  codeVerifier: string,
+): Promise<void> {
+  const response = await authFetch(`/auth/openrouter/connect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code, codeVerifier }),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(text || 'Failed to connect OpenRouter account');
+  }
+}
+
 // --- User Profile & Preferences ---
 
 export async function getProfile(): Promise<{
@@ -227,6 +286,36 @@ export async function checkBackendHealth(): Promise<boolean> {
   }
 }
 
+// --- Chat usage / quota ---
+
+export interface ChatUsage {
+  /** Retained for compatibility; free usage no longer requires login. */
+  requiresLogin: boolean;
+  /** True when the quota is the lower per-IP anonymous allowance. */
+  anonymous: boolean;
+  /** Daily free-message allowance for this caller. */
+  limit: number;
+  /** Messages spent today. */
+  used: number;
+  /** Messages left today. */
+  remaining: number;
+  /** ISO timestamp of the next reset. */
+  resetsAt: string;
+}
+
+/** Free-usage quota for the current user (sends the auth cookie if present). */
+export async function getChatUsage(): Promise<ChatUsage | null> {
+  try {
+    const response = await fetch(`${API_BASE}/chat/usage`, {
+      credentials: 'include',
+    });
+    if (!response.ok) return null;
+    return response.json();
+  } catch {
+    return null;
+  }
+}
+
 // --- Chat ---
 
 export interface ChatRequest {
@@ -265,8 +354,21 @@ export async function* streamChat(request: ChatRequest, signal?: AbortSignal): A
   }
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error || `HTTP ${response.status}: Failed to connect to chat API`);
+    // Errors raised before the SSE stream opens (login required, quota reached,
+    // missing key) come back as a normal JSON body. Prefer its human-readable
+    // message and carry the status so the UI can react (e.g. prompt sign-in).
+    const raw = await response.text();
+    let message = raw;
+    try {
+      const parsed = JSON.parse(raw);
+      message = parsed.error || parsed.message || raw;
+    } catch {
+      // Non-JSON body — use the raw text as-is.
+    }
+    throw new ApiError(
+      response.status,
+      message || `HTTP ${response.status}: Failed to connect to chat API`,
+    );
   }
 
   const reader = response.body?.getReader();

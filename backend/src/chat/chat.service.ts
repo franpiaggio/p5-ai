@@ -2,8 +2,10 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { OpenAIProvider } from './providers/openai.provider';
 import { AnthropicProvider } from './providers/anthropic.provider';
 import { GroqProvider } from './providers/groq.provider';
+import { GeminiProvider } from './providers/gemini.provider';
 import { DeepSeekProvider } from './providers/deepseek.provider';
 import { OpencodeProvider } from './providers/opencode.provider';
+import { OpenRouterProvider } from './providers/openrouter.provider';
 import { UsersService } from '../users/users.service';
 import { ChatRequestDto, ImageAttachmentDto } from './dto/chat.dto';
 import type { LLMMessage, LLMProvider } from './providers/llm.interface';
@@ -141,6 +143,7 @@ export function buildSystemPrompt(allowMultiFile: boolean): string {
 }
 
 const DEMO_MODEL = 'llama-3.3-70b-versatile';
+const DEMO_GEMINI_MODEL = process.env.GEMINI_DEMO_MODEL || 'gemini-2.0-flash';
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const JPEG_MAGIC = [0xff, 0xd8, 0xff];
@@ -165,10 +168,83 @@ export class ChatService {
     private openaiProvider: OpenAIProvider,
     private anthropicProvider: AnthropicProvider,
     private groqProvider: GroqProvider,
+    private geminiProvider: GeminiProvider,
     private deepseekProvider: DeepSeekProvider,
     private opencodeProvider: OpencodeProvider,
+    private openRouterProvider: OpenRouterProvider,
     private usersService: UsersService,
   ) {}
+
+  /** Ordered free-tier providers behind demo mode. Only those with a configured
+   * key are included; the demo stream tries them in turn. */
+  private demoCandidates(): {
+    provider: LLMProvider;
+    model: string;
+    apiKey: string;
+    label: string;
+  }[] {
+    const candidates: {
+      provider: LLMProvider;
+      model: string;
+      apiKey: string;
+      label: string;
+    }[] = [];
+    if (process.env.GROQ_API_KEY) {
+      candidates.push({
+        provider: this.groqProvider,
+        model: DEMO_MODEL,
+        apiKey: process.env.GROQ_API_KEY,
+        label: 'groq',
+      });
+    }
+    if (process.env.GEMINI_API_KEY) {
+      candidates.push({
+        provider: this.geminiProvider,
+        model: DEMO_GEMINI_MODEL,
+        apiKey: process.env.GEMINI_API_KEY,
+        label: 'gemini',
+      });
+    }
+    return candidates;
+  }
+
+  /** Stream demo mode through the free-tier chain, falling back to the next
+   * provider when one fails *before* producing any output (e.g. rate limit or
+   * misconfiguration). Once tokens have started flowing a mid-stream failure is
+   * surfaced as-is — we can't cleanly switch providers mid-response. */
+  private async *streamDemo(messages: LLMMessage[]): AsyncGenerator<string> {
+    const candidates = this.demoCandidates();
+    if (!candidates.length) {
+      throw new Error(
+        'Demo mode is not configured. Please use your own API key in Settings.',
+      );
+    }
+
+    let lastError: unknown;
+    for (const candidate of candidates) {
+      const iterator = candidate.provider
+        .stream(messages, candidate.model, candidate.apiKey)
+        [Symbol.asyncIterator]();
+      let yielded = false;
+      try {
+        while (true) {
+          const next = await iterator.next();
+          if (next.done) return;
+          yielded = true;
+          yield next.value;
+        }
+      } catch (error) {
+        lastError = error;
+        // Already streaming — can't fall back without duplicating output.
+        if (yielded) throw error;
+        // Otherwise try the next free provider.
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Demo mode is temporarily unavailable. Please try again.');
+  }
 
   async resolveApiKey(
     provider: string,
@@ -373,13 +449,7 @@ export class ChatService {
     });
 
     if (request.config.provider === 'demo') {
-      const groqKey = process.env.GROQ_API_KEY;
-      if (!groqKey) {
-        throw new Error(
-          'Demo mode is not configured. Please use your own API key in Settings.',
-        );
-      }
-      yield* this.groqProvider.stream(messages, DEMO_MODEL, groqKey);
+      yield* this.streamDemo(messages);
       return;
     }
 
@@ -388,6 +458,7 @@ export class ChatService {
       anthropic: this.anthropicProvider,
       deepseek: this.deepseekProvider,
       opencode: this.opencodeProvider,
+      openrouter: this.openRouterProvider,
     };
 
     const provider = providers[request.config.provider];
@@ -414,10 +485,14 @@ export class ChatService {
         return this.deepseekProvider.listModels(apiKey);
       case 'opencode':
         return this.opencodeProvider.listModels();
+      case 'openrouter':
+        return this.openRouterProvider.listModels(apiKey);
       case 'demo': {
         const groqKey = process.env.GROQ_API_KEY;
-        if (!groqKey) return ['llama-3.3-70b-versatile'];
-        return this.groqProvider.listModels(groqKey);
+        if (groqKey) return this.groqProvider.listModels(groqKey);
+        const geminiKey = process.env.GEMINI_API_KEY;
+        if (geminiKey) return this.geminiProvider.listModels(geminiKey);
+        return [DEMO_MODEL];
       }
       default:
         return [];

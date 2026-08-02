@@ -7,11 +7,14 @@ interface ChatInputProps {
   onSend: (message: string, images?: ImageAttachment[]) => void;
   isLoading: boolean;
   disabled: boolean;
+  /** A diff is pending review: keep the field focusable but block sending until
+   * the user accepts/rejects (Enter/Escape, handled in DiffToolbar). */
+  blockSend?: boolean;
   showAttach: boolean;
   children: ReactNode;
 }
 
-export function ChatInput({ onSend, isLoading, disabled, showAttach, children }: ChatInputProps) {
+export function ChatInput({ onSend, isLoading, disabled, blockSend, showAttach, children }: ChatInputProps) {
   const [input, setInput] = useState('');
   const [attachedImages, setAttachedImages] = useState<ImageAttachment[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -60,6 +63,7 @@ export function ChatInput({ onSend, isLoading, disabled, showAttach, children }:
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
+    if (blockSend) return;
     if (!input.trim() && attachedImages.length === 0) return;
 
     const attachments = attachedImages.length > 0 ? [...attachedImages] : [];
@@ -74,7 +78,7 @@ export function ChatInput({ onSend, isLoading, disabled, showAttach, children }:
     setInput('');
     setAttachedImages([]);
     onSend(msg || 'What do you see in this image?', attachments.length > 0 ? attachments : undefined);
-  }, [input, attachedImages, onSend]);
+  }, [input, attachedImages, onSend, blockSend]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -190,7 +194,7 @@ export function ChatInput({ onSend, isLoading, disabled, showAttach, children }:
           />
           <button
             type="submit"
-            disabled={isLoading || (!input.trim() && attachedImages.length === 0) || disabled}
+            disabled={isLoading || (!input.trim() && attachedImages.length === 0) || disabled || blockSend}
             className="btn-primary px-3 py-2 text-xs"
           >
             {isLoading ? (

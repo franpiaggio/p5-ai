@@ -45,7 +45,9 @@ describe('OriginGuard', () => {
 
   it('allows a request with a matching Origin', () => {
     expect(
-      guard.canActivate(contextWithHeaders({ origin: 'https://app.example.com' })),
+      guard.canActivate(
+        contextWithHeaders({ origin: 'https://app.example.com' }),
+      ),
     ).toBe(true);
   });
 

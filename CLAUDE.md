@@ -120,9 +120,10 @@ file; the last tab can't close).
 **NestJS modules**:
 - `chat/` — Core LLM streaming. `chat.service.ts` builds the system prompt
   (`buildSystemPrompt(allowMultiFile)` swaps in single-file or multi-file layout rules —
-  the client decides, see `utils/fileMode.ts`), clamps history (20 msgs / 250KB), validates images (PNG/JPEG magic bytes, 4MB each, 8MB total, max 12). Controller streams SSE with 2-min timeout. No user login required, but app-only: `OriginGuard` (`common/origin.guard.ts`) rejects requests whose Origin/Referer isn't in `CORS_ORIGIN` — protects the server-side demo key from direct scripts (spoofable by a determined client; throttling covers the rest).
-- `chat/providers/` — LLM provider implementations behind `LLMProvider` interface: `openai.provider.ts`, `anthropic.provider.ts`, `groq.provider.ts`, `deepseek.provider.ts`, `opencode.provider.ts` (talks to a local `opencode serve` instance instead of a hosted API — no API key; models are addressed as `providerID/modelID` from opencode's own catalog)
-- `auth/` — Google OAuth + local username/password login, JWT in httpOnly cookie, admin user seeded from `ADMIN_PASSWORD` env
+  the client decides, see `utils/fileMode.ts`), clamps history (20 msgs / 250KB), validates images (PNG/JPEG magic bytes, 4MB each, 8MB total, max 12). Controller streams SSE with 2-min timeout. App-only: `OriginGuard` (`common/origin.guard.ts`) rejects requests whose Origin/Referer isn't in `CORS_ORIGIN` — protects the server-side demo key from direct scripts (spoofable by a determined client; throttling covers the rest). **Free/demo mode (`provider: 'demo'`) is rationed per day (no login required)**: logged-in users get the per-user allowance, anonymous callers a lower per-IP one. The controller returns 429 when the quota is spent and charges one message only once real output starts (a failed generation costs nothing). BYOK providers skip the quota. `GET /api/chat/usage` returns the caller's quota (`{ anonymous }` flags the per-IP tier). Demo streaming runs a free-tier fallback chain (`ChatService.streamDemo`): Groq → Gemini, switching to the next provider only if one fails *before* emitting any token.
+- `usage/` — `UsageService` + `UsageDaily` entity (`usage_daily`, composite PK subject+UTC day, where subject is `u:<userId>` or `ip:<addr>`). Counts free/demo messages per subject per day via an atomic SQLite upsert; allowances are `FREE_MESSAGES_PER_DAY` (user, default 25) and `ANON_FREE_MESSAGES_PER_DAY` (anonymous, default 3). Real client IP needs `trust proxy` (set in `main.ts`) behind nginx.
+- `chat/providers/` — LLM provider implementations behind `LLMProvider` interface: `openai.provider.ts`, `anthropic.provider.ts`, `groq.provider.ts`, `gemini.provider.ts` (Google Gemini via its OpenAI-compatible endpoint — free-tier fallback for demo mode), `deepseek.provider.ts`, `openrouter.provider.ts` (OpenRouter via its OpenAI-compatible endpoint — the user's own OAuth-connected account/credits; models addressed as `vendor/model`), `opencode.provider.ts` (talks to a local `opencode serve` instance instead of a hosted API — no API key; models are addressed as `providerID/modelID` from opencode's own catalog)
+- `auth/` — Google OAuth + local username/password login, JWT in httpOnly cookie, admin user seeded from `ADMIN_PASSWORD` env. `connectOpenRouter` completes an OpenRouter OAuth PKCE exchange (`POST /api/auth/openrouter/connect`, auth-required): swaps the auth code for a user-scoped OpenRouter key and stores it encrypted as the user's `openrouter` provider key — the frontend generates the PKCE challenge and redirects (see `services/api.ts` `startOpenRouterConnect` + the callback handler in `App.tsx`).
 - `users/` — User entity with encrypted API key storage (`common/crypto.util.ts`)
 - `sketches/` — CRUD with user ownership enforcement, code history stored as `simple-json`
 
@@ -136,6 +137,7 @@ Frontend Vite proxy forwards `/api/*` to backend at `:3001`. Backend routes:
 - `POST /api/chat` — Stream chat (SSE)
 - `POST /api/chat/models` — List models for a provider
 - `POST /api/auth/login`, `POST /api/auth/google`, `POST /api/auth/logout`
+- `POST /api/auth/openrouter/connect` — Complete OpenRouter OAuth PKCE, store user-scoped key (auth required)
 - `GET /api/users/me` — Current user profile
 - `GET/PUT /api/users/me/api-key` — Retrieve/save encrypted API key
 - `GET/POST/PUT/DELETE /api/sketches` — Sketch CRUD (auth required)
@@ -145,6 +147,9 @@ Frontend Vite proxy forwards `/api/*` to backend at `:3001`. Backend routes:
 
 Config via `.env` at project root or `backend/.env` (root takes priority). Loaded by `@nestjs/config`:
 - `JWT_SECRET`, `GOOGLE_CLIENT_ID`, `GROQ_API_KEY`, `ADMIN_PASSWORD`
+- `GEMINI_API_KEY` (optional) — free-tier fallback for demo mode; `GEMINI_DEMO_MODEL` (default `gemini-2.0-flash`)
+- `FREE_MESSAGES_PER_DAY` (default 25) — per-user daily allowance for free/demo chat
+- `ANON_FREE_MESSAGES_PER_DAY` (default 3) — per-IP daily allowance for anonymous free/demo chat
 - `DATABASE_PATH` (default `./data/p5editor.sqlite`)
 - `CORS_ORIGIN` (default `http://localhost:5173`, supports comma-separated values)
 - `PORT` (default `3001`)

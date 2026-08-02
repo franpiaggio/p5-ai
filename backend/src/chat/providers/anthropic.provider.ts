@@ -23,7 +23,9 @@ export class AnthropicProvider implements LLMProvider {
     parts.push({
       type: 'text',
       text: msg.content,
-      ...(cacheBreakpoint ? { cache_control: { type: 'ephemeral' as const } } : {}),
+      ...(cacheBreakpoint
+        ? { cache_control: { type: 'ephemeral' as const } }
+        : {}),
     });
     return parts;
   }

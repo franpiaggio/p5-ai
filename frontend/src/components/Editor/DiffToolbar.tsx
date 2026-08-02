@@ -17,17 +17,40 @@ export function DiffToolbar() {
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      // Enter accepts, Escape rejects. Capture phase + stopPropagation so the
+      // shortcuts win even while the read-only diff editor has focus (Monaco
+      // routes keystrokes through a hidden textarea that would otherwise
+      // swallow them — that's why they only worked after leaving the editor).
+      // The chat input is disabled during review (see ChatPanel `chatDisabled`),
+      // so repurposing plain Enter here can't collide with sending a message.
+      // We handle keys from the chat input (so focus can stay there — Enter
+      // accepts / Escape rejects without leaving the field) and from the diff
+      // editor's own hidden textarea (which lives inside `.monaco-editor`).
+      // Any *other* form field (e.g. an open modal's input) keeps its keys.
+      const target = e.target as HTMLElement | null;
+      const editable =
+        !!target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable);
+      const isOwnField =
+        !!target &&
+        (target.hasAttribute('data-chat-input') || !!target.closest('.monaco-editor'));
+      if (editable && !isOwnField) return;
+
       if (e.key === 'Escape') {
         e.preventDefault();
+        e.stopPropagation();
         reject();
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      if (e.key === 'Enter' && !e.shiftKey && !e.altKey) {
         e.preventDefault();
+        e.stopPropagation();
         accept();
       }
     };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
+    window.addEventListener('keydown', handleKey, true);
+    return () => window.removeEventListener('keydown', handleKey, true);
   }, [accept, reject]);
 
   const change = review ? review.changes[review.index] : null;
@@ -110,7 +133,7 @@ export function DiffToolbar() {
         onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
         onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
       >
-        Accept <span style={{ opacity: 0.7 }}>Ctrl+Enter</span>
+        Accept <span style={{ opacity: 0.7 }}>↵</span>
       </button>
       {review && review.changes.length - review.index > 1 && (
         <button

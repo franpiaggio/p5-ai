@@ -59,7 +59,8 @@ export class SketchesService {
       ],
     });
     // Private (or missing) sketches are indistinguishable from non-existent ones.
-    if (!sketch || !sketch.isPublic) throw new NotFoundException('Sketch not found');
+    if (!sketch || !sketch.isPublic)
+      throw new NotFoundException('Sketch not found');
     return sketch;
   }
 

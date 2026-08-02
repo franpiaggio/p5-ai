@@ -50,8 +50,10 @@ describe('ChatService', () => {
   let openai: { stream: jest.Mock; listModels: jest.Mock };
   let anthropic: { stream: jest.Mock; listModels: jest.Mock };
   let groq: { stream: jest.Mock; listModels: jest.Mock };
+  let gemini: { stream: jest.Mock; listModels: jest.Mock };
   let deepseek: { stream: jest.Mock; listModels: jest.Mock };
   let opencode: { stream: jest.Mock; listModels: jest.Mock };
+  let openrouter: { stream: jest.Mock; listModels: jest.Mock };
   let usersService: { getProviderKey: jest.Mock };
   let service: ChatService;
 
@@ -67,15 +69,19 @@ describe('ChatService', () => {
     openai = mockProvider();
     anthropic = mockProvider();
     groq = mockProvider();
+    gemini = mockProvider();
     deepseek = mockProvider();
     opencode = mockProvider();
+    openrouter = mockProvider();
     usersService = { getProviderKey: jest.fn().mockResolvedValue(null) };
     service = new ChatService(
       openai as never,
       anthropic as never,
       groq as never,
+      gemini as never,
       deepseek as never,
       opencode as never,
+      openrouter as never,
       usersService as never,
     );
   });
@@ -381,10 +387,19 @@ describe('ChatService', () => {
 
   describe('demo mode', () => {
     const originalGroqKey = process.env.GROQ_API_KEY;
+    const originalGeminiKey = process.env.GEMINI_API_KEY;
+
+    beforeEach(() => {
+      // Deterministic regardless of the developer's local env.
+      delete process.env.GROQ_API_KEY;
+      delete process.env.GEMINI_API_KEY;
+    });
 
     afterEach(() => {
       if (originalGroqKey === undefined) delete process.env.GROQ_API_KEY;
       else process.env.GROQ_API_KEY = originalGroqKey;
+      if (originalGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+      else process.env.GEMINI_API_KEY = originalGeminiKey;
     });
 
     it('routes demo requests to Groq with the server-side key and fixed model', async () => {
@@ -401,12 +416,74 @@ describe('ChatService', () => {
       expect(openai.stream).not.toHaveBeenCalled();
     });
 
+    it('falls back to Gemini when Groq fails before streaming any output', async () => {
+      process.env.GROQ_API_KEY = 'gsk-server';
+      process.env.GEMINI_API_KEY = 'gem-server';
+      groq.stream.mockImplementation(
+        // eslint-disable-next-line @typescript-eslint/require-await, require-yield
+        async function* (): AsyncGenerator<string> {
+          throw new Error('rate limit reached');
+        },
+      );
+      const req = request({ config: { provider: 'demo', model: 'ignored' } });
+
+      const out = await consume(service.streamChat(req));
+
+      expect(groq.stream).toHaveBeenCalled();
+      expect(gemini.stream).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(String),
+        'gem-server',
+      );
+      expect(out).toContain('chunk');
+    });
+
+    it('does not fall back once Groq has started streaming', async () => {
+      process.env.GROQ_API_KEY = 'gsk-server';
+      process.env.GEMINI_API_KEY = 'gem-server';
+      groq.stream.mockImplementation(
+        // eslint-disable-next-line @typescript-eslint/require-await
+        async function* (): AsyncGenerator<string> {
+          yield 'partial';
+          throw new Error('mid-stream failure');
+        },
+      );
+      const req = request({ config: { provider: 'demo', model: 'ignored' } });
+
+      await expect(consume(service.streamChat(req))).rejects.toThrow(
+        'mid-stream failure',
+      );
+      expect(gemini.stream).not.toHaveBeenCalled();
+    });
+
     it('fails clearly when demo mode is not configured', async () => {
-      delete process.env.GROQ_API_KEY;
       const req = request({ config: { provider: 'demo', model: 'x' } });
       await expect(consume(service.streamChat(req))).rejects.toThrow(
         'Demo mode is not configured',
       );
+    });
+  });
+
+  describe('openrouter mode', () => {
+    it('routes to the OpenRouter provider with the resolved key and model', async () => {
+      const req = request({
+        config: {
+          provider: 'openrouter',
+          model: 'anthropic/claude-3.5-sonnet',
+          apiKey: 'sk-or-user',
+        },
+      });
+
+      await consume(service.streamChat(req));
+
+      expect(openrouter.stream).toHaveBeenCalledWith(
+        expect.anything(),
+        'anthropic/claude-3.5-sonnet',
+        'sk-or-user',
+        expect.anything(),
+      );
+      expect(groq.stream).not.toHaveBeenCalled();
+      expect(openai.stream).not.toHaveBeenCalled();
     });
   });
 });

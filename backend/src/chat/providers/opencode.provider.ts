@@ -4,12 +4,6 @@ import type { LLMProvider, LLMMessage } from './llm.interface';
 
 const DEFAULT_BASE_URL = 'http://127.0.0.1:4096';
 
-/** Some opencode models treat a flattened "User: ... / Assistant: ..." blob as
- * plain text to continue rather than a chat turn to reply to, and echo the
- * prompt back verbatim before answering. This instruction heads that off. */
-const TRANSCRIPT_INSTRUCTION =
-  'The user message below is the conversation so far, formatted as "User: ..." / "Assistant: ..." lines and ending with the latest user message. Reply only with your answer to that final message — do not repeat, quote, or echo any part of the transcript, and do not prefix your reply with "Assistant:".';
-
 type ApiErrorLike = { name?: string; data?: { message?: string } } | undefined;
 
 /** Talks to a local `opencode serve` instance instead of a hosted LLM API —
@@ -77,32 +71,89 @@ export class OpencodeProvider implements LLMProvider {
     const client = await this.client();
     const { providerID, modelID } = this.splitModel(model);
     const systemMessage = messages.find((m) => m.role === 'system');
+    const turns = messages.filter((m) => m.role !== 'system');
+    // The last non-system message is always this request's actual user
+    // input (see ChatService.streamChat) — send that as the real prompt.
+    const latest = turns[turns.length - 1];
+    const history = turns.slice(0, -1);
 
     // opencode sessions carry their own history, but this app resends the
-    // full conversation on every request — so each call gets a throwaway
-    // session and prior turns are flattened into one prompt.
-    const transcript = messages
-      .filter((m) => m.role !== 'system')
-      .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
-      .join('\n\n');
-
-    const system = [systemMessage?.content, TRANSCRIPT_INSTRUCTION]
-      .filter(Boolean)
-      .join('\n\n');
+    // full conversation on every request, so each call gets a throwaway
+    // session. Earlier turns go into the system prompt as labeled
+    // reference context rather than into the prompt text itself — folding
+    // them into one "User: ... / Assistant: ..." blob and asking the model
+    // to continue it made weaker models treat the whole thing as text to
+    // complete, echoing prior turns back instead of answering.
+    const contextBlock = history.length
+      ? `\n\nPrevious conversation, for context only — do not repeat, quote, or continue it:\n${history
+          .map(
+            (m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`,
+          )
+          .join('\n\n')}`
+      : '';
+    const system = (systemMessage?.content ?? '') + contextBlock;
 
     const sessionID = await this.createSession(client);
 
     try {
-      yield* this.streamSession(
+      const raw = this.streamSession(
         client,
         sessionID,
         providerID,
         modelID,
         system,
-        transcript,
+        latest?.content ?? '',
       );
+      // Several free/cheap opencode models echo the prompt verbatim before
+      // actually answering, regardless of instructions or prompt shape —
+      // strip that off defensively rather than rely on any model behaving.
+      yield* this.stripLeadingEcho(raw, latest?.content ?? '');
     } finally {
       client.session.delete({ path: { id: sessionID } }).catch(() => {});
+    }
+  }
+
+  /** Buffers the start of `source` until it can tell whether it opens with a
+   * verbatim copy of `echoText`; strips that copy if so, then passes the
+   * rest of the stream through untouched. */
+  private async *stripLeadingEcho(
+    source: AsyncGenerator<string>,
+    echoText: string,
+  ): AsyncGenerator<string> {
+    const target = echoText.trim();
+    if (!target) {
+      yield* source;
+      return;
+    }
+
+    // Never `break` out of this loop — that would call source.return() and
+    // silently drop the rest of the stream. Once resolved, just pass chunks
+    // straight through instead of stopping the iteration.
+    let buffer = '';
+    let resolved = false;
+
+    for await (const chunk of source) {
+      if (resolved) {
+        yield chunk;
+        continue;
+      }
+
+      buffer += chunk;
+      const trimmed = buffer.replace(/^\s+/, '');
+      if (trimmed.length < target.length) {
+        if (target.startsWith(trimmed)) continue; // could still be the echo
+        resolved = true;
+        yield buffer;
+        continue;
+      }
+
+      resolved = true;
+      if (trimmed.startsWith(target)) {
+        const rest = trimmed.slice(target.length).replace(/^\s+/, '');
+        if (rest) yield rest;
+      } else {
+        yield buffer;
+      }
     }
   }
 
@@ -111,8 +162,8 @@ export class OpencodeProvider implements LLMProvider {
     sessionID: string,
     providerID: string,
     modelID: string,
-    system: string | undefined,
-    transcript: string,
+    system: string,
+    userMessage: string,
   ): AsyncGenerator<string> {
     const { stream: events } = await client.event.subscribe();
 
@@ -125,7 +176,7 @@ export class OpencodeProvider implements LLMProvider {
         body: {
           model: { providerID, modelID },
           system,
-          parts: [{ type: 'text', text: transcript }],
+          parts: [{ type: 'text', text: userMessage }],
         },
       }),
     ).then((res) =>

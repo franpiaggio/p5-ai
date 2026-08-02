@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
-import type { LLMProvider, LLMMessage, LLMStreamOptions } from './llm.interface';
+import type {
+  LLMProvider,
+  LLMMessage,
+  LLMStreamOptions,
+} from './llm.interface';
 
 const MAX_COMPLETION_TOKENS = 16_384;
 
@@ -48,7 +52,12 @@ export class OpenAIProvider implements LLMProvider {
         // are a near-copy of it, cutting latency 2-4x. Rejected prediction
         // tokens bill at output rates — acceptable for sketch-sized files.
         ...(options?.prediction && supportsPrediction(model)
-          ? { prediction: { type: 'content' as const, content: options.prediction } }
+          ? {
+              prediction: {
+                type: 'content' as const,
+                content: options.prediction,
+              },
+            }
           : {}),
       });
 

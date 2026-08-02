@@ -4,7 +4,7 @@ import { useEscapeClose } from '../../hooks/useEscapeClose';
 import { useAuthStore } from '../../store/authStore';
 import { useModelList, MODELS, PROVIDER_LABELS, providerNeedsApiKey } from '../../hooks/useModelList';
 import { useProviderKeysQuery, useSaveProviderKey, useClearProviderKey } from '../../hooks/useProviderKeys';
-import { updatePreferences } from '../../services/api';
+import { updatePreferences, startOpenRouterConnect } from '../../services/api';
 import { APP_THEMES } from '../Editor/editorConfig';
 import type { LLMConfig, ProviderKeys } from '../../types';
 
@@ -117,9 +117,11 @@ export function SettingsModal() {
 
   const isDemo = draft.provider === 'demo';
   const isOpencode = draft.provider === 'opencode';
+  const isOpenRouter = draft.provider === 'openrouter';
   const isKeyless = !providerNeedsApiKey(draft.provider);
   const currentKey = draft.keys[draft.provider] ?? '';
   const storedKeyMask = draft.storeApiKeys && !draft.pendingDeletes.includes(draft.provider) ? remoteKeys?.[draft.provider] : undefined;
+  const openRouterConnected = !!storedKeyMask || !!draft.keys.openrouter;
   const disabled = saving || loadingModels;
 
   const updateDraft = (partial: Partial<Draft>) => setDraft((prev) => prev ? { ...prev, ...partial } : prev);
@@ -220,7 +222,46 @@ export function SettingsModal() {
             </p>
           )}
 
-          {!isKeyless && (
+          {isOpenRouter && (
+            <div className="space-y-2">
+              <p className="text-[10px] text-info/60 bg-info/5 border border-info/15 rounded-lg px-3 py-2">
+                Connect your OpenRouter account to use your own credits across many models. No API key to paste — requests are billed to your OpenRouter balance.
+              </p>
+              {openRouterConnected ? (
+                <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-success/25 bg-success/5">
+                  <span className="text-[11px] text-success/80 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Account connected{storedKeyMask ? ` (${storedKeyMask})` : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleClearKey}
+                    className="text-[11px] text-error hover:underline cursor-pointer"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!user) {
+                      useAuthStore.getState().setIsLoginOpen(true);
+                      return;
+                    }
+                    void startOpenRouterConnect();
+                  }}
+                  className="btn-primary w-full"
+                >
+                  Connect OpenRouter account
+                </button>
+              )}
+            </div>
+          )}
+
+          {!isKeyless && !isOpenRouter && (
             <div>
               <label htmlFor="settings-api-key" className="block text-[10px] uppercase tracking-widest text-text-muted/50 mb-1.5">
                 API Key
@@ -294,7 +335,7 @@ export function SettingsModal() {
             </div>
           )}
 
-          {!isKeyless && user && (
+          {!isKeyless && !isOpenRouter && user && (
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"

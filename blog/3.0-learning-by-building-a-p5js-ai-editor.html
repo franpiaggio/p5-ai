@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What a tiny AI editor taught me</title>
+<meta name="description" content="I set out to build a mini web editor for p5.js with an AI assistant. The project became a course on how AI editors apply code changes, taught half by failures and half by the models themselves.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --paper: oklch(0.975 0.006 60);
+    --paper-deep: oklch(0.945 0.009 60);
+    --ink: oklch(0.26 0.012 40);
+    --ink-soft: oklch(0.45 0.014 40);
+    --faint: oklch(0.60 0.012 45);
+    --rule: oklch(0.88 0.010 55);
+    --accent: oklch(0.56 0.16 12);
+    --accent-ink: oklch(0.46 0.14 12);
+    --editor: oklch(0.235 0.022 265);
+    --editor-ink: oklch(0.88 0.012 260);
+    --editor-faint: oklch(0.62 0.02 260);
+    --col: 42rem;
+    --col-wide: 57rem;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 1.125rem/1.68 "Literata", Georgia, serif;
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header.masthead {
+    max-width: var(--col-wide);
+    margin: 0 auto;
+    padding: 1.6rem 1.5rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.85rem;
+  }
+  .masthead .wordmark { font-weight: 700; letter-spacing: 0.01em; }
+  .masthead .wordmark span { color: var(--accent); }
+  .masthead .section-name { color: var(--faint); font-weight: 500; }
+
+  .titleblock {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: clamp(3rem, 8vh, 5.5rem) 1.5rem 0;
+  }
+  h1 {
+    font-family: "Archivo", sans-serif;
+    font-weight: 700;
+    font-size: clamp(2rem, 5.2vw, 3rem);
+    line-height: 1.12;
+    letter-spacing: -0.022em;
+    margin: 0 0 1.2rem;
+  }
+  .standfirst {
+    font-size: 1.28rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    margin: 0 0 1.6rem;
+  }
+  .meta {
+    font-family: "Archivo", sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--faint);
+    padding-bottom: 2.2rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .meta b { color: var(--ink-soft); font-weight: 600; }
+
+  main {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: 0 1.5rem 5rem;
+  }
+  p { margin: 0 0 1.35rem; }
+  a {
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.16em;
+    text-decoration-color: oklch(0.56 0.16 12 / 0.4);
+  }
+  a:hover { text-decoration-color: currentColor; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  h2 {
+    font-family: "Archivo", sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    margin: 3.6rem 0 1.1rem;
+  }
+  h2 .no {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+  h3 {
+    font-family: "Archivo", sans-serif;
+    font-weight: 600;
+    font-size: 1.08rem;
+    letter-spacing: -0.01em;
+    margin: 2.2rem 0 0.7rem;
+  }
+  ul, ol { padding-left: 1.3rem; margin: 0 0 1.35rem; }
+  li { margin-bottom: 0.55rem; }
+  li::marker { color: var(--faint); }
+
+  nav.contents {
+    margin: 2.6rem 0 0;
+    padding: 1.4rem 0 0.4rem;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.92rem;
+  }
+  nav.contents h2 {
+    margin: 0 0 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  nav.contents ol {
+    margin: 0; padding: 0;
+    list-style: none;
+    columns: 2;
+    column-gap: 2.5rem;
+  }
+  nav.contents li { margin: 0 0 0.45rem; break-inside: avoid; }
+  nav.contents a { text-decoration: none; color: var(--ink-soft); }
+  nav.contents a:hover { color: var(--accent-ink); }
+  nav.contents .n { color: var(--accent); font-weight: 600; margin-right: 0.5em; font-variant-numeric: tabular-nums; }
+  @media (max-width: 540px) { nav.contents ol { columns: 1; } }
+
+  code {
+    font: 500 0.82em/1.6 "JetBrains Mono", monospace;
+    background: var(--paper-deep);
+    border-radius: 4px;
+    padding: 0.08em 0.32em;
+  }
+  pre {
+    background: var(--editor);
+    color: var(--editor-ink);
+    border-radius: 8px;
+    padding: 1.15rem 1.4rem;
+    overflow-x: auto;
+    margin: 1.7rem 0;
+    font-size: 0.83rem;
+    line-height: 1.65;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; font-weight: 400; }
+  pre .k { color: oklch(0.75 0.12 12); }
+  pre .c { color: var(--editor-faint); }
+  pre.mermaid {
+    background: none;
+    color: inherit;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+  pre.mermaid svg { width: 100%; }
+
+  figure {
+    margin: 2.2rem auto;
+    max-width: var(--col-wide);
+    width: calc(100vw - 3rem);
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  figure.fit { text-align: center; }
+  figure a.shot { display: block; text-decoration: none; }
+  figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  figure.half img { width: min(41rem, 100%); margin: 0 auto; }
+  figure .diagram {
+    display: flex;
+    justify-content: center;
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 1.6rem 1rem;
+    overflow-x: auto;
+  }
+  figcaption {
+    font-family: "Archivo", sans-serif;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: var(--faint);
+    max-width: var(--col);
+    margin: 0.75rem auto 0;
+    text-align: left;
+  }
+  figcaption b { color: var(--ink-soft); font-weight: 600; }
+
+  .tablewrap { overflow-x: auto; margin: 1.7rem 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    padding: 0.5rem 1rem 0.5rem 0;
+    border-bottom: 2px solid var(--ink);
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.65rem 1rem 0.65rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  td:first-child, th:first-child { font-weight: 600; }
+
+  aside.case {
+    font-family: "Archivo", sans-serif;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 0.9rem 1.2rem;
+    margin: 0 0 1.35rem;
+  }
+  aside.case b { color: var(--accent-ink); }
+
+  section.sources {
+    margin-top: 4rem;
+    padding-top: 1.8rem;
+    border-top: 1px solid var(--rule);
+  }
+  section.sources h2 { margin-top: 0; font-size: 1.15rem; }
+  section.sources ol {
+    margin: 0; padding-left: 1.4rem;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+  }
+  section.sources li { margin-bottom: 0.6rem; }
+  section.sources li::marker { color: var(--accent); font-weight: 600; }
+
+  footer.colophon {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: 0 1.5rem 4rem;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.85rem;
+    color: var(--faint);
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wordmark">p5<span>·</span>AI editor</div>
+  <div class="section-name">Engineering notes</div>
+</header>
+
+<div class="titleblock">
+  <h1>What a tiny AI editor taught me</h1>
+  <p class="standfirst">I set out to build a small p5.js editor with an AI
+  assistant. The hard part turned out to be how the AI edits code, and I
+  learned it the direct way: breaking things, asking, reading, rebuilding.</p>
+  <p class="meta"><b>July 2026</b> &nbsp;·&nbsp; 9 minute read &nbsp;·&nbsp;
+  <a href="https://github.com/franpiaggio">franpiaggio</a></p>
+</div>
+
+<main>
+
+<nav class="contents" aria-label="Contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><span class="n">1</span><a href="#plan">Small on purpose</a></li>
+    <li><span class="n">2</span><a href="#collision">The first collision</a></li>
+    <li><span class="n">3</span><a href="#tutor">LLMs as tutor</a></li>
+    <li><span class="n">4</span><a href="#cases">Case files</a></li>
+    <li><span class="n">5</span><a href="#loop">The learning loop</a></li>
+    <li><span class="n">6</span><a href="#advice">If you try this</a></li>
+  </ol>
+</nav>
+
+<h2 id="plan"><span class="no">Section 1</span>Small on purpose</h2>
+
+<p>I wanted to build a small web editor for <a href="https://p5js.org">p5.js</a>
+sketches: Monaco on the left, the running canvas on the right, and a chat
+where you type "make the particles smaller" and the change arrives as a diff
+you can accept or reject. The kind of interaction Cursor made normal, scoped
+down to creative coding.</p>
+
+<p>The small scope was the point. I was not trying to compete with Cursor; I
+was trying to understand it. A p5.js sketch is a few hundred lines: the whole
+codebase fits in one prompt, the whole problem fits in one head, and every
+result shows up on a canvas within a second. Hard to design a better
+laboratory.</p>
+
+<figure>
+  <a class="shot" href="images/editor-overview.png" target="_blank">
+    <img src="images/editor-overview.png"
+         alt="The p5 AI editor: code editor on the left, live p5.js preview on the right, AI chat panel at the bottom.">
+  </a>
+  <figcaption><b>Figure 1.</b> The thing I set out to build. Editor, live
+  preview, chat. It looks simple, and the front half is.</figcaption>
+</figure>
+
+<p>The front half <em>is</em> simple: an editor component, a sandboxed
+iframe, a streaming chat. I had that working quickly. Then I wired the chat
+to the editor, and the project stopped being simple in the most educational
+way possible.</p>
+
+<h2 id="collision"><span class="no">Section 2</span>The first collision</h2>
+
+<p>Version one of "the AI edits your code" was exactly what you would guess:
+send the sketch and the request to the model, get back a code block, replace
+the file with it. It worked in the demo. It kept working just long enough for
+me to trust it.</p>
+
+<p>Then the cracks appeared, one per week. Rewrites of a growing sketch got
+slow and expensive, because I was paying for 300 lines of output to change
+one. Models started eliding code on long files ("rest of the sketch
+unchanged"), which my naive replace turned into deletions. And I noticed I
+had no answer to a question I had never consciously asked: <strong>in what
+format should a model express a code edit?</strong></p>
+
+<p>I had assumed the answer was "code". It turns out the answer is a whole
+design space with names, benchmarks, published failure modes, and at least
+one company whose product is essentially a very good answer to it. I knew
+none of that. Which brings me to the part of this project I did not plan.</p>
+
+<h2 id="tutor"><span class="no">Section 3</span>LLMs as tutor</h2>
+
+<p>Here is the honest version of how I learned this material: I asked the
+models. Not to write the code first, but to <em>orient me</em>. My starting
+question was some form of "how does Cursor apply edits so fast?", and the
+answer, imperfect as it was, handed me the vocabulary I didn't have:
+<em>apply model</em>, <em>speculative decoding</em>, <em>search/replace
+blocks</em>, <em>edit format benchmarks</em>, <em>Aider</em>. You cannot
+search for a thing you cannot name. The single most valuable thing an LLM did
+for this project was turn my vague confusion into a list of proper nouns.</p>
+
+<p>From there a working method settled in, three rules long:</p>
+
+<ul>
+  <li><strong>Names from the model, facts from the source.</strong> Once I
+  had the vocabulary, I read the primary material: Aider's benchmark
+  write-ups, Cursor's engineering post on instant apply, the provider docs on
+  caching and predicted outputs. The model's summaries were directionally
+  right and wrong in details, roughly the ratio you'd expect from a very
+  well-read friend recalling papers from memory.</li>
+  <li><strong>Ask for failure modes, not features.</strong> "Explain
+  search/replace blocks" gets you marketing. "How do search/replace blocks
+  fail in practice?" gets you trailing whitespace, ambiguous matches, and
+  models drifting on indentation, which is precisely the list of things I
+  would spend the next weeks handling. Failure-mode questions are where LLM
+  tutoring earns its keep.</li>
+  <li><strong>Verify by building.</strong> Every technique got a smallest
+  testable version in the editor the same day I learned it. The sketch on the
+  canvas is merciless ground truth: either the particles got smaller or they
+  didn't. A tutor that can be checked against reality is safe to learn from;
+  one that can't is a rumor mill.</li>
+</ul>
+
+<p>One more thing worth admitting: the models were also my rubber duck for
+design decisions. "Here is my matching cascade, argue against it" produced
+better objections than I produced alone. The pattern that never worked was
+asking for agreement; the pattern that always worked was asking for
+attack.</p>
+
+<h2 id="cases"><span class="no">Section 4</span>Case files</h2>
+
+<p>Every technique in the editor arrived the same way: something broke, I
+asked and read until I understood it, and a small implementation shipped.
+Four of those cycles, in order.</p>
+
+<h3>Case 1: the expensive rewrite</h3>
+
+<aside class="case"><b>Broke:</b> one-line tweaks cost a full-file rewrite,
+in tokens and in waiting.&nbsp; <b>Learned:</b> the taxonomy of edit formats,
+and why the industry converged on content-addressed
+patches.&nbsp; <b>Shipped:</b> two response formats, chosen by the model:
+full code for rewrites, search/replace blocks for edits.</aside>
+
+<p>The fix is a contract in the system prompt: two formats and a rule for
+choosing. Big changes come back as a full file; small ones come back as
+search/replace blocks:</p>
+
+<pre><code><span class="k">&lt;&lt;&lt;SEARCH</span>
+  background(30);
+<span class="k">===</span>
+  background(48, 24, 38);
+<span class="k">&gt;&gt;&gt;REPLACE</span></code></pre>
+
+<p>Find this text, replace it with that text. Understanding why this format
+wins meant understanding why the alternatives lose, and each one loses
+differently:</p>
+
+<div class="tablewrap">
+<table>
+  <thead>
+    <tr><th>Format</th><th>Addresses by</th><th>Reliability</th><th>Cost for a 1-line edit</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Full rewrite</td><td>nothing</td><td>Highest</td><td>Whole file</td></tr>
+    <tr><td>Line numbers</td><td>position</td><td>Lowest</td><td>Minimal</td></tr>
+    <tr><td>Unified diff</td><td>position + context</td><td>Low as specified</td><td>Low</td></tr>
+    <tr><td>Search/replace</td><td>content</td><td>High</td><td>Low</td></tr>
+    <tr><td>Lazy edit + apply model</td><td>content, learned</td><td>High</td><td>Low + a second model</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>Line-number edits</strong> ("replace lines 7 through 7 with...")
+have the best economics on paper and the worst reliability in practice,
+because models cannot count lines. A model reads the file as a token stream,
+not a numbered grid; its idea of "line 7" comes from attention, not an
+index, and it is frequently off by one with complete confidence. Worse, if a
+reply contains three edits, applying the first one shifts the line numbers
+of the other two.</p>
+
+<p><strong>Unified diffs</strong>, the git format, carry context lines,
+which helps, but the hunk header (<code>@@ -4,7 +4,7 @@</code>) is a
+line-number edit hiding inside a better format. Aider's fix is revealing:
+their applier ignores the line numbers entirely and locates hunks by
+searching for the context lines instead,<sup><a href="#src-2">[2]</a></sup>
+which quietly turns diffs into search/replace.</p>
+
+<p><strong>Search/replace</strong> asks the model for the one thing it does
+reliably with code it just read: quoting it. Aider's benchmarks across
+models settled on this as the most reliable practical
+format,<sup><a href="#src-1">[1]</a></sup> and my numbers agreed: a one-line
+change went from roughly 2,400 output tokens to 30.</p>
+
+<p><strong>The lazy edit plus apply model</strong> is Cursor's route: let
+the big model write a sketchy partial edit, then have a small fine-tuned
+model merge it into the file at around a thousand tokens per
+second.<sup><a href="#src-3">[3]</a></sup> The right answer if you can train
+and serve a second model. I couldn't, which becomes relevant in case 3.</p>
+
+<h3>Case 2: near matches</h3>
+
+<aside class="case"><b>Broke:</b> search/replace blocks failing on invisible
+differences: a trailing space, a tab.&nbsp; <b>Learned:</b> models
+reconstruct code from attention, not from a copy buffer; drift is structural,
+not a bug you can prompt away.&nbsp; <b>Shipped:</b> a three-tier matching
+cascade, exact first, then whitespace-insensitive, then
+indentation-insensitive, with a hard uniqueness rule at the fuzzy tiers.</aside>
+
+<p>The instructive part was <em>why</em> the drift happens. I had been
+treating the model like it had the file in a clipboard. It doesn't. It has a
+probabilistic memory of the file, and its quote of your code is a
+reconstruction. So the fix stopped being "write a sterner prompt" and became
+"meet the reconstruction halfway".</p>
+
+<p>Concretely, each block gets three attempts:</p>
+
+<figure class="fit">
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart TD
+    A[Search block] --> B{Exact substring&lt;br/&gt;match?}
+    B -- yes --> C[Replace first occurrence]
+    B -- no --> D{Per-line match,&lt;br/&gt;ignoring trailing&lt;br/&gt;whitespace?}
+    D -- "exactly 1" --> E[Splice replacement lines]
+    D -- no --> F{Per-line match,&lt;br/&gt;fully trimmed&lt;br/&gt;indent-insensitive?}
+    F -- "exactly 1" --> G[Re-indent replacement&lt;br/&gt;to the target, splice]
+    F -- "0 or >1" --> H[Fail the block:&lt;br/&gt;not found / ambiguous]
+    style H fill:#7a2b2b,color:#fff
+    </pre>
+  </div>
+  <figcaption><b>Figure 2.</b> The matching cascade. Each tier forgives one
+  observed failure mode; ambiguity at a fuzzy tier fails the block rather
+  than guessing.</figcaption>
+</figure>
+
+<p>Exact substring match first. Failing that, a line-by-line match that
+ignores trailing whitespace, the most common drift. Failing that, a fully
+trimmed match that ignores indentation and re-indents the replacement to fit
+the file, so the file stays consistent even when the model's memory of it
+wasn't. One rule keeps the fuzzy tiers honest: the match must be unique. If
+a trimmed search fits two places, the block fails instead of guessing,
+because an edit applied in the wrong place corrupts the sketch silently, and
+a failed edit is just a retry. Only one of those is dangerous.</p>
+
+<h3>Case 3: the wiped sketch</h3>
+
+<aside class="case"><b>Broke:</b> I asked a small demo model for smaller
+particles; it replied with only the loop it changed; my client treated that
+fragment as the whole file and wiped the sketch.&nbsp; <b>Learned:</b> this
+failure class is exactly what Cursor trained a dedicated apply model
+for.&nbsp; <b>Shipped:</b> a fragment detector plus anchor-based merging, and
+a rule that unmergeable fragments are dropped, not guessed at.</aside>
+
+<p>This one hurt and taught in proportion. The history panel recovered the
+sketch, but "the undo button saved us" is not an architecture. The defense I
+ended up with has two halves.</p>
+
+<p><strong>Detection.</strong> A block claiming to be a full file gets
+flagged as a fragment if its first line is indented (no complete file starts
+mid-scope), if it targets the main sketch but never declares
+<code>setup()</code>, or if it is under half the target file's size and
+re-declares none of its symbols.</p>
+
+<p><strong>Merging.</strong> Once a fragment is detected, the right move is
+not to reject it. The model's edit is usually correct, just incomplete. So
+the client tries to place it:</p>
+
+<figure class="fit">
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+    subgraph File["Existing file"]
+        L1["let plankton = [];"]
+        L2["function setup() {"]
+        L3["  for (let i...) {   ◄ anchor"]
+        L4["    size: random(2, 6),"]
+        L5["    hue: random(...)  ◄ anchor"]
+        L6["  }"]
+        L7["}"]
+        L8["function draw() {...}"]
+    end
+    subgraph Fragment
+        F1["  for (let i...) {"]
+        F2["    size: random(1, 3),"]
+        F3["    hue: random(...)"]
+        F4["  }"]
+    end
+    F1 -.match.-> L3
+    F3 -.match.-> L5
+    </pre>
+  </div>
+  <figcaption><b>Figure 3.</b> Anchor merging. Fragment lines that appear
+  exactly once in the file pin the fragment to a region; the region is
+  replaced, and the rest of the file survives.</figcaption>
+</figure>
+
+<p>The fragment's lines that appear exactly once in the file, compared
+trimmed, become anchors: unique landmarks that pin the fragment to a
+location. If at least two anchors line up in the same order they appear in
+the fragment, the region they span is replaced by the fragment and the rest
+of the file survives. The one-line change lands as a one-line diff, and
+<code>draw()</code> lives. No safe anchors, no edit: the suggestion stays
+visible in chat instead, where you can apply it by hand or ask again. A poor
+man's apply model, no training required.</p>
+
+<h3>Case 4: the growing bill</h3>
+
+<aside class="case"><b>Broke:</b> nothing visible. The bill just grew faster
+than usage did.&nbsp; <b>Learned:</b> my prompt was resending the same sketch
+five times per request (once as context, four more inside chat history), and
+prompt caching only works on a stable prefix.&nbsp; <b>Shipped:</b>
+history code-stripping, cache breakpoints ordered most-stable-first, and
+predicted outputs where the provider supports them.</aside>
+
+<p>Two changes fixed it. First, older assistant messages get their code
+blocks replaced with a short placeholder before sending; only the newest
+reply keeps its code, so "apply what you just suggested" still works.
+Second, the prompt is assembled most-stable-first, with cache breakpoints
+after the stable parts:</p>
+
+<figure class="fit">
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+    subgraph Request["Prompt assembly (per request)"]
+        SP["System prompt&lt;br/&gt;📌 cache breakpoint"] --> CC["Current sketch files&lt;br/&gt;📌 cache breakpoint"]
+        CC --> H["History (last 10)&lt;br/&gt;older code stripped"]
+        H --> M["New user message"]
+    end
+    </pre>
+  </div>
+  <figcaption><b>Figure 4.</b> Prompt assembly, most-stable-first. The
+  expensive parts sit inside the cached region.</figcaption>
+</figure>
+
+<p>The ordering is the entire trick. Providers cache a stable
+prefix<sup><a href="#src-4">[4]</a></sup> and cached tokens bill at roughly
+a tenth of the price, so the prompt goes from most stable to most volatile:
+the system prompt never changes, the sketch changes only when you edit it,
+the history changes every turn. The fix was not "send less"; it was "put the
+unchanging parts where the cache can see them". Where the provider supports
+it, the current code also goes along as a predicted
+output,<sup><a href="#src-5">[5]</a></sup> which makes full rewrites decode
+2&ndash;4&times; faster because a rewrite is a near-copy of the file.</p>
+
+<h2 id="loop"><span class="no">Section 5</span>The learning loop</h2>
+
+<p>Lay the four cases side by side and the same shape repeats:</p>
+
+<figure class="fit">
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+    A[Something breaks&lt;br/&gt;in the editor] --> B[Ask an LLM:&lt;br/&gt;name the problem space]
+    B --> C[Read the primary&lt;br/&gt;sources it pointed to]
+    C --> D[Build the smallest&lt;br/&gt;testable version]
+    D --> E{Does the sketch&lt;br/&gt;behave?}
+    E -- no --> B
+    E -- yes --> F[Technique ships,&lt;br/&gt;writeup follows]
+    F --> A
+    </pre>
+  </div>
+  <figcaption><b>Figure 5.</b> The learning loop. The canvas is the exam; the
+  LLM is the tutor; the primary sources are the textbook.</figcaption>
+</figure>
+
+<p>None of the three parts works alone. The LLM without sources drifts into
+plausible fiction. The sources without a project are trivia. The project
+without the tutor moves at the speed of my ignorance. Together they
+compound: every incident became a technique, and every technique became a
+writeup.</p>
+
+<p>What closes the loop is the domain. p5.js verifies every experiment for
+free: the canvas does what you asked, or it doesn't. That became my main
+criterion for choosing a learning project. Not "is it impressive", but
+<strong>"does it grade my homework instantly"</strong>.</p>
+
+<h2 id="advice"><span class="no">Section 6</span>If you try this</h2>
+
+<p>The recipe generalizes beyond editors:</p>
+
+<ul>
+  <li><strong>Build the toy version of the thing you admire.</strong> Small
+  enough to fit in your head, real enough to break. The breakages are the
+  curriculum; my four best lessons were four failures.</li>
+  <li><strong>Pick a domain with instant ground truth.</strong> Creative
+  coding, games, plotters, anything visual. A learning loop is only as fast
+  as its verification step.</li>
+  <li><strong>Use LLMs to get the vocabulary, then leave.</strong> Their
+  superpower is converting confusion into searchable names. Take the names to
+  the primary sources; come back with hard questions.</li>
+  <li><strong>Ask for failure modes and for attacks.</strong> "How does this
+  break" and "argue against my design" consistently outperformed "explain
+  this" and "is this good".</li>
+  <li><strong>Ship the smallest testable version the same day.</strong>
+  Understanding you haven't executed is a feeling, not knowledge.</li>
+</ul>
+
+<p>The editor ended up genuinely fun to use, which matters more than I
+expected: playing keeps finding edge cases, and edge cases keep the loop
+spinning. But the tool was never really the deliverable. The understanding
+was. This is what the project was for.</p>
+
+<section class="sources" id="sources">
+  <h2>Sources &amp; further reading</h2>
+  <ol>
+    <li id="src-1">Aider, <a href="https://aider.chat/docs/benchmarks.html">Edit
+    format benchmarks</a>. Reliability of edit formats measured across
+    models; the primary material behind cases 1 and 2.</li>
+    <li id="src-2">Aider, <a href="https://aider.chat/2023/12/21/unified-diffs.html">Unified
+    diffs make GPT-4 Turbo 3&times; less lazy</a>. Includes the applier
+    design that ignores hunk line numbers.</li>
+    <li id="src-3">Cursor, <a href="https://cursor.com/blog/instant-apply">Near-instant
+    full-file edits</a>. The lazy-edit plus fine-tuned apply-model
+    architecture, the industrial solution to case 3.</li>
+    <li id="src-4">Anthropic, <a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching">Prompt
+    caching</a>. How cache breakpoints work and what cached tokens cost.</li>
+    <li id="src-5">OpenAI, <a href="https://platform.openai.com/docs/guides/predicted-outputs">Predicted
+    Outputs</a>. Speculative decoding against a known likely output.</li>
+    <li>Aider, <a href="https://aider.chat/docs/more/edit-formats.html">Edit
+    formats reference</a>. The whole, diff, and editblock formats as
+    shipped.</li>
+    <li><a href="https://p5js.org">p5.js</a>. The creative-coding library
+    this is all in service of.</li>
+  </ol>
+</section>
+
+</main>
+
+<footer class="colophon">
+  Built with React, Monaco, and NestJS. The screenshot is of the real app;
+  the editing machinery described here is about 600 lines of plain
+  TypeScript.
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'base',
+    themeVariables: {
+      fontFamily: 'Archivo, sans-serif',
+      fontSize: '15px',
+      primaryColor: '#efe8e0',
+      primaryTextColor: '#3a332e',
+      primaryBorderColor: '#c8bcb0',
+      lineColor: '#8d8177',
+      clusterBkg: '#f2ece5',
+      clusterBorder: '#d5cabf',
+      edgeLabelBackground: '#f8f4ef',
+      tertiaryColor: '#f2ece5',
+    },
+  });
+  window.addEventListener('load', async () => {
+    await mermaid.run({ querySelector: 'pre.mermaid' });
+    document.querySelectorAll('pre.mermaid svg').forEach((svg) => {
+      const natural = parseFloat(svg.style.maxWidth) || svg.viewBox.baseVal.width;
+      svg.style.minWidth = Math.min(natural, 640) + 'px';
+    });
+  });
+</script>
+</body>
+</html>

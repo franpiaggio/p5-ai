@@ -10,6 +10,11 @@ import { allowedOrigins } from './common/origin.guard';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
+  // Behind nginx (prod) the client IP arrives in X-Forwarded-For. Trusting the
+  // first hop makes req.ip the real client — used for anonymous free-usage quota
+  // and throttling. Harmless in dev (localhost).
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   const baseJsonLimit = process.env.JSON_LIMIT ?? '256kb';
   const chatJsonLimit = process.env.CHAT_JSON_LIMIT ?? '12mb';
 
@@ -18,13 +23,18 @@ async function bootstrap() {
     compression({
       filter: (req, res) => {
         const ct = res.getHeader('Content-Type');
-        if (typeof ct === 'string' && ct.includes('text/event-stream')) return false;
+        if (typeof ct === 'string' && ct.includes('text/event-stream'))
+          return false;
         return compression.filter(req, res);
       },
     }),
   );
   app.use((req, res, next) => {
-    if (req.path.startsWith('/api/chat') || req.path.startsWith('/api/sketches')) return next();
+    if (
+      req.path.startsWith('/api/chat') ||
+      req.path.startsWith('/api/sketches')
+    )
+      return next();
     return json({ limit: baseJsonLimit })(req, res, next);
   });
   app.use('/api/sketches', json({ limit: '2mb' }));

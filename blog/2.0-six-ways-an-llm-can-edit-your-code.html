@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Six ways an LLM can edit your code</title>
+<meta name="description" content="A taxonomy of edit formats for AI code editors, from full-file rewrites to fine-tuned apply models: the same one-line change expressed in every format, with each format's failure mode.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --paper: oklch(0.975 0.006 60);
+    --paper-deep: oklch(0.945 0.009 60);
+    --ink: oklch(0.26 0.012 40);
+    --ink-soft: oklch(0.45 0.014 40);
+    --faint: oklch(0.60 0.012 45);
+    --rule: oklch(0.88 0.010 55);
+    --accent: oklch(0.56 0.16 12);
+    --accent-ink: oklch(0.46 0.14 12);
+    --editor: oklch(0.235 0.022 265);
+    --editor-ink: oklch(0.88 0.012 260);
+    --editor-faint: oklch(0.62 0.02 260);
+    --col: 42rem;
+    --col-wide: 57rem;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 1.125rem/1.68 "Literata", Georgia, serif;
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  header.masthead {
+    max-width: var(--col-wide);
+    margin: 0 auto;
+    padding: 1.6rem 1.5rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.85rem;
+  }
+  .masthead .wordmark { font-weight: 700; letter-spacing: 0.01em; }
+  .masthead .wordmark span { color: var(--accent); }
+  .masthead .section-name { color: var(--faint); font-weight: 500; }
+
+  .titleblock {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: clamp(3rem, 8vh, 5.5rem) 1.5rem 0;
+  }
+  h1 {
+    font-family: "Archivo", sans-serif;
+    font-weight: 700;
+    font-size: clamp(2rem, 5.2vw, 3rem);
+    line-height: 1.12;
+    letter-spacing: -0.022em;
+    margin: 0 0 1.2rem;
+  }
+  .standfirst {
+    font-size: 1.28rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    margin: 0 0 1.6rem;
+  }
+  .meta {
+    font-family: "Archivo", sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--faint);
+    padding-bottom: 2.2rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .meta b { color: var(--ink-soft); font-weight: 600; }
+
+  main {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: 0 1.5rem 5rem;
+  }
+  p { margin: 0 0 1.35rem; }
+  a {
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.16em;
+    text-decoration-color: oklch(0.56 0.16 12 / 0.4);
+  }
+  a:hover { text-decoration-color: currentColor; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  h2 {
+    font-family: "Archivo", sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    margin: 3.6rem 0 1.1rem;
+  }
+  h2 .no {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+  ul { padding-left: 1.3rem; margin: 0 0 1.35rem; }
+  li { margin-bottom: 0.55rem; }
+  li::marker { color: var(--faint); }
+
+  nav.contents {
+    margin: 2.6rem 0 0;
+    padding: 1.4rem 0 0.4rem;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.92rem;
+  }
+  nav.contents h2 {
+    margin: 0 0 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  nav.contents ol {
+    margin: 0; padding: 0;
+    list-style: none;
+    columns: 2;
+    column-gap: 2.5rem;
+  }
+  nav.contents li { margin: 0 0 0.45rem; break-inside: avoid; }
+  nav.contents a { text-decoration: none; color: var(--ink-soft); }
+  nav.contents a:hover { color: var(--accent-ink); }
+  nav.contents .n { color: var(--accent); font-weight: 600; margin-right: 0.5em; font-variant-numeric: tabular-nums; }
+  @media (max-width: 540px) { nav.contents ol { columns: 1; } }
+
+  code {
+    font: 500 0.82em/1.6 "JetBrains Mono", monospace;
+    background: var(--paper-deep);
+    border-radius: 4px;
+    padding: 0.08em 0.32em;
+  }
+  pre {
+    background: var(--editor);
+    color: var(--editor-ink);
+    border-radius: 8px;
+    padding: 1.15rem 1.4rem;
+    overflow-x: auto;
+    margin: 1.7rem 0;
+    font-size: 0.83rem;
+    line-height: 1.65;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; font-weight: 400; }
+  pre .k { color: oklch(0.75 0.12 12); }
+  pre .c { color: var(--editor-faint); }
+  pre .add { color: oklch(0.78 0.11 150); }
+  pre .del { color: oklch(0.72 0.13 20); }
+  pre.mermaid {
+    background: none;
+    color: inherit;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+  pre.mermaid svg { width: 100%; }
+
+  figure {
+    margin: 2.2rem auto;
+    max-width: var(--col-wide);
+    width: calc(100vw - 3rem);
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  figure.fit { text-align: center; }
+  figure .diagram {
+    display: flex;
+    justify-content: center;
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 1.6rem 1rem;
+    overflow-x: auto;
+  }
+  figcaption {
+    font-family: "Archivo", sans-serif;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: var(--faint);
+    max-width: var(--col);
+    margin: 0.75rem auto 0;
+    text-align: left;
+  }
+  figcaption b { color: var(--ink-soft); font-weight: 600; }
+
+  .tablewrap { overflow-x: auto; margin: 1.7rem 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    padding: 0.5rem 1rem 0.5rem 0;
+    border-bottom: 2px solid var(--ink);
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.65rem 1rem 0.65rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  td:first-child, th:first-child { font-weight: 600; }
+
+  aside.verdict {
+    font-family: "Archivo", sans-serif;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 0.9rem 1.2rem;
+    margin: 0 0 1.35rem;
+  }
+  aside.verdict b { color: var(--accent-ink); }
+
+  section.sources {
+    margin-top: 4rem;
+    padding-top: 1.8rem;
+    border-top: 1px solid var(--rule);
+  }
+  section.sources h2 { margin-top: 0; font-size: 1.15rem; }
+  section.sources ol {
+    margin: 0; padding-left: 1.4rem;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+  }
+  section.sources li { margin-bottom: 0.6rem; }
+  section.sources li::marker { color: var(--accent); font-weight: 600; }
+
+  footer.colophon {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: 0 1.5rem 4rem;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.85rem;
+    color: var(--faint);
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wordmark">p5<span>·</span>AI editor</div>
+  <div class="section-name">Engineering notes</div>
+</header>
+
+<div class="titleblock">
+  <h1>Six ways an LLM can edit your code</h1>
+  <p class="standfirst">A taxonomy of edit formats, from the dumbest to the
+  most industrial. The same one-line change expressed in every format, with
+  each format's characteristic way of failing.</p>
+  <p class="meta"><b>July 2026</b> &nbsp;·&nbsp; 7 minute read &nbsp;·&nbsp;
+  article 2.0 &nbsp;·&nbsp; <a href="https://github.com/franpiaggio">franpiaggio</a></p>
+</div>
+
+<main>
+
+<nav class="contents" aria-label="Contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><span class="n">1</span><a href="#contract">The contract problem</a></li>
+    <li><span class="n">2</span><a href="#rewrite">Full-file rewrite</a></li>
+    <li><span class="n">3</span><a href="#lines">Line-number edits</a></li>
+    <li><span class="n">4</span><a href="#udiff">Unified diff</a></li>
+    <li><span class="n">5</span><a href="#sr">Search/replace blocks</a></li>
+    <li><span class="n">6</span><a href="#lazy">Lazy edit + apply model</a></li>
+    <li><span class="n">7</span><a href="#ast">Structural edits</a></li>
+    <li><span class="n">8</span><a href="#choosing">Choosing</a></li>
+  </ol>
+</nav>
+
+<h2 id="contract"><span class="no">Section 1</span>The contract problem</h2>
+
+<p>A language model cannot reach into your editor and move the cursor. It can
+only emit text. So every AI coding tool needs a contract with its model: when
+you want to change the code, express the change in this format, and I will
+parse it and apply it. The format you choose determines your token bill, your
+latency, and, above all, how often edits fail to land.</p>
+
+<p>This piece walks through the six formats in use today, simplest first.
+While building an <a href="1.3-building-a-cursor-like-editor-for-p5js.html">AI
+editor for p5.js sketches</a> I ended up trying or studying all of them, and
+the interesting part is that each one fails in its own characteristic way.
+The failures, more than the successes, explain why the industry settled where
+it did.</p>
+
+<p>One running example throughout. The file is a 17-line p5.js sketch, and
+the user asked for a warmer background. The change is one line:</p>
+
+<pre><code><span class="c">// line 7, inside draw():</span>
+<span class="del">-  background(30);</span>
+<span class="add">+  background(48, 24, 38);</span></code></pre>
+
+<p>Here is what that one-line change looks like in each format.</p>
+
+<h2 id="rewrite"><span class="no">Section 2 · Format 1</span>Full-file rewrite</h2>
+
+<p>The model sends the entire file again, changed line included:</p>
+
+<pre><code>function setup() {
+  createCanvas(windowWidth, windowHeight);
+  rectMode(CENTER);
+}
+
+function draw() {
+<span class="add">  background(48, 24, 38);</span>
+  translate(width / 2, height / 2);
+  <span class="c">// ...ten more lines, all identical to what you already have</span>
+}</code></pre>
+
+<p>This is what raw ChatGPT does, and it is worth taking seriously before
+dismissing it: it is the <em>most reliable format that exists</em>. There is
+nothing to match, nothing to locate, no way to apply the edit in the wrong
+place. Parsing is trivial. For brand-new files it is the only option, and for
+small files it is honestly fine.</p>
+
+<p>The failure is economic, and it scales with file size. You pay output
+tokens (the expensive kind) for every unchanged line, and you wait for them
+too, because generation is sequential. A one-line change to a 300-line file
+costs roughly 2,400 output tokens and arrives at typing speed. There is also
+a subtler failure: models get lazy on long rewrites and truncate or elide
+("rest of the file unchanged"), which silently deletes everything they didn't
+repeat. A format whose worst case is <em>deleting most of the file</em> needs
+guardrails.</p>
+
+<aside class="verdict"><b>Verdict.</b> Perfect reliability, worst economics.
+Right for new files and genuine rewrites; wasteful for everything else.</aside>
+
+<h2 id="lines"><span class="no">Section 3 · Format 2</span>Line-number edits</h2>
+
+<p>The obvious optimization: address the change by position instead of
+repeating content.</p>
+
+<pre><code>{ <span class="k">"start_line"</span>: 7, <span class="k">"end_line"</span>: 7,
+  <span class="k">"replacement"</span>: "  background(48, 24, 38);" }</code></pre>
+
+<p>Minimal tokens, trivially parseable, and it looks like an API call, which
+makes it attractive for tool-calling designs. It is also the format that
+fails most often in practice, for a reason that sounds like a joke but is
+thoroughly documented: <strong>language models cannot reliably count
+lines</strong>. A model reads the file as a token stream, not as a numbered
+grid; its idea of "line 7" comes from soft attention, not from an index. It
+is frequently off by one or two, and off-by-one in this format means the edit
+lands on the wrong line with complete confidence.</p>
+
+<p>There is a second failure baked in: staleness. If the model emits three
+edits in one reply, applying the first one shifts every line number below it.
+Either the model has to predict the shifted positions of its own future edits
+(it can't), or the client has to apply edits bottom-up and hope no ranges
+overlap. Every tool that has tried pure line-number addressing has either
+abandoned it or wrapped it in verification.</p>
+
+<aside class="verdict"><b>Verdict.</b> Best economics on paper, worst
+reliability in practice. Positions are the one thing models are bad at
+quoting.</aside>
+
+<h2 id="udiff"><span class="no">Section 4 · Format 3</span>Unified diff</h2>
+
+<p>The format git has used for decades, and the one every model has seen
+millions of times in training:</p>
+
+<pre><code><span class="k">@@ -4,7 +4,7 @@</span>
+ function draw() {
+<span class="del">-  background(30);</span>
+<span class="add">+  background(48, 24, 38);</span>
+   translate(width / 2, height / 2);</code></pre>
+
+<p>Compact, familiar, and it carries context lines, which is a real
+improvement over bare positions: the context anchors the change to content,
+not just to a number. GPT-4 Turbo in particular got measurably less lazy when
+asked for diffs instead of full files; Aider's benchmark run on lazy-coding
+tasks cut task failures roughly in half by switching to
+diffs.<sup><a href="#src-2">[2]</a></sup></p>
+
+<p>But the hunk header is a line-number edit hiding inside a better format.
+<code>@@ -4,7 +4,7 @@</code> claims "starting at line 4, seven lines". Models
+get those numbers wrong constantly, and a hunk whose numbers don't match its
+context is, by the strict rules of <code>patch</code>, unappliable. Aider's
+fix is telling: their applier <em>ignores the line numbers entirely</em> and
+locates hunks by searching for the context lines
+instead.<sup><a href="#src-2">[2]</a></sup> Which means the thing that makes
+LLM unified diffs work is quietly turning them into the next format on this
+list.</p>
+
+<aside class="verdict"><b>Verdict.</b> Good economics, mediocre reliability
+as specified. Only works when the applier stops trusting the part of the
+format that makes it a diff.</aside>
+
+<h2 id="sr"><span class="no">Section 5 · Format 4</span>Search/replace blocks</h2>
+
+<p>Drop the pretense of positions altogether. Quote the code to change, then
+the code to change it to:</p>
+
+<pre><code><span class="k">&lt;&lt;&lt;SEARCH</span>
+  background(30);
+<span class="k">===</span>
+  background(48, 24, 38);
+<span class="k">&gt;&gt;&gt;REPLACE</span></code></pre>
+
+<p>This works because it asks the model for the one thing it is genuinely
+good at: quoting text it just read. No counting, no arithmetic, no
+bookkeeping across edits. Aider's public benchmarks across models settled on
+this as the most reliable practical format,<sup><a href="#src-1">[1]</a></sup>
+and it is what my editor uses: the one-line change above costs about 30
+output tokens instead of 2,400.</p>
+
+<p>Its characteristic failure is subtler than the others: <strong>near
+match</strong>. The model reconstructs the SEARCH text from attention over a
+long context and drifts on invisible details: a trailing space, tab width, a
+semicolon. A naive <code>indexOf</code> applier then reports "not found" for
+an edit that is 99% correct. The mitigations are client-side and well
+understood: cascading match tolerance (exact, then
+whitespace-insensitive, then indentation-insensitive), and a hard rule that
+fuzzy matches must be unique in the file, because applying an edit in the
+wrong one of two candidate locations is far worse than failing. I covered
+the full cascade in
+<a href="1.3-building-a-cursor-like-editor-for-p5js.html#cascade">article
+1, section 5</a>.</p>
+
+<aside class="verdict"><b>Verdict.</b> The practical sweet spot: good
+economics, high reliability, and its failures are fixable on the client.
+This is the format to beat.</aside>
+
+<h2 id="lazy"><span class="no">Section 6 · Format 5</span>Lazy edit + apply model</h2>
+
+<p>The industrial answer, used by Cursor. Let the big model write the change
+the way models naturally want to, sketchy and incomplete:</p>
+
+<pre><code>function draw() {
+<span class="add">  background(48, 24, 38);</span>
+  <span class="c">// ... existing code ...</span>
+}</code></pre>
+
+<p>Then hand that sketch, plus the real file, to a <em>second model</em>: a
+small one, fine-tuned exclusively for merging, running under speculative
+decoding at around a thousand tokens per
+second.<sup><a href="#src-3">[3]</a></sup> The big model spends its
+intelligence deciding <em>what</em> to change; the apply model spends its
+speed working out <em>where</em>. Laziness stops being a failure mode and
+becomes the format itself.</p>
+
+<p>The catch is the price of admission: you have to train, host, and serve a
+custom model, and its mistakes are a new failure surface that you own. This
+is the right trade for a company whose product applies millions of edits a
+day. For everyone else, a heuristic approximation covers a surprising amount
+of the ground: detect that a block is a fragment (it starts mid-scope, or is
+far too short to be the whole file), then anchor its unique lines against the
+file and replace the spanned region. That client-side version is
+<a href="1.3-building-a-cursor-like-editor-for-p5js.html#fragments">article
+1, section 6</a>.</p>
+
+<aside class="verdict"><b>Verdict.</b> The best user experience in the
+business, bought with a second model. Approximable client-side if you accept
+refusing the unmergeable cases.</aside>
+
+<h2 id="ast"><span class="no">Section 7 · Format 6</span>Structural edits</h2>
+
+<p>The formats so far treat code as text. The last family treats it as
+structure: address the edit to a syntactic unit instead of a location.</p>
+
+<pre><code>{ <span class="k">"replace_function"</span>: "draw",
+  <span class="k">"body"</span>: "function draw() {\n  background(48, 24, 38);\n  ..." }</code></pre>
+
+<p>The appeal is real: function names are stable addresses. They survive the
+file being edited above them, they can't be off by one, and a parser can
+verify the result compiles. Tools in the refactoring tradition, and some
+agent frameworks, use exactly this.</p>
+
+<p>Why hasn't it won? Three quiet costs. The unit of edit is the whole
+function, so a one-line change inside a 60-line <code>draw()</code> resends
+60 lines: the economics regress toward the full rewrite. Not every edit
+lives inside a neat unit: imports, top-level constants, comments, and CSS
+have no function name to address. And the applier now needs a parser per
+language, which turns a text-pipeline problem into a compiler-tooling
+problem. Structural editing shines for <em>mechanical</em> refactors done by
+deterministic tools; as an LLM output format, the text-based formats beat it
+on flexibility and cost.</p>
+
+<aside class="verdict"><b>Verdict.</b> Precise addressing, coarse
+granularity. Great for tooling-driven refactors, rarely optimal as a model's
+output format.</aside>
+
+<h2 id="choosing"><span class="no">Section 8</span>Choosing</h2>
+
+<p>Laid side by side:</p>
+
+<div class="tablewrap">
+<table>
+  <thead>
+    <tr><th>Format</th><th>Addresses by</th><th>Reliability</th><th>Cost for a 1-line edit</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Full rewrite</td><td>nothing</td><td>Highest</td><td>Whole file</td></tr>
+    <tr><td>Line numbers</td><td>position</td><td>Lowest</td><td>Minimal</td></tr>
+    <tr><td>Unified diff</td><td>position + context</td><td>Low as specified</td><td>Low</td></tr>
+    <tr><td>Search/replace</td><td>content</td><td>High</td><td>Low</td></tr>
+    <tr><td>Lazy + apply model</td><td>content, learned</td><td>High</td><td>Low + a second model</td></tr>
+    <tr><td>Structural</td><td>syntax tree</td><td>High per unit</td><td>Whole unit</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The pattern behind the table: reliability tracks <em>what the model is
+asked to quote</em>. Formats that make it quote positions fail, because
+counting is not something transformers do well. Formats that make it quote
+content succeed, because reproducing text it just read is the core skill.
+Every format the industry actually ships lands on content-addressing, either
+explicitly (search/replace), by retrofit (Aider's diffs with ignored line
+numbers), or by learning it (Cursor's apply model).</p>
+
+<figure class="fit">
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart TD
+    A{New file, or most&lt;br/&gt;of it changing?} -- yes --> B[Full rewrite]
+    A -- no --> C{Can you train and&lt;br/&gt;serve a merge model?}
+    C -- yes --> D[Lazy edit +&lt;br/&gt;apply model]
+    C -- no --> E[Search/replace blocks&lt;br/&gt;+ fuzzy matching client-side]
+    E -.guard against.-> F[Fragments treated&lt;br/&gt;as full files]
+    </pre>
+  </div>
+  <figcaption><b>Figure 1.</b> The decision in practice. Both viable branches
+  are content-addressed; the difference is who does the merging.</figcaption>
+</figure>
+
+<p>For my p5.js editor the answer was the model-free branch: search/replace
+with a client-side matching cascade, full rewrites for new sketches, and a
+fragment guard for the day a small model gets lazy anyway. How those three
+pieces fit together, and what broke before they did, is
+<a href="1.3-building-a-cursor-like-editor-for-p5js.html">article 1</a>.</p>
+
+<section class="sources" id="sources">
+  <h2>Sources</h2>
+  <ol>
+    <li id="src-1">Aider, <a href="https://aider.chat/docs/benchmarks.html">Edit
+    format benchmarks</a>. Reliability of edit formats measured across
+    models.</li>
+    <li id="src-2">Aider, <a href="https://aider.chat/2023/12/21/unified-diffs.html">Unified
+    diffs make GPT-4 Turbo 3&times; less lazy</a>. Includes the applier
+    design that ignores hunk line numbers.</li>
+    <li id="src-3">Cursor, <a href="https://cursor.com/blog/instant-apply">Near-instant
+    full-file edits</a>. The lazy-edit plus fine-tuned apply-model
+    architecture.</li>
+    <li id="src-4">Aider, <a href="https://aider.chat/docs/more/edit-formats.html">Edit
+    formats reference</a>. The whole, diff, and editblock formats as
+    shipped.</li>
+  </ol>
+</section>
+
+</main>
+
+<footer class="colophon">
+  Article 2 of the p5 AI editor series.
+  <a href="1.3-building-a-cursor-like-editor-for-p5js.html">Article 1:
+  Building a Cursor-like AI editor for p5.js</a>.
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'base',
+    themeVariables: {
+      fontFamily: 'Archivo, sans-serif',
+      fontSize: '15px',
+      primaryColor: '#efe8e0',
+      primaryTextColor: '#3a332e',
+      primaryBorderColor: '#c8bcb0',
+      lineColor: '#8d8177',
+      clusterBkg: '#f2ece5',
+      clusterBorder: '#d5cabf',
+      edgeLabelBackground: '#f8f4ef',
+      tertiaryColor: '#f2ece5',
+    },
+  });
+  window.addEventListener('load', async () => {
+    await mermaid.run({ querySelector: 'pre.mermaid' });
+    document.querySelectorAll('pre.mermaid svg').forEach((svg) => {
+      const natural = parseFloat(svg.style.maxWidth) || svg.viewBox.baseVal.width;
+      svg.style.minWidth = Math.min(natural, 640) + 'px';
+    });
+  });
+</script>
+</body>
+</html>

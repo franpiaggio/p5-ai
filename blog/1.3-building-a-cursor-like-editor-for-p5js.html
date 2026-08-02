@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Building a Cursor-like AI editor for p5.js</title>
+<meta name="description" content="What it took to make an LLM edit code reliably and cheaply in a small creative-coding editor: edit formats, matching cascades, fragment guards, and token economics.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --paper: oklch(0.975 0.006 60);
+    --paper-deep: oklch(0.945 0.009 60);
+    --ink: oklch(0.26 0.012 40);
+    --ink-soft: oklch(0.45 0.014 40);
+    --faint: oklch(0.60 0.012 45);
+    --rule: oklch(0.88 0.010 55);
+    --accent: oklch(0.56 0.16 12);
+    --accent-ink: oklch(0.46 0.14 12);
+    --editor: oklch(0.235 0.022 265);
+    --editor-ink: oklch(0.88 0.012 260);
+    --editor-faint: oklch(0.62 0.02 260);
+    --col: 42rem;
+    --col-wide: 57rem;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 400 1.125rem/1.68 "Literata", Georgia, serif;
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- Masthead ---------- */
+  header.masthead {
+    max-width: var(--col-wide);
+    margin: 0 auto;
+    padding: 1.6rem 1.5rem 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.85rem;
+  }
+  .masthead .wordmark { font-weight: 700; letter-spacing: 0.01em; }
+  .masthead .wordmark span { color: var(--accent); }
+  .masthead .section-name { color: var(--faint); font-weight: 500; }
+
+  /* ---------- Article header ---------- */
+  .titleblock {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: clamp(3rem, 8vh, 5.5rem) 1.5rem 0;
+  }
+  h1 {
+    font-family: "Archivo", sans-serif;
+    font-weight: 700;
+    font-size: clamp(2rem, 5.2vw, 3rem);
+    line-height: 1.12;
+    letter-spacing: -0.022em;
+    margin: 0 0 1.2rem;
+  }
+  .standfirst {
+    font-size: 1.28rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    margin: 0 0 1.6rem;
+  }
+  .meta {
+    font-family: "Archivo", sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--faint);
+    padding-bottom: 2.2rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  .meta b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---------- Body column ---------- */
+  main {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: 0 1.5rem 5rem;
+  }
+  p { margin: 0 0 1.35rem; }
+  a {
+    color: var(--accent-ink);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.16em;
+    text-decoration-color: oklch(0.56 0.16 12 / 0.4);
+  }
+  a:hover { text-decoration-color: currentColor; }
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  h2 {
+    font-family: "Archivo", sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
+    margin: 3.6rem 0 1.1rem;
+  }
+  h2 .no {
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+  ul { padding-left: 1.3rem; margin: 0 0 1.35rem; }
+  li { margin-bottom: 0.55rem; }
+  li::marker { color: var(--faint); }
+
+  /* ---------- Contents ---------- */
+  nav.contents {
+    margin: 2.6rem 0 0;
+    padding: 1.4rem 0 0.4rem;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.92rem;
+  }
+  nav.contents h2 {
+    margin: 0 0 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+  nav.contents ol {
+    margin: 0; padding: 0;
+    list-style: none;
+    columns: 2;
+    column-gap: 2.5rem;
+  }
+  nav.contents li { margin: 0 0 0.45rem; break-inside: avoid; }
+  nav.contents a { text-decoration: none; color: var(--ink-soft); }
+  nav.contents a:hover { color: var(--accent-ink); }
+  nav.contents .n { color: var(--accent); font-weight: 600; margin-right: 0.5em; font-variant-numeric: tabular-nums; }
+  @media (max-width: 540px) { nav.contents ol { columns: 1; } }
+
+  /* ---------- Code ---------- */
+  code {
+    font: 500 0.82em/1.6 "JetBrains Mono", monospace;
+    background: var(--paper-deep);
+    border-radius: 4px;
+    padding: 0.08em 0.32em;
+  }
+  pre {
+    background: var(--editor);
+    color: var(--editor-ink);
+    border-radius: 8px;
+    padding: 1.15rem 1.4rem;
+    overflow-x: auto;
+    margin: 1.7rem 0;
+    font-size: 0.83rem;
+    line-height: 1.65;
+  }
+  pre code { background: none; padding: 0; font-size: 1em; font-weight: 400; }
+  pre.mermaid {
+    background: none;
+    color: inherit;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+  }
+  /* Mermaid sets only an inline max-width (the natural size); without an
+     explicit width the SVG collapses to the 300px default. Fill the box and
+     let the inline max-width cap each diagram at its natural size. */
+  pre.mermaid svg { width: 100%; }
+  pre .k { color: oklch(0.75 0.12 12); }      /* markers */
+  pre .c { color: var(--editor-faint); }       /* comments */
+
+  /* ---------- Figures ---------- */
+  figure {
+    margin: 2.2rem auto;
+    max-width: var(--col-wide);
+    width: calc(100vw - 3rem);
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  figure.fit { text-align: center; }
+  figure a.shot { display: block; text-decoration: none; }
+  figure img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  figure.half img { width: min(41rem, 100%); margin: 0 auto; }
+  figure .diagram {
+    display: flex;
+    justify-content: center;
+    background: var(--paper-deep);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 1.6rem 1rem;
+    overflow-x: auto;
+  }
+  figcaption {
+    font-family: "Archivo", sans-serif;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: var(--faint);
+    max-width: var(--col);
+    margin: 0.75rem auto 0;
+    text-align: left;
+  }
+  figcaption b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---------- Tables ---------- */
+  .tablewrap { overflow-x: auto; margin: 1.7rem 0; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    padding: 0.5rem 1rem 0.5rem 0;
+    border-bottom: 2px solid var(--ink);
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.65rem 1rem 0.65rem 0;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  td:first-child, th:first-child { font-weight: 600; }
+
+  blockquote {
+    margin: 1.7rem 0;
+    padding: 0 0 0 1.3rem;
+    border-left: 1px solid var(--rule);
+    color: var(--ink-soft);
+    font-style: italic;
+  }
+  blockquote p { margin: 0; }
+
+  /* ---------- Sources ---------- */
+  section.sources {
+    margin-top: 4rem;
+    padding-top: 1.8rem;
+    border-top: 1px solid var(--rule);
+  }
+  section.sources h2 { margin-top: 0; font-size: 1.15rem; }
+  section.sources ol {
+    margin: 0; padding-left: 1.4rem;
+    font-size: 0.95rem;
+    color: var(--ink-soft);
+  }
+  section.sources li { margin-bottom: 0.6rem; }
+  section.sources li::marker { color: var(--accent); font-weight: 600; }
+
+  footer.colophon {
+    max-width: var(--col);
+    margin: 0 auto;
+    padding: 0 1.5rem 4rem;
+    font-family: "Archivo", sans-serif;
+    font-size: 0.85rem;
+    color: var(--faint);
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wordmark">p5<span>·</span>AI editor</div>
+  <div class="section-name">Engineering notes</div>
+</header>
+
+<div class="titleblock">
+  <h1>Building a Cursor-like AI editor for p5.js</h1>
+  <p class="standfirst">What it took to make a language model edit code
+  reliably and cheaply in a small creative-coding editor, with a review flow
+  that stays out of the way.</p>
+  <p class="meta"><b>July 2026</b> &nbsp;·&nbsp; 12 minute read &nbsp;·&nbsp;
+  revision 1.3 &nbsp;·&nbsp; <a href="https://github.com/franpiaggio">franpiaggio</a></p>
+</div>
+
+<main>
+
+<nav class="contents" aria-label="Contents">
+  <h2>Contents</h2>
+  <ol>
+    <li><span class="n">1</span><a href="#why">Why p5.js</a></li>
+    <li><span class="n">2</span><a href="#system">What the thing is</a></li>
+    <li><span class="n">3</span><a href="#formats">How should a model edit code?</a></li>
+    <li><span class="n">4</span><a href="#two-formats">Two response formats</a></li>
+    <li><span class="n">5</span><a href="#cascade">Cascading match tolerance</a></li>
+    <li><span class="n">6</span><a href="#fragments">The lazy fragment problem</a></li>
+    <li><span class="n">7</span><a href="#tokens">Token economics</a></li>
+    <li><span class="n">8</span><a href="#multifile">Multi-file review</a></li>
+    <li><span class="n">9</span><a href="#streaming">Streaming</a></li>
+    <li><span class="n">10</span><a href="#lessons">What I took away</a></li>
+  </ol>
+</nav>
+
+<h2 id="why"><span class="no">Section 1</span>Why p5.js</h2>
+
+<p>If you have used <a href="https://cursor.com">Cursor</a> or GitHub's
+<a href="https://github.blog/news-insights/product-news/github-copilot-the-agent-awakens/">Copilot
+Edits</a>, you know the interaction: you describe a change in plain language
+and, instead of a wall of chat text, you get a diff. Green lines in, red lines
+out, accept or reject. I wanted to understand how that works under the hood,
+and reading about it wasn't going to be enough. I had to build one.</p>
+
+<p>I didn't want to build it for general-purpose programming, though. That
+version of the problem is dominated by a question I find less interesting: how
+do you decide which parts of a large codebase to show the model? Whole
+companies exist to answer it. So I picked a domain where the question
+disappears: <a href="https://p5js.org">p5.js</a> sketches.</p>
+
+<p>Creative coding turns out to be a good laboratory for this. A sketch is one
+file, maybe a handful, a few hundred lines in total; the entire codebase fits
+in a single prompt, so there is no retrieval problem at all. Feedback is
+immediate and visual: if you asked for smaller particles and the particles got
+smaller, it worked, and you can tell without reading a line of the diff. And
+when an edit goes wrong, the cost is a rectangle in the wrong place rather
+than a production incident. You can afford to break things while you iterate
+on the editing machinery itself, which is the part I actually cared about.</p>
+
+<p>The result is two things at once: a small creative-coding tool that is fun
+to use, and a scaled-down testbed for the same techniques the production AI
+editors use. All the interesting code adds up to about 600 lines of plain
+TypeScript. You can read it in a sitting.</p>
+
+<h2 id="system"><span class="no">Section 2</span>What the thing is</h2>
+
+<p>Here is the app: Monaco (the editor inside VS Code) on the left, the
+running sketch on the right, chat below.</p>
+
+<figure>
+  <a class="shot" href="images/editor-overview.png" target="_blank">
+    <img src="images/editor-overview.png"
+         alt="The p5 AI editor: code editor on the left, live p5.js preview on the right, AI chat panel at the bottom.">
+  </a>
+  <figcaption><b>Figure 1.</b> The editor. Code on the left, live p5.js
+  preview on the right, AI chat at the bottom. Click any figure to open it at
+  full size.</figcaption>
+</figure>
+
+<p>And the architecture behind it:</p>
+
+<figure class="fit">
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart TB
+    subgraph Browser
+        direction LR
+        E[Monaco editor&lt;br/&gt;tabs + files] --> S[(Zustand store)]
+        C[AI chat] --> S
+        S --> P[Preview iframe&lt;br/&gt;sandboxed p5.js]
+        S --> D[Diff review&lt;br/&gt;accept / reject]
+    end
+    subgraph Backend["NestJS backend"]
+        direction LR
+        API[POST /api/chat&lt;br/&gt;SSE stream] --> PB[Prompt builder&lt;br/&gt;system + code + history]
+        PB --> PR[Provider adapters]
+    end
+    C -- "message + full sketch files" --> API
+    PR --> OAI[OpenAI]
+    PR --> ANT[Anthropic]
+    PR --> GRQ[Groq / demo]
+    PR --> DS[DeepSeek]
+    </pre>
+  </div>
+  <figcaption><b>Figure 2.</b> The system. A browser app holding all state,
+  and a thin streaming backend that adapts the prompt to each provider.</figcaption>
+</figure>
+
+<p>The frontend holds all the state (files, chat, undo history) in a
+<a href="https://zustand-demo.pmnd.rs/">Zustand</a> store. The p5.js preview
+runs in a sandboxed iframe. The backend is a thin
+<a href="https://nestjs.com">NestJS</a> proxy that assembles the prompt,
+adapts it to each provider's API, and streams the response back over
+<a href="https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events">Server-Sent
+Events</a>.</p>
+
+<p>One early decision shaped everything after it: since sketches are small,
+the full code goes into every single request. No RAG, no embeddings, no
+relevance heuristics. Naively this is wasteful, and section 7 is about why it
+doesn't have to be, but it buys a great deal of simplicity everywhere
+else.</p>
+
+<h2 id="formats"><span class="no">Section 3</span>How should a model edit code?</h2>
+
+<p>A language model cannot reach into your editor and move the cursor. It can
+only emit text. So you need a contract between you and the model: when you
+want to change the code, express the change in this format, and I will apply
+it. Choosing that format is the central design problem of any AI editor, and
+the candidates trade off against each other:</p>
+
+<div class="tablewrap">
+<table>
+  <thead>
+    <tr><th>Format</th><th>Reliability</th><th>Token cost</th><th>Latency</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Full-file rewrite</td>
+      <td>High: nothing to match</td>
+      <td>Worst: resends everything</td>
+      <td>Worst</td>
+    </tr>
+    <tr>
+      <td>Unified diff</td>
+      <td>Low: models hallucinate line numbers</td>
+      <td>Best</td>
+      <td>Best</td>
+    </tr>
+    <tr>
+      <td>Search/replace blocks</td>
+      <td>High: anchored on content, not positions</td>
+      <td>Good</td>
+      <td>Good</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>A full-file rewrite is what raw ChatGPT gives you: the whole file again,
+with the change somewhere inside. Nothing can fail to apply, but you pay for
+300 lines of output to change one, and you wait for all of them.</p>
+
+<p>Unified diffs, the <code>@@ -12,4 +12,6 @@</code> format git uses, are
+compact but lean on line numbers, and models are unreliable at counting lines.
+Aider's experiments found that models produce diffs with slightly wrong
+numbers and malformed hunks often enough to matter; close, but a diff that is
+close does not apply.<sup><a href="#src-2">[2]</a></sup></p>
+
+<p>Search/replace blocks sit in the middle: find this exact snippet, replace
+it with this one. No positions and no counting, only quoting, and quoting code
+they just read is something models do well. Aider's public
+benchmarks<sup><a href="#src-1">[1]</a></sup> settled on this format as the
+most reliable in practice, and it is what this project uses too.</p>
+
+<p>Cursor went a different way, and it is worth knowing what you are choosing
+not to do. Their main model emits a lazy edit, a sketch of the change with
+<code>// ... existing code ...</code> markers, and a separate small model,
+fine-tuned for exactly this job, merges it into the real file at around a
+thousand tokens per second.<sup><a href="#src-3">[3]</a></sup> That is the
+industrial answer: train a second model whose only task is merging. My
+question for this project was how far prompt design plus client-side merging
+can go without any custom model. The answer turned out to be: further than I
+expected. The next six sections are the techniques that got it there.</p>
+
+<h2 id="two-formats"><span class="no">Section 4 · Technique 1</span>Two response formats, chosen by the model</h2>
+
+<p>The system prompt offers the model two ways to answer, along with the rule
+for choosing:</p>
+
+<pre><code><span class="c">### Format A: full code (new sketches, major rewrites, &gt;40% changes)</span>
+<span class="c">A single code block containing the COMPLETE file, first line to last.</span>
+
+<span class="c">### Format B: search/replace blocks (small targeted edits)</span>
+<span class="k">&lt;&lt;&lt;SEARCH</span>
+  background(240, 60, 8);
+<span class="k">===</span>
+  background(200, 80, 15);
+<span class="k">&gt;&gt;&gt;REPLACE</span></code></pre>
+
+<p>Format B does most of the work day to day. A one-line color tweak costs
+about 30 output tokens instead of a 300-line resend. Format A stays available
+for genuine rewrites ("start over with a flow field"), where a patch format
+would collapse into one enormous block covering the whole file anyway.</p>
+
+<p>The model picks the format because the model is the only party that knows
+the scope of the change before writing it. The prompt gives it a threshold,
+roughly: patch below 40% of the file, rewrite above. Models follow it well.</p>
+
+<p>This is what a search/replace block looks like by the time the user sees
+it. The raw block never appears in chat; it lands directly in the editor as an
+inline diff:</p>
+
+<figure class="half">
+  <a class="shot" href="images/diff-review.png" target="_blank">
+    <img src="images/diff-review.png"
+         alt="A one-line search/replace edit under review: the old line highlighted in red, the new one in green, Accept and Reject buttons in a floating toolbar, and a review banner in the chat below.">
+  </a>
+  <figcaption><b>Figure 3.</b> A one-line edit under review. Old line in red,
+  new line in green, accept and reject in the floating toolbar, and the
+  review banner in the chat.</figcaption>
+</figure>
+
+<p>Two lines in that prompt deserve a closer look, because both are lies of a
+sort.</p>
+
+<p>"The SEARCH text must match EXACTLY." It won't, not reliably. Models
+reconstruct code from attention over a long context and they drift: trailing
+whitespace, indentation, a stray semicolon. Technique 2 exists because of
+this.</p>
+
+<p>"A code block must contain the COMPLETE file." Also not always true, no
+matter how firmly you phrase it. Weaker models send fragments anyway.
+Technique 3 exists because of that.</p>
+
+<p>The stance I ended up with: the prompt defines the happy path, and the
+client assumes the model got things almost right rather than exactly right.
+Instructions are wishes. Reliability has to live in the code that receives the
+response.</p>
+
+<h2 id="cascade"><span class="no">Section 5 · Technique 2</span>Cascading match tolerance</h2>
+
+<p>The obvious implementation of search/replace is <code>indexOf</code>: find
+the SEARCH text, splice in the replacement. It works in a demo and fails
+within a week, the first time the model remembers
+<code>background(30);</code> but the file has a trailing space after it. Each
+miss is costly out of proportion to its cause: the edit silently fails to
+apply, the user asks again, and the token savings you chose this format for
+are gone.</p>
+
+<p>The fix, similar in spirit to how Aider's matching
+evolved,<sup><a href="#src-1">[1]</a></sup> is a cascade of increasingly
+tolerant tiers, applied per block:</p>
+
+<figure class="fit">
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart TD
+    A[Search block] --> B{Exact substring&lt;br/&gt;match?}
+    B -- yes --> C[Replace first occurrence]
+    B -- no --> D{Per-line match,&lt;br/&gt;ignoring trailing&lt;br/&gt;whitespace?}
+    D -- "exactly 1" --> E[Splice replacement lines]
+    D -- no --> F{Per-line match,&lt;br/&gt;fully trimmed&lt;br/&gt;indent-insensitive?}
+    F -- "exactly 1" --> G[Re-indent replacement&lt;br/&gt;to the target, splice]
+    F -- "0 or >1" --> H[Fail the block:&lt;br/&gt;not found / ambiguous]
+    style H fill:#7a2b2b,color:#fff
+    </pre>
+  </div>
+  <figcaption><b>Figure 4.</b> The matching cascade. Each tier forgives one
+  observed failure mode; ambiguity at a fuzzy tier fails the block rather than
+  guessing.</figcaption>
+</figure>
+
+<p>The first tier is the fast exact path. The second forgives trailing
+whitespace, which is the most common drift. The third compares lines fully
+trimmed, forgiving indentation entirely. Each tier corresponds to a failure I
+actually observed in model output, not one I imagined.</p>
+
+<p>Two decisions in this cascade matter more than the cascade itself.</p>
+
+<p>First, the fuzzy tiers demand uniqueness. An exact match takes the first
+occurrence, since the model usually quotes enough surrounding context to be
+unambiguous. But a fuzzy match that hits two different places in the file
+refuses to choose between them and fails the block instead. The reasoning: an
+edit applied in the wrong place corrupts the sketch quietly, while an edit
+that visibly failed to apply is just a retry. Only one of those is
+dangerous.</p>
+
+<p>Second, the trimmed tier re-indents. If the model wrote its block with
+two-space indentation and the file uses six, the replacement lines are shifted
+to match the file before splicing. The file stays consistent with itself even
+when the model's memory of it wasn't.</p>
+
+<h2 id="fragments"><span class="no">Section 6 · Technique 3</span>The lazy fragment problem</h2>
+
+<p>This technique earned its place through a real failure. I asked a small
+demo model for smaller particles, and it answered with a code block containing
+only the loop it had changed. No <code>setup()</code>, no <code>draw()</code>,
+just the four lines it was thinking about. The client, following the contract,
+treated the block as Format A, a complete file, and replaced the entire sketch
+with it. One keystroke turned a working sketch into two
+<code>ReferenceError</code>s.</p>
+
+<p>The built-in history saved that sketch, but an undo button is not a defense
+strategy, so the incident became a technique.</p>
+
+<p>This is precisely the problem Cursor's apply model is trained
+on.<sup><a href="#src-3">[3]</a></sup> A heuristic, client-side version gets
+closer than I expected. It has two halves.</p>
+
+<p><strong>Detection.</strong> A code block that claims to replace a file is
+flagged as a fragment if any of these hold:</p>
+
+<ul>
+  <li>Its first non-empty line is indented. No complete file starts
+  mid-scope.</li>
+  <li>It targets the entry file but never declares
+  <code>function setup()</code>. Every complete p5.js sketch has one.
+  (<code>draw()</code> deliberately isn't required; a static sketch
+  legitimately has only <code>setup()</code>.)</li>
+  <li>It targets a helper file, is under half that file's current size, and
+  re-declares none of the file's top-level symbols. A legitimate rewrite keeps
+  roughly the same shape; a fragment keeps neither the size nor the
+  declarations.</li>
+</ul>
+
+<p><strong>Anchor merging.</strong> Once a fragment is detected, the right
+move is not to reject it. The model's edit is usually correct, just
+incomplete. So the client tries to place it:</p>
+
+<figure class="fit">
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+    subgraph File["Existing file"]
+        L1["let plankton = [];"]
+        L2["function setup() {"]
+        L3["  for (let i...) {   ◄ anchor"]
+        L4["    size: random(2, 6),"]
+        L5["    hue: random(...)  ◄ anchor"]
+        L6["  }"]
+        L7["}"]
+        L8["function draw() {...}"]
+    end
+    subgraph Fragment
+        F1["  for (let i...) {"]
+        F2["    size: random(1, 3),"]
+        F3["    hue: random(...)"]
+        F4["  }"]
+    end
+    F1 -.match.-> L3
+    F3 -.match.-> L5
+    </pre>
+  </div>
+  <figcaption><b>Figure 5.</b> Anchor merging. Fragment lines that appear
+  exactly once in the file pin the fragment to a region; the region is
+  replaced, and the rest of the file survives.</figcaption>
+</figure>
+
+<p>Fragment lines that appear exactly once in the file, compared trimmed,
+become anchors: unique landmarks that pin the fragment to a location. If at
+least two anchors map onto the file in the same order they appear in the
+fragment, the spanned region of the file is replaced by the fragment. The
+one-line change lands as a one-line diff and <code>draw()</code>
+survives.</p>
+
+<p>When no safe anchoring exists, the change is dropped entirely. A no-op
+beats a wipeout: the suggestion is still fully visible in the chat, where the
+user can apply it by hand or simply ask again. The philosophy is the same as
+the cascade's. When the system isn't sure, it declines loudly instead of
+guessing quietly.</p>
+
+<h2 id="tokens"><span class="no">Section 7 · Technique 4</span>Token economics</h2>
+
+<p>Sending the full sketch on every turn is only viable if you stop paying
+full price for it. Left alone, a ten-turn conversation resends the same code
+ten times, and every assistant reply that quoted code gets resent inside the
+history as well; the same lines can appear five times in a single request.
+Three measures address this, in order of impact:</p>
+
+<div class="tablewrap">
+<table>
+  <thead>
+    <tr><th>Measure</th><th>What it does</th><th>Effect</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>History code-stripping</td>
+      <td>Older assistant messages get their code blocks replaced by a short
+      placeholder note. The newest reply keeps its code so that "apply what
+      you just suggested" still has a referent.</td>
+      <td>The same sketch stops appearing 4&ndash;5&times; per request</td>
+    </tr>
+    <tr>
+      <td>Prompt caching<br>(Anthropic)</td>
+      <td>Two <code>cache_control</code> breakpoints: one after the static
+      system prompt (always hits) and one after the code-context message
+      (hits while the sketch is unchanged between turns).<sup><a href="#src-4">[4]</a></sup></td>
+      <td>&sim;90% off the cached prefix</td>
+    </tr>
+    <tr>
+      <td>Predicted Outputs<br>(OpenAI)</td>
+      <td>The current code is passed as a <code>prediction</code>. A full
+      rewrite is a near-copy of it, so the API speculatively decodes against
+      the prediction instead of generating token by
+      token.<sup><a href="#src-5">[5]</a></sup></td>
+      <td>2&ndash;4&times; lower latency on rewrites</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<figure class="fit">
+  <div class="diagram">
+    <pre class="mermaid">
+flowchart LR
+    subgraph Request["Prompt assembly (per request)"]
+        SP["System prompt&lt;br/&gt;📌 cache breakpoint"] --> CC["Current sketch files&lt;br/&gt;📌 cache breakpoint"]
+        CC --> H["History (last 10)&lt;br/&gt;older code stripped"]
+        H --> M["New user message"]
+    end
+    </pre>
+  </div>
+  <figcaption><b>Figure 6.</b> Prompt assembly, most-stable-first. The
+  expensive parts sit inside the cached region.</figcaption>
+</figure>
+
+<p>The ordering in that diagram is the entire trick of prompt caching.
+Caching operates on a stable prefix, so the prompt is assembled
+most-stable-first: the system prompt never changes, the sketch changes only
+when you edit it, and the history changes every turn. Arranged that way, the
+expensive parts sit inside the cached region.</p>
+
+<p>A caveat on Predicted Outputs: rejected prediction tokens bill at output
+rates, so the feature is a bet that pays off in edit-heavy sessions and costs
+a little in chat-heavy ones. It is also restricted to the model families that
+accept the parameter, and sending it to one that doesn't fails the whole
+request, so the client checks the model name first.</p>
+
+<h2 id="multifile"><span class="no">Section 8 · Technique 5</span>Multi-file sketches and per-file review</h2>
+
+<p>Sketches outgrow a single file quickly. A <code>Particle</code> class
+here, a palette module there, and suddenly the single-file editing flow faces
+two questions it never had to answer.</p>
+
+<p>The first: where does an edit land? Search/replace blocks carry an
+optional <code>// filename:</code> prefix line, but models omit it, so when
+the prefix is missing the target is resolved by content. Whichever file
+actually contains the SEARCH text is the target, checking the active file
+first, then the entry file, then any file with a unique match. The model has
+no way of knowing which file you are looking at, but the code it quotes
+identifies the file on its own. The quote serves as the address.</p>
+
+<p>The second: how do you review an edit that spans three files? Stepping
+through three diffs before anything moves on screen would kill the creative
+loop, and seeing the result quickly is the entire point of the medium. So the
+flow works the way Cursor's multi-file edits do: every change is applied to
+the live preview immediately, and then you step through the files one at a
+time, at your own pace.</p>
+
+<figure>
+  <a class="shot" href="images/multi-file-review.png" target="_blank">
+    <img src="images/multi-file-review.png"
+         alt="A two-file suggestion under review: a new particle.js file shown as an all-green diff, a toolbar reading particle.js (new) 1 of 2 with an Accept all option, and the preview already running the proposed result.">
+  </a>
+  <figcaption><b>Figure 7.</b> A two-file suggestion under review.
+  <code>particle.js</code> is new, shown all-green; the toolbar reads
+  "particle.js (new) 1/2" with an accept-all option, and the preview is
+  already running the proposed result.</figcaption>
+</figure>
+
+<figure class="fit">
+  <div class="diagram">
+    <pre class="mermaid">
+stateDiagram-v2
+    [*] --> Applied: changes hit the preview
+    Applied --> Reviewing: file 1 of N
+    Reviewing --> Reviewing: Accept → next file&lt;br/&gt;Reject → revert this file, next
+    Reviewing --> Done: last file handled&lt;br/&gt;(or Accept all)
+    Done --> [*]: blocks marked applied/rejected,&lt;br/&gt;history recorded per file
+    </pre>
+  </div>
+  <figcaption><b>Figure 8.</b> The per-file review loop. Optimistic apply
+  first, judgment at the user's pace after.</figcaption>
+</figure>
+
+<p>Rejecting a file reverts only that file; a rejected brand-new file is
+deleted again. Accepting records a per-file history entry you can restore
+later. Because the preview shows the full proposed result the whole time,
+review becomes a visual judgment (do I like what I'm seeing?) rather than an
+act of faith in a diff.</p>
+
+<h2 id="streaming"><span class="no">Section 9 · Technique 6</span>Streaming without burning the client</h2>
+
+<p>LLM responses arrive as a stream of small chunks, several per second. Two
+client-side details keep that pleasant instead of janky.</p>
+
+<p>The first is showing the diff while it streams. As search/replace blocks
+arrive, they are applied leniently against the file on screen; blocks that
+don't match yet, because they are only half-arrived, are skipped without
+complaint. Monaco renders the in-progress diff, and you watch the edit take
+shape instead of staring at a spinner.</p>
+
+<p>The second is throttling. The naive streaming loop re-parses the entire
+accumulated response and re-renders the diff on every chunk, which is
+quadratic work over the length of the response, spent at the exact moment the
+p5.js preview is trying to animate at 60fps. But chunks arrive every few
+milliseconds and eyes don't. One parse and render per 80&nbsp;ms, with the
+first chunk shown immediately and the final state flushed atomically when the
+stream ends, removes the quadratic cost without any visible change in
+liveness.</p>
+
+<h2 id="lessons"><span class="no">Section 10</span>What I took away</h2>
+
+<p>Three things, none of which I fully believed before building this.</p>
+
+<p><strong>Prompts propose, clients dispose.</strong> Every format rule in
+the system prompt gets violated by some model on some day. The reliability in
+this project came from client-side machinery (cascading matching, fragment
+detection, anchor merging) built on the assumption that the model got things
+almost right, and that the client's job is to close the last millimeter.</p>
+
+<p><strong>Refusing is a feature.</strong> The two best behaviors in the
+project are both refusals: fuzzy matches that decline to guess between two
+locations, and fragments that decline to apply without safe anchors. In an
+editor, wrong-and-confident is the only fatal failure mode. A visible refusal
+costs one retry; a silent corruption costs the user's trust.</p>
+
+<p><strong>p5.js is a genuinely good harness for this research.</strong>
+Instant visual verification turns every interaction into an evaluation. When
+the AI misplaces an edit, you don't read a stack trace. You watch the wrong
+thing rotate.</p>
+
+<p>Next on the list: reporting failed search/replace blocks back to the model
+for a targeted retry, which Aider already does, and instrumenting how often
+each cascade tier and the fragment guard fire in real sessions.</p>
+
+<section class="sources" id="sources">
+  <h2>Sources</h2>
+  <ol>
+    <li id="src-1">Aider, <a href="https://aider.chat/docs/benchmarks.html">Edit
+    format benchmarks</a>. Why search/replace beats other formats in practice,
+    measured across models.</li>
+    <li id="src-2">Aider, <a href="https://aider.chat/2023/12/21/unified-diffs.html">Unified
+    diffs experiment</a>. What happens when you ask LLMs for git-style
+    diffs.</li>
+    <li id="src-3">Cursor, <a href="https://cursor.com/blog/instant-apply">Near-instant
+    full-file edits</a>. The lazy-edit plus fine-tuned apply-model
+    architecture.</li>
+    <li id="src-4">Anthropic, <a href="https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching">Prompt
+    caching</a>. How <code>cache_control</code> breakpoints work and what
+    cached tokens cost.</li>
+    <li id="src-5">OpenAI, <a href="https://platform.openai.com/docs/guides/predicted-outputs">Predicted
+    Outputs</a>. Speculative decoding against a known likely output.</li>
+  </ol>
+</section>
+
+</main>
+
+<footer class="colophon">
+  Built with React, Monaco, and NestJS. The screenshots are of the real app,
+  in states produced by mocking the LLM at the network layer, the same
+  technique the project's end-to-end tests use.
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'base',
+    themeVariables: {
+      fontFamily: 'Archivo, sans-serif',
+      fontSize: '15px',
+      primaryColor: '#efe8e0',
+      primaryTextColor: '#3a332e',
+      primaryBorderColor: '#c8bcb0',
+      lineColor: '#8d8177',
+      clusterBkg: '#f2ece5',
+      clusterBorder: '#d5cabf',
+      edgeLabelBackground: '#f8f4ef',
+      tertiaryColor: '#f2ece5',
+    },
+  });
+  window.addEventListener('load', async () => {
+    await mermaid.run({ querySelector: 'pre.mermaid' });
+    // On narrow screens, let wide diagrams scroll at a readable size instead
+    // of scaling down to fit. minWidth = min(natural width, 640px).
+    document.querySelectorAll('pre.mermaid svg').forEach((svg) => {
+      const natural = parseFloat(svg.style.maxWidth) || svg.viewBox.baseVal.width;
+      svg.style.minWidth = Math.min(natural, 640) + 'px';
+    });
+  });
+</script>
+</body>
+</html>

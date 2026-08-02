@@ -16,7 +16,10 @@ export class GroqProvider implements LLMProvider {
 
     try {
       // Groq doesn't support vision — always send content as plain string.
-      // 8k output cap: safe across Groq's model lineup (some cap at 8k).
+      // Groq's TPM rate limiter counts input + max_tokens as the request size,
+      // and this provider only ever runs on the server's demo key (free tier:
+      // 12k TPM on llama-3.3-70b). 4k output leaves ~8k for input — enough for
+      // a full sketch rewrite while keeping large sketches under the limit.
       const stream = await client.chat.completions.create({
         model,
         messages: messages.map((m) => ({
@@ -24,7 +27,7 @@ export class GroqProvider implements LLMProvider {
           content: m.content,
         })) as OpenAI.ChatCompletionMessageParam[],
         stream: true,
-        max_tokens: 8_192,
+        max_tokens: 4_096,
       });
 
       for await (const chunk of stream) {

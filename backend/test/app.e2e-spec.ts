@@ -19,10 +19,11 @@ describe('API (e2e)', () => {
     process.env.JWT_SECRET = 'e2e-jwt-secret';
     process.env.ADMIN_PASSWORD = 'e2e-admin-password';
     // Keep the suite hermetic: a real key (from the root .env) would make
-    // demo-provider requests hit the actual Groq API. Empty string (not
+    // demo-provider requests hit the actual Groq/Gemini API. Empty string (not
     // delete): dotenv won't override an existing env var, but '' is falsy
     // for the demo-key checks.
     process.env.GROQ_API_KEY = '';
+    process.env.GEMINI_API_KEY = '';
 
     // Import after env is set so ConfigModule picks up the test values.
     const { AppModule } =
@@ -102,6 +103,67 @@ describe('API (e2e)', () => {
         .send({ provider: 'demo' })
         .expect(201);
       expect(res.body.models).toEqual(['llama-3.3-70b-versatile']);
+    });
+  });
+
+  describe('free-usage quota', () => {
+    const APP_ORIGIN = 'http://localhost:5173';
+
+    it('reports the anonymous per-IP allowance for logged-out callers', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/chat/usage')
+        .set('Origin', APP_ORIGIN)
+        .expect(200);
+      expect(res.body.anonymous).toBe(true);
+      expect(res.body.used).toBe(0);
+      expect(res.body.remaining).toBe(res.body.limit);
+      expect(typeof res.body.limit).toBe('number');
+    });
+
+    it('reports the larger allowance for a logged-in user', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/chat/usage')
+        .set('Origin', APP_ORIGIN)
+        .set('Cookie', authCookie)
+        .expect(200);
+      expect(res.body.anonymous).toBe(false);
+      expect(res.body.used).toBe(0);
+      expect(res.body.remaining).toBe(res.body.limit);
+      expect(typeof res.body.resetsAt).toBe('string');
+    });
+
+    it('lets anonymous callers through the quota pre-flight (no 401)', async () => {
+      // Demo isn't configured in this hermetic suite, so the request passes the
+      // per-IP quota check and then surfaces the "not configured" error in-stream
+      // — proving anonymous demo is allowed (not blocked with 401 as before).
+      const res = await request(app.getHttpServer())
+        .post('/api/chat')
+        .set('Origin', APP_ORIGIN)
+        .send({
+          message: 'hi',
+          code: '',
+          history: [],
+          config: { provider: 'demo', model: 'x' },
+        })
+        .expect(201); // NestJS default for POST; the SSE body carries the error
+      expect(res.text).toContain('Demo mode is not configured');
+    });
+  });
+
+  describe('OpenRouter connect', () => {
+    it('requires auth to connect an OpenRouter account', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/openrouter/connect')
+        .send({ code: 'abc', codeVerifier: 'a'.repeat(40) })
+        .expect(401);
+    });
+
+    it('validates the connect payload', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/openrouter/connect')
+        .set('Cookie', authCookie)
+        .send({ code: 'abc' }) // missing codeVerifier
+        .expect(400);
     });
   });
 
