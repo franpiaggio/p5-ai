@@ -162,8 +162,10 @@ const MAX_MESSAGE_TEXT_BYTES = 100_000;
 
 const FENCED_JS_BLOCK_REGEX =
   /```(?:javascript|js|jsx|typescript|ts|tsx)\s*\n[\s\S]*?```/g;
+// Tolerant of marker drift (Aider-style `<<<<<<< SEARCH` / `>>>>>>> REPLACE`,
+// trailing spaces) — mirrors the frontend parser in utils/codeUtils.ts.
 const SEARCH_REPLACE_BLOCK_REGEX =
-  /(?:^\/\/[ \t]*filename:[ \t]*\S+[ \t]*\n)?<<<SEARCH\n[\s\S]*?\n>>>REPLACE/gm;
+  /(?:^\/\/[ \t]*filename:[ \t]*\S+[ \t]*\n)?^<{3,}[ \t]*SEARCH[ \t]*\n[\s\S]*?\n>{3,}[ \t]*REPLACE/gm;
 const CODE_OMITTED_NOTE =
   '[previous code omitted — the current sketch code above already includes every applied change]';
 

@@ -5,6 +5,7 @@ import {
   extractSearchReplaceBlocks,
   applySearchReplace,
   declaredSymbols,
+  hasSearchReplaceMarkers,
   type SearchReplaceBlock,
 } from './codeUtils';
 import {
@@ -86,10 +87,13 @@ export function planFileChanges(
     }
   }
 
-  // Full code blocks → per-file sections.
+  // Full code blocks → per-file sections. A fenced block carrying search/replace
+  // markers is a patch the model mis-wrapped in a code fence, never file content —
+  // applying it verbatim would inject `<<<SEARCH`/`===` lines into the sketch
+  // (when the patch parses, srChanges above already covers the edit).
   const sections = extractJsBlocks(content)
     .flatMap((b) => splitFileSections(b))
-    .filter((s) => s.code.trim().length > 0);
+    .filter((s) => s.code.trim().length > 0 && !hasSearchReplaceMarkers(s.code));
 
   const blockChanges: FileChange[] = [];
   for (const s of sections) {

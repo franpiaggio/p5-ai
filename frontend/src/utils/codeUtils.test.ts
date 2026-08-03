@@ -12,6 +12,7 @@ import {
   applySearchReplace,
   applySearchReplaceLenient,
   stripSearchReplaceBlocks,
+  hasSearchReplaceMarkers,
   diffSummary,
 } from './codeUtils';
 
@@ -68,6 +69,24 @@ describe('extractSearchReplaceBlocks', () => {
     const md = `// filename: utils.js\n\n${block('a', 'b')}`;
     const blocks = extractSearchReplaceBlocks(md)!;
     expect(blocks[0].fileName).toBeUndefined();
+  });
+
+  it('tolerates Aider-style markers (<<<<<<< SEARCH / ======= / >>>>>>> REPLACE)', () => {
+    const md = '<<<<<<< SEARCH\nbackground(30);\n=======\nbackground(0);\n>>>>>>> REPLACE';
+    expect(extractSearchReplaceBlocks(md)).toEqual([
+      { search: 'background(30);', replace: 'background(0);' },
+    ]);
+  });
+
+  it('tolerates a longer separator and trailing spaces on marker lines', () => {
+    const md = '<<<SEARCH  \nbackground(30);\n==== \nbackground(0);\n>>>REPLACE';
+    expect(extractSearchReplaceBlocks(md)).toEqual([
+      { search: 'background(30);', replace: 'background(0);' },
+    ]);
+  });
+
+  it('does not match a marker mentioned mid-line in prose', () => {
+    expect(extractSearchReplaceBlocks('use <<<SEARCH\nfoo\n===\nbar\n>>>REPLACE')).toBeNull();
   });
 });
 
@@ -184,6 +203,24 @@ describe('stripSearchReplaceBlocks', () => {
 
   it('removes a dangling filename header whose block has not streamed yet', () => {
     expect(stripSearchReplaceBlocks('Next change:\n// filename: parti')).toBe('Next change:');
+  });
+
+  it('removes Aider-style marker variants too', () => {
+    const md = 'Fixing:\n\n<<<<<<< SEARCH\na\n=======\nb\n>>>>>>> REPLACE\n\nDone.';
+    expect(stripSearchReplaceBlocks(md)).toBe('Fixing:\n\n\n\nDone.');
+  });
+});
+
+describe('hasSearchReplaceMarkers', () => {
+  it('detects canonical and Aider-style markers at line start', () => {
+    expect(hasSearchReplaceMarkers('<<<SEARCH\nfoo')).toBe(true);
+    expect(hasSearchReplaceMarkers('text\n<<<<<<< SEARCH\nfoo')).toBe(true);
+    expect(hasSearchReplaceMarkers('foo\n>>>>>>> REPLACE')).toBe(true);
+  });
+
+  it('ignores plain code and mid-line mentions', () => {
+    expect(hasSearchReplaceMarkers('if (a === b) { }')).toBe(false);
+    expect(hasSearchReplaceMarkers('the <<<SEARCH marker')).toBe(false);
   });
 });
 

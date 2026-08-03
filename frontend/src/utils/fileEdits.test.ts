@@ -176,6 +176,46 @@ describe('mixed responses (search/replace + code blocks in one message)', () => 
   });
 });
 
+describe('marker-injection guard (a patch wrapped in a code fence is never file content)', () => {
+  const sketch = 'function setup() {\n  createCanvas(1, 1);\n}\nfunction draw() {\n  background(30);\n}';
+  const files = [file('sketch.js', sketch), file('particle.js', 'class Particle {}')];
+
+  it('a fenced patch targeting another file does not overwrite the entry with raw markers', () => {
+    // No filename header: the patch resolves to particle.js by content, and the
+    // unnamed fence section would (pre-guard) land on the entry as raw markers.
+    const md = [
+      '```js',
+      '<<<SEARCH',
+      'class Particle {}',
+      '===',
+      'class Particle { constructor() {} }',
+      '>>>REPLACE',
+      '```',
+    ].join('\n');
+    const changes = planFileChanges(files, 'sketch.js', md);
+    expect(changes).toHaveLength(1);
+    expect(changes[0].name).toBe('particle.js');
+    expect(changes[0].newContent).toBe('class Particle { constructor() {} }');
+    for (const c of changes) {
+      expect(c.newContent).not.toContain('<<<');
+      expect(c.newContent).not.toContain('>>>REPLACE');
+    }
+  });
+
+  it('a fenced malformed patch (bad separator) is dropped instead of applied verbatim', () => {
+    const md = [
+      '```js',
+      '<<<SEARCH',
+      '  background(30);',
+      '---',
+      '  background(0);',
+      '>>>REPLACE',
+      '```',
+    ].join('\n');
+    expect(planFileChanges(files, 'sketch.js', md)).toEqual([]);
+  });
+});
+
 describe('lazy-fragment guard (partial code block must not wipe the sketch)', () => {
   const fullSketch = [
     'let plankton = [];',

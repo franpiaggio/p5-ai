@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useEditorStore } from '../../store/editorStore';
-import { simpleHash, extractJsBlocks, extractSearchReplaceBlocks, applySearchReplaceLenient, stripSearchReplaceBlocks, diffSummary } from '../../utils/codeUtils';
+import { simpleHash, extractJsBlocks, extractSearchReplaceBlocks, applySearchReplaceLenient, stripSearchReplaceBlocks, diffSummary, hasSearchReplaceMarkers } from '../../utils/codeUtils';
 import { planFileChanges, applyChangesToFiles, presentationFor } from '../../utils/fileEdits';
 import { allowsMultiFile } from '../../utils/fileMode';
 import { streamChat, checkBackendHealth, getChatUsage, ApiError } from '../../services/api';
@@ -213,7 +213,7 @@ export function ChatPanel() {
         }
         assistantContent += chunk;
 
-        if (!hasSearchReplace && assistantContent.includes('<<<SEARCH')) {
+        if (!hasSearchReplace && hasSearchReplaceMarkers(assistantContent)) {
           hasSearchReplace = true;
         }
 

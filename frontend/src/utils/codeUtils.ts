@@ -32,12 +32,22 @@ export interface SearchReplaceBlock {
   fileName?: string;
 }
 
+/** True when the text contains a search/replace marker line, in any tolerated
+ * variant. Used both to detect patch responses and to keep raw markers from
+ * ever being applied as file content. */
+export function hasSearchReplaceMarkers(text: string): boolean {
+  return /^<{3,}[ \t]*SEARCH|^>{3,}[ \t]*REPLACE/m.test(text);
+}
+
 /** Parse all <<<SEARCH ... === ... >>>REPLACE blocks from markdown, each with an
- * optional `// filename: x` line directly above it. Returns null if none found. */
+ * optional `// filename: x` line directly above it. Returns null if none found.
+ * Tolerant of marker drift: models trained on the Aider format emit
+ * `<<<<<<< SEARCH` / `=======` / `>>>>>>> REPLACE` (or add trailing spaces), so
+ * 3+ marker characters and trailing whitespace are accepted. */
 export function extractSearchReplaceBlocks(markdown: string): SearchReplaceBlock[] | null {
   const blocks: SearchReplaceBlock[] = [];
   const regex =
-    /(?:^\/\/[ \t]*filename:[ \t]*(\S+)[ \t]*\n)?<<<SEARCH\n([\s\S]*?)\n===\n([\s\S]*?)\n>>>REPLACE/gm;
+    /(?:^\/\/[ \t]*filename:[ \t]*(\S+)[ \t]*\n)?^<{3,}[ \t]*SEARCH[ \t]*\n([\s\S]*?)\n={3,}[ \t]*\n([\s\S]*?)\n>{3,}[ \t]*REPLACE/gm;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(markdown)) !== null) {
     blocks.push({
@@ -159,10 +169,10 @@ export function applySearchReplaceLenient(
  * prefix lines) from text for chat display. */
 export function stripSearchReplaceBlocks(text: string): string {
   let result = text.replace(
-    /(?:^\/\/[ \t]*filename:[ \t]*\S+[ \t]*\n)?<<<SEARCH\n[\s\S]*?\n===\n[\s\S]*?\n>>>REPLACE/gm,
+    /(?:^\/\/[ \t]*filename:[ \t]*\S+[ \t]*\n)?^<{3,}[ \t]*SEARCH[ \t]*\n[\s\S]*?\n={3,}[ \t]*\n[\s\S]*?\n>{3,}[ \t]*REPLACE/gm,
     '',
   );
-  result = result.replace(/(?:^\/\/[ \t]*filename:[ \t]*\S+[ \t]*\n)?<<<SEARCH[\s\S]*$/m, '');
+  result = result.replace(/(?:^\/\/[ \t]*filename:[ \t]*\S+[ \t]*\n)?^<{3,}[ \t]*SEARCH[\s\S]*$/m, '');
   // A filename header whose block hasn't started streaming yet.
   result = result.replace(/\n?\/\/[ \t]*filename:[ \t]*\S*[ \t]*$/, '');
   return result.trimEnd();
