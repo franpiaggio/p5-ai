@@ -7,6 +7,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { EDITOR_OPTIONS, defineCustomThemes, injectErrorStyles, registerFunctionCallTokenProvider, resolveMonacoTheme } from './editorConfig';
 import { P5_TYPE_DEFS } from './p5Types';
 import { languageFromExtension, isEntryFile } from '../../constants/defaultFiles';
+import { computeMinimalEdit } from '../../utils/textDiff';
 
 export function CodeEditor() {
   const code = useEditorStore((s) => s.code);
@@ -17,6 +18,7 @@ export function CodeEditor() {
   const pendingDiff = useEditorStore((s) => s.pendingDiff);
   const editorLanguage = useEditorStore((s) => s.editorLanguage);
   const streamingCode = useEditorStore((s) => s.streamingCode);
+  const streamingIsPatch = useEditorStore((s) => s.streamingIsPatch);
   const isLoading = useEditorStore((s) => s.isLoading);
   const appTheme = useEditorStore((s) => s.appTheme);
   const isMobile = useIsMobile();
@@ -60,6 +62,8 @@ export function CodeEditor() {
   const monacoRef = useRef<typeof Monaco | null>(null);
   const decorationsRef = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null);
   const streamingDiffRef = useRef<Monaco.editor.IStandaloneDiffEditor | null>(null);
+  const streamingPlainRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const streamingInitialRef = useRef<string | null>(null);
 
   runRef.current = runSketch;
   clearRef.current = clearConsoleLogs;
@@ -226,44 +230,108 @@ export function CodeEditor() {
     requestAnimationFrame(() => tryScroll(10));
   }, []);
 
+  // Push the latest streamed code into the visible model as a minimal edit
+  // (common prefix/suffix). Replacing the whole buffer (the `modified`/`value`
+  // prop / setValue path) drops every diff decoration and Monaco recomputes the
+  // diff async, so the editor blinks between plain and highlighted on each chunk.
+  const syncStreamingModel = useCallback((target: string) => {
+    const editor = streamingDiffRef.current?.getModifiedEditor() ?? streamingPlainRef.current;
+    if (!editor) return;
+    const model = editor.getModel();
+    if (model && !model.isDisposed()) {
+      const edit = computeMinimalEdit(model.getValue(), target);
+      if (edit) {
+        const start = model.getPositionAt(edit.start);
+        const end = model.getPositionAt(edit.oldEnd);
+        model.applyEdits([
+          {
+            range: {
+              startLineNumber: start.lineNumber,
+              startColumn: start.column,
+              endLineNumber: end.lineNumber,
+              endColumn: end.column,
+            },
+            text: edit.text,
+          },
+        ]);
+      }
+    }
+    editor.revealLine(model?.getLineCount() || 1);
+  }, []);
+
   const handleStreamingDiffMount: DiffOnMount = useCallback((editor) => {
     streamingDiffRef.current = editor;
-    const modified = editor.getModifiedEditor();
-    const lineCount = modified.getModel()?.getLineCount() || 1;
-    modified.revealLine(lineCount);
-  }, []);
+    streamingPlainRef.current = null;
+    // Chunks may have streamed in while Monaco was still mounting; catch up.
+    const current = useEditorStore.getState().streamingCode;
+    if (current !== null) syncStreamingModel(current);
+  }, [syncStreamingModel]);
+
+  const handleStreamingPlainMount: OnMount = useCallback((editor) => {
+    streamingPlainRef.current = editor;
+    streamingDiffRef.current = null;
+    const current = useEditorStore.getState().streamingCode;
+    if (current !== null) syncStreamingModel(current);
+  }, [syncStreamingModel]);
 
   useEffect(() => {
     if (streamingCode === null) {
       streamingDiffRef.current = null;
+      streamingPlainRef.current = null;
+      streamingInitialRef.current = null;
       return;
     }
-    if (streamingDiffRef.current) {
-      const modified = streamingDiffRef.current.getModifiedEditor();
-      const lineCount = modified.getModel()?.getLineCount() || 1;
-      modified.revealLine(lineCount);
-    }
-  }, [streamingCode]);
+    syncStreamingModel(streamingCode);
+  }, [streamingCode, syncStreamingModel]);
 
   if (streamingCode !== null) {
+    // Freeze the content prop at the first streamed snapshot: with a readOnly
+    // editor, @monaco-editor/react handles prop changes via model.setValue(),
+    // which resets the diff and makes the editor flicker on every chunk. Later
+    // chunks flow through syncStreamingModel instead.
+    if (streamingInitialRef.current === null) {
+      streamingInitialRef.current = streamingCode;
+    }
     return (
       <div className="h-full w-full relative">
-        <DiffEditor
-          height="100%"
-          language={editorLanguage}
-          original={code}
-          modified={streamingCode}
-          theme={resolvedTheme}
-          onMount={handleStreamingDiffMount}
-          options={{
-            ...EDITOR_OPTIONS,
-            readOnly: true,
-            renderSideBySide: false,
-            renderOverviewRuler: false,
-            glyphMargin: false,
-            scrollbar: { vertical: 'hidden', horizontal: 'hidden' },
-          }}
-        />
+        {streamingIsPatch ? (
+          // Search/replace stream: streamingCode is the full file with only the
+          // real edits applied, so a live diff is accurate.
+          <DiffEditor
+            height="100%"
+            language={editorLanguage}
+            original={code}
+            modified={streamingInitialRef.current}
+            theme={resolvedTheme}
+            onMount={handleStreamingDiffMount}
+            options={{
+              ...EDITOR_OPTIONS,
+              readOnly: true,
+              renderSideBySide: false,
+              renderOverviewRuler: false,
+              glyphMargin: false,
+              scrollbar: { vertical: 'hidden', horizontal: 'hidden' },
+            }}
+          />
+        ) : (
+          // Full-code rewrite stream: the buffer is a partial file, so diffing
+          // it against the whole original would mark everything as changed.
+          // Show the code being written plainly; the accurate diff comes with
+          // the accept/reject review once the stream completes.
+          <Editor
+            height="100%"
+            language={editorLanguage}
+            defaultValue={streamingInitialRef.current}
+            theme={resolvedTheme}
+            onMount={handleStreamingPlainMount}
+            options={{
+              ...EDITOR_OPTIONS,
+              readOnly: true,
+              glyphMargin: false,
+              scrollbar: { vertical: 'hidden', horizontal: 'hidden' },
+            }}
+          />
+        )}
         {/* Block manual scroll/interaction during streaming */}
         <div className="absolute inset-0" />
       </div>

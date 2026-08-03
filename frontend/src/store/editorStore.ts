@@ -92,6 +92,13 @@ interface EditorState {
   providerKeys: ProviderKeys;
   storeApiKeys: boolean;
   streamingCode: string | null;
+  /**
+   * True while the streaming response is search/replace blocks: streamingCode
+   * is then the full file with only the real edits applied, so a live diff is
+   * accurate. False for full-code rewrites, where a partial buffer diffed
+   * against the whole original would mark everything as changed.
+   */
+  streamingIsPatch: boolean;
   lastSavedCode: string;
   pendingNavigation: (() => void) | null;
   showSuggestion: boolean;
@@ -288,6 +295,7 @@ export const useEditorStore = create<EditorState>()(
       providerKeys: {} as ProviderKeys,
       storeApiKeys: false,
       streamingCode: null,
+      streamingIsPatch: false,
       lastSavedCode: DEFAULT_CODE,
       pendingNavigation: null,
       showSuggestion: true,

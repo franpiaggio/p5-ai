@@ -182,7 +182,9 @@ export function ChatPanel() {
           };
           return {
             messages: newMessages,
-            ...(newStreamingCode !== null ? { streamingCode: newStreamingCode } : {}),
+            ...(newStreamingCode !== null
+              ? { streamingCode: newStreamingCode, streamingIsPatch: hasSearchReplace }
+              : {}),
           };
         });
       };
